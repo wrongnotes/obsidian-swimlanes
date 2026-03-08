@@ -1,3 +1,35 @@
+# Obsidian Swimlanes — Agent Instructions
+
+## Project-specific conventions
+
+### File naming
+
+- All TypeScript source files use **kebab-case**: `swimlane-view.ts`, `lexo-rank.ts`, etc.
+- Test files co-located with source: `swimlane-view.test.ts` alongside `swimlane-view.ts`
+- Mocks live in `tests/__mocks__/`
+
+### Testing
+
+- **Jest** is the test runner (`npm test`).
+- Config: `jest.config.ts` (requires `ts-node` to parse the TS config file)
+- Test environment: `jest-environment-jsdom`
+- Obsidian module is mocked at `tests/__mocks__/obsidian.ts` — extend it when new Obsidian APIs are used in source
+- Obsidian DOM extensions (`createEl`, `createDiv`, `createSpan`, `empty`) are shimmed in `tests/setup.ts` — extend it when new extension methods are needed
+- **Write tests for every new source file.** Tests should cover key rendering and logic paths.
+
+### Key source files
+
+| File                          | Purpose                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `src/main.ts`                 | Plugin entry point; registers the BasesView                          |
+| `src/swimlane-view.ts`        | The swimlane board view (extends `BasesView`)                        |
+| `tests/__mocks__/obsidian.ts` | Jest mock for the Obsidian API                                       |
+| `tests/setup.ts`              | Adds Obsidian DOM extensions to jsdom                                |
+| `docs/base-api-notes.md`      | Full Bases API research notes (read this before touching Bases code) |
+| `docs/product-plan.md`        | Product specification and milestones                                 |
+
+---
+
 # Obsidian community plugin
 
 ## Project overview
@@ -66,13 +98,13 @@ npm run build
 
 ## Manifest rules (`manifest.json`)
 
-- Must include (non-exhaustive):  
-  - `id` (plugin ID; for local dev it should match the folder name)  
-  - `name`  
-  - `version` (Semantic Versioning `x.y.z`)  
-  - `minAppVersion`  
-  - `description`  
-  - `isDesktopOnly` (boolean)  
+- Must include (non-exhaustive):
+  - `id` (plugin ID; for local dev it should match the folder name)
+  - `name`
+  - `version` (Semantic Versioning `x.y.z`)
+  - `minAppVersion`
+  - `description`
+  - `isDesktopOnly` (boolean)
   - Optional: `author`, `authorUrl`, `fundingUrl` (string or map)
 - Never change `id` after release. Treat it as stable API.
 - Keep `minAppVersion` accurate when using newer APIs.
@@ -147,12 +179,14 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 ## Agent do/don't
 
 **Do**
+
 - Add commands with stable IDs (don't rename once released).
 - Provide defaults and validation in settings.
 - Write idempotent code paths so reload/unload doesn't leak listeners or intervals.
 - Use `this.register*` helpers for everything that needs cleanup.
 
 **Don't**
+
 - Introduce network calls without an obvious user-facing reason and documentation.
 - Ship features that require cloud services without clear disclosure and explicit opt-in.
 - Store or transmit vault contents unless essential and consented.
@@ -162,45 +196,48 @@ Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particula
 ### Organize code across multiple files
 
 **main.ts** (minimal, lifecycle only):
+
 ```ts
-import { Plugin } from "obsidian";
-import { MySettings, DEFAULT_SETTINGS } from "./settings";
-import { registerCommands } from "./commands";
+import { Plugin } from "obsidian"
+import { MySettings, DEFAULT_SETTINGS } from "./settings"
+import { registerCommands } from "./commands"
 
 export default class MyPlugin extends Plugin {
-  settings: MySettings;
+  settings: MySettings
 
   async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    registerCommands(this);
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    registerCommands(this)
   }
 }
 ```
 
 **settings.ts**:
+
 ```ts
 export interface MySettings {
-  enabled: boolean;
-  apiKey: string;
+  enabled: boolean
+  apiKey: string
 }
 
 export const DEFAULT_SETTINGS: MySettings = {
   enabled: true,
   apiKey: "",
-};
+}
 ```
 
 **commands/index.ts**:
+
 ```ts
-import { Plugin } from "obsidian";
-import { doSomething } from "./my-command";
+import { Plugin } from "obsidian"
+import { doSomething } from "./my-command"
 
 export function registerCommands(plugin: Plugin) {
   plugin.addCommand({
     id: "do-something",
     name: "Do something",
     callback: () => doSomething(plugin),
-  });
+  })
 }
 ```
 
@@ -211,7 +248,7 @@ this.addCommand({
   id: "your-command-id",
   name: "Do the thing",
   callback: () => this.doTheThing(),
-});
+})
 ```
 
 ### Persist settings
@@ -229,14 +266,24 @@ async onload() {
 ### Register listeners safely
 
 ```ts
-this.registerEvent(this.app.workspace.on("file-open", f => { /* ... */ }));
-this.registerDomEvent(window, "resize", () => { /* ... */ });
-this.registerInterval(window.setInterval(() => { /* ... */ }, 1000));
+this.registerEvent(
+  this.app.workspace.on("file-open", f => {
+    /* ... */
+  }),
+)
+this.registerDomEvent(window, "resize", () => {
+  /* ... */
+})
+this.registerInterval(
+  window.setInterval(() => {
+    /* ... */
+  }, 1000),
+)
 ```
 
 ## Troubleshooting
 
-- Plugin doesn't load after build: ensure `main.js` and `manifest.json` are at the top level of the plugin folder under `<Vault>/.obsidian/plugins/<plugin-id>/`. 
+- Plugin doesn't load after build: ensure `main.js` and `manifest.json` are at the top level of the plugin folder under `<Vault>/.obsidian/plugins/<plugin-id>/`.
 - Build issues: if `main.js` is missing, run `npm run build` or `npm run dev` to compile your TypeScript source code.
 - Commands not appearing: verify `addCommand` runs after `onload` and IDs are unique.
 - Settings not persisting: ensure `loadData`/`saveData` are awaited and you re-render the UI after changes.

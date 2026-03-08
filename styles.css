@@ -1,8 +1,79 @@
 /*
+ * Obsidian CSS variable references:
+ *   Docs:  https://docs.obsidian.md/Reference/CSS+variables/CSS+variables
+ *   Theme: https://github.com/obsidianmd/obsidian-default-theme
+ */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.swimlane-board {
+    display: flex;
+    gap: var(--size-4-4);
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--size-4-4);
+    box-sizing: border-box;
+    align-items: flex-start;
+}
 
-If your plugin does not need CSS, delete this file.
+.swimlane-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+    max-width: 300px;
+    flex-shrink: 0;
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+}
 
-*/
+.swimlane-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--size-4-2) var(--size-4-3);
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.swimlane-column-count {
+    background-color: var(--background-modifier-border);
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    padding: 1px 6px;
+    border-radius: var(--radius-s);
+}
+
+.swimlane-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    padding: var(--size-4-2);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.swimlane-card {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2) var(--size-4-3);
+    cursor: pointer;
+}
+
+.swimlane-card:hover {
+    border-color: var(--interactive-accent);
+}
+
+.swimlane-card-title {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    font-weight: var(--font-medium);
+}
+
+.swimlane-empty {
+    padding: var(--size-4-4);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}

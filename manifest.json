@@ -1,11 +1,9 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+  "id": "wrongnotes-swimlanes",
+  "name": "Swimlanes",
+  "version": "0.1.0",
+  "minAppVersion": "1.10.0",
+  "description": "Kanban swimlane board view for Obsidian Bases.",
+  "author": "WrongNotes",
+  "isDesktopOnly": true
 }
