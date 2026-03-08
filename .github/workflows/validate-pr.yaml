@@ -11,6 +11,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
         permissions:
+            contents: read
             pull-requests: write
         steps:
             - uses: actions/checkout@v4
@@ -24,7 +25,7 @@ jobs:
             - run: npm run lint
             - run: npm test -- --coverage
             - name: Post coverage comment
-              if: github.event_name == 'pull_request'
-              uses: MishaKav/jest-coverage-comment@main
+              uses: MishaKav/jest-coverage-comment@v1.10.2
               with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   coverage-summary-path: coverage/coverage-summary.json
