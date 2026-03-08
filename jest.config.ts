@@ -7,6 +7,8 @@ const config: Config = {
     "^obsidian$": "<rootDir>/tests/__mocks__/obsidian.ts",
   },
   setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
+  coverageReporters: ["json-summary", "text"],
+  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.test.ts"],
 }
 
 export default config
