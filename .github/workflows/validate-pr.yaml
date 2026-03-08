@@ -46,15 +46,18 @@ jobs:
               run: npm ci
             - name: Run tests with coverage
               run: npm test -- --coverage
+            - name: Get short commit hash
+              id: sha
+              run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
             - name: Upload coverage report
               id: coverage-artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: coverage-report
+                  name: coverage-report-${{ steps.sha.outputs.short }}
                   path: coverage/
             - name: Post coverage comment
               uses: MishaKav/jest-coverage-comment@main
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   coverage-summary-path: coverage/coverage-summary.json
-                  title: "Coverage — [view full report](${{ steps.coverage-artifact.outputs.artifact-url }})"
+                  title: "Coverage — [download full report](${{ steps.coverage-artifact.outputs.artifact-url }})"
