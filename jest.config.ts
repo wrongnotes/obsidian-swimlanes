@@ -8,7 +8,7 @@ const config: Config = {
   },
   setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
   coverageReporters: ["json-summary", "text", "html"],
-  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.test.ts"],
+  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.test.ts", "!src/main.ts"],
 }
 
 export default config
