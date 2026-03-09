@@ -29,12 +29,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.ts"],
-    rules: {
-      curly: "error",
-    },
-  },
-  {
     files: ["src/**/*.ts"],
     plugins: { obsidianmd },
     // obsidianmd.configs.recommended is a legacy-style flat object of { ruleName: severity }
@@ -54,6 +48,13 @@ export default tseslint.config(
     },
   },
   prettier,
+  // curly must come after prettier, which otherwise disables it.
+  {
+    files: ["**/*.ts"],
+    rules: {
+      curly: "error",
+    },
+  },
   globalIgnores([
     "node_modules",
     "dist",

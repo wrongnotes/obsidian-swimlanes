@@ -2,7 +2,7 @@ import { SwimlaneView } from "./swimlane-view"
 
 function makeEntry(basename: string) {
     return {
-        file: { basename },
+        file: { basename, path: `${basename}.md` },
         getValue: () => null,
     }
 }
@@ -19,6 +19,12 @@ function makeView(groups: ReturnType<typeof makeGroup>[]) {
     const container = document.createElement("div")
     const view = new SwimlaneView({} as any, container, {} as any)
     view.data = { groupedData: groups } as any
+    view.app = {
+        metadataCache: { getFileCache: () => null },
+        vault: { getFileByPath: () => null },
+        fileManager: { processFrontMatter: async () => {} },
+    } as any
+    view.config = { get: () => null, set: () => {} } as any
     return { view, container }
 }
 

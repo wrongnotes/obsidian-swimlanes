@@ -5,10 +5,11 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
+    "prepare": "husky",
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "jiti scripts/version-bump.ts && git add manifest.json versions.json",
-    "format": "prettier --write .",
+    "format": "eslint . --fix && prettier --write .",
     "lint": "eslint .",
     "test": "jest",
     "install-plugin": "jiti scripts/install-plugin.ts"
@@ -24,6 +25,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-obsidianmd": "0.1.9",
     "globals": "14.0.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jiti": "2.6.1",

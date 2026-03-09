@@ -52,6 +52,25 @@
     padding: var(--size-4-2);
     overflow-y: auto;
     flex: 1;
+    position: relative;
+}
+
+.swimlane-card-list.swimlane-drag-over {
+    background-color: var(--background-modifier-hover);
+    border-radius: var(--radius-s);
+}
+
+/* Applied by drag controller to draggables; style in your view as needed. */
+.drag-touch-none {
+    touch-action: none;
+}
+
+.is-drag-hidden {
+    display: none;
+}
+
+.drag-clone--dropping {
+    opacity: 0;
 }
 
 .swimlane-card {
@@ -59,11 +78,34 @@
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     padding: var(--size-4-2) var(--size-4-3);
-    cursor: pointer;
+    cursor: grab;
+}
+
+.swimlane-card.is-dragging {
+    cursor: grabbing;
+}
+
+
+.drag-clone {
+    opacity: 0.95;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    cursor: grabbing;
+    transform: rotate(2deg);
+    transform-origin: top left;
+    transition: transform 120ms ease;
+}
+
+.swimlane-drop-indicator {
+    flex-shrink: 0;
+    pointer-events: none;
 }
 
 .swimlane-card:hover {
     border-color: var(--interactive-accent);
+}
+
+.is-board-dragging .swimlane-card:hover {
+    border-color: var(--background-modifier-border);
 }
 
 .swimlane-card-title {
