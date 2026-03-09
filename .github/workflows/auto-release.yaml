@@ -13,15 +13,8 @@ env:
 jobs:
     release:
         name: Bump version & release
-        # For release/** branches: fire on any merge (always patch).
-        # For main: require a bump label.
-        if: |
-            github.event.pull_request.merged == true && (
-              startsWith(github.event.pull_request.base.ref, 'release/') ||
-              contains(github.event.pull_request.labels.*.name, 'bump/major') ||
-              contains(github.event.pull_request.labels.*.name, 'bump/minor') ||
-              contains(github.event.pull_request.labels.*.name, 'bump/patch')
-            )
+        # Fire on any merged PR to main or release/**. No label = patch.
+        if: github.event.pull_request.merged == true
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -61,10 +54,16 @@ jobs:
 
             - name: Bump version
               id: version
-              # npm version runs our `version` script (version-bump.ts) then commits + tags
+              # --no-git-tag-version lets us control exactly which files go into the commit.
+              # The `version` npm script (version-bump.ts) still runs and stages manifest.json
+              # and versions.json; we then explicitly add the remaining version files and commit.
               run: |
-                  npm version ${{ steps.bump.outputs.type }} --message "chore: release v%s"
-                  echo "tag=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+                  npm version ${{ steps.bump.outputs.type }} --no-git-tag-version
+                  TAG="v$(node -p "require('./package.json').version")"
+                  git add package.json package-lock.json manifest.json versions.json
+                  git commit -m "chore: release ${TAG}"
+                  git tag "${TAG}"
+                  echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
             - name: Push commit & tag
               run: git push --follow-tags

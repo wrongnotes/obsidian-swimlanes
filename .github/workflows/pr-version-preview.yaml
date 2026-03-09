@@ -41,20 +41,17 @@ jobs:
                     BUMP=patch
                     CONTEXT="\`bump/patch\`"
                   else
-                    BUMP=none
+                    BUMP=patch
+                    CONTEXT="default patch (no bump label)"
                   fi
 
-                  if [[ "$BUMP" != "none" ]]; then
-                    NEXT=$(node -e "
-                      const [maj, min, pat] = '$CURRENT'.split('.').map(Number);
-                      if ('$BUMP' === 'major') process.stdout.write((maj+1)+'.0.0');
-                      else if ('$BUMP' === 'minor') process.stdout.write(maj+'.'+(min+1)+'.0');
-                      else process.stdout.write(maj+'.'+min+'.'+(pat+1));
-                    ")
-                    BODY="**Version preview:** merging this PR will release \`v${NEXT}\` (${CONTEXT})."
-                  else
-                    BODY="**Version preview:** no bump label — this PR will **not** trigger a release on merge. Add one of: \`bump/patch\`, \`bump/minor\`, \`bump/major\`."
-                  fi
+                  NEXT=$(node -e "
+                    const [maj, min, pat] = '$CURRENT'.split('.').map(Number);
+                    if ('$BUMP' === 'major') process.stdout.write((maj+1)+'.0.0');
+                    else if ('$BUMP' === 'minor') process.stdout.write(maj+'.'+(min+1)+'.0');
+                    else process.stdout.write(maj+'.'+min+'.'+(pat+1));
+                  ")
+                  BODY="**Version preview:** merging this PR will release \`v${NEXT}\` (${CONTEXT})."
 
                   { echo "body<<EOF"; echo "$BODY"; echo "EOF"; } >> $GITHUB_OUTPUT
 
