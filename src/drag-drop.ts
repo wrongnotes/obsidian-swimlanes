@@ -297,22 +297,25 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         const rect = draggable.getBoundingClientRect()
         this.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top }
         if (this.dropIndicator) {
-            this.dropIndicator.style.height = `${rect.height}px`
+            this.dropIndicator.setCssStyles({
+                height: `${rect.height}px`,
+                width: `${rect.width}px`,
+            })
         }
         const clone = draggable.cloneNode(true) as HTMLElement
         draggable.addClass(this.hiddenClass)
         draggable.addClass(this.draggingClass)
         this.container?.classList.add(this.containerDraggingClass)
-        clone.style.cssText = `
-            position: fixed;
-            left: ${rect.left}px;
-            top: ${rect.top}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
-            pointer-events: none;
-            z-index: 9999;
-            margin: 0;
-        `
+        clone.setCssStyles({
+            position: "fixed",
+            left: `${rect.left}px`,
+            top: `${rect.top}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            pointerEvents: "none",
+            zIndex: "9999",
+            margin: "0",
+        })
         clone.classList.add(this.dragCloneClass)
         document.body.appendChild(clone)
         this.dragClone = clone

@@ -1,6 +1,7 @@
 import { BasesEntry, BasesEntryGroup, BasesView, QueryController } from "obsidian"
-import type { MultitextOption, TextOption, ViewOption } from "obsidian"
+import type { MultitextOption, TextOption, ToggleOption, ViewOption } from "obsidian"
 import { DragAndDropContext } from "./drag-drop"
+import { CardPropertyAlias, renderCard } from "./swimlane-card"
 import { LexorankPosition, midRank } from "./lexorank"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
@@ -14,6 +15,7 @@ const CONFIG_KEYS = {
     swimlaneOrder: "swimlaneOrder",
     swimlaneProperty: "swimlaneProperty",
     rankProperty: "rankProperty",
+    showPropertyIcons: "showPropertyIcons",
 } as const
 
 export class SwimlaneView extends BasesView {
@@ -35,9 +37,9 @@ export class SwimlaneView extends BasesView {
             containerDraggingClass: "is-board-dragging",
             dragCloneClass: "drag-clone",
             hiddenClass: "is-drag-hidden",
-            getDropTarget: this.getDropTarget,
+            getDropTarget: (el, x, y, d) => this.getDropTarget(el, x, y, d),
             positionsEqual: (a, b) => a.beforeRank === b.beforeRank && a.afterRank === b.afterRank,
-            onDrop: this.handleDrop,
+            onDrop: (state, context, position) => this.handleDrop(state, context, position),
         })
         this.dnd.registerContainer(containerEl)
     }
@@ -61,6 +63,12 @@ export class SwimlaneView extends BasesView {
                 displayName: "Rank property",
                 placeholder: "rank",
             } satisfies TextOption,
+            {
+                type: "toggle",
+                key: CONFIG_KEYS.showPropertyIcons,
+                displayName: "Show property icons",
+                default: true,
+            } satisfies ToggleOption,
         ]
     }
 
@@ -79,6 +87,19 @@ export class SwimlaneView extends BasesView {
         return Array.isArray(val) ? (val as string[]).filter(v => typeof v === "string") : []
     }
 
+    private get showPropertyIcons(): boolean {
+        const val = this.config.get(CONFIG_KEYS.showPropertyIcons)
+        return val !== false
+    }
+
+    private get cardPropertyAliases(): CardPropertyAlias[] {
+        // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
+        const excluded = new Set([`note.${this.rankProp}`, `note.${this.statusProp}`, "file.name"])
+        return this.data.properties
+            .filter(propId => !excluded.has(propId))
+            .map(propId => ({ propId, alias: "" }))
+    }
+
     onUnload(): void {
         this.dnd.destroy()
     }
@@ -87,7 +108,23 @@ export class SwimlaneView extends BasesView {
         if (this.dnd.isDragging) {
             return
         }
+        const wasDropAnimating = this.dnd.isDropAnimating
         this.dnd.flushDrag()
+
+        // After a drop, defer rebuild to the next frame so drop cleanup can paint first.
+        if (wasDropAnimating) {
+            requestAnimationFrame(() => {
+                if (!this.boardEl.isConnected) {
+                    return
+                }
+                this.rebuildBoard()
+            })
+        } else {
+            this.rebuildBoard()
+        }
+    }
+
+    private rebuildBoard(): void {
         this.boardEl.empty()
 
         const groups = this.data.groupedData
@@ -115,6 +152,9 @@ export class SwimlaneView extends BasesView {
         this.dnd.clearDropAreas()
 
         const orderedGroups = this.sortGroups(groups)
+        const propConfigs = this.cardPropertyAliases
+        const rankProp = this.rankProp
+        const showIcons = this.showPropertyIcons
 
         for (const group of orderedGroups) {
             const groupKey = group.hasKey() ? (group.key?.toString() ?? "") : ""
@@ -131,13 +171,16 @@ export class SwimlaneView extends BasesView {
             const orderedEntries = this.sortEntries(group.entries)
 
             for (const entry of orderedEntries) {
-                const rank = getFrontmatter<string>(this.app, entry.file, this.rankProp) ?? ""
-
-                const card = cardList.createDiv({ cls: "swimlane-card" })
-                card.dataset.path = entry.file.path
-                card.dataset[this.rankProp] = rank
-                card.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
-
+                const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
+                const card = renderCard(
+                    cardList,
+                    entry,
+                    rankProp,
+                    propConfigs,
+                    this.app,
+                    rank,
+                    showIcons,
+                )
                 this.dnd.registerDraggable(card, { path: entry.file.path, groupKey })
             }
         }

@@ -111,6 +111,62 @@
     font-size: var(--font-ui-small);
     color: var(--text-normal);
     font-weight: var(--font-medium);
+    padding-bottom: var(--size-4-2);
+}
+
+.swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-title {
+    padding-bottom: 0;
+}
+
+.swimlane-card-props {
+    width: 100%;
+    font-size: var(--font-ui-smaller);
+    border-collapse: collapse;
+}
+
+.swimlane-card-props td {
+    padding: var(--size-4-1) 8px;
+    border: 1px solid var(--background-modifier-border);
+    vertical-align: middle;
+}
+
+.swimlane-card-props td:first-child {
+    border-left: none;
+}
+
+.swimlane-card-props td:last-child {
+    border-right: none;
+}
+
+.swimlane-card-props tr:last-child td {
+    border-bottom: none;
+}
+
+.swimlane-card-prop-label {
+    color: var(--text-muted);
+    white-space: nowrap;
+    width: 1%;
+}
+
+.swimlane-card-prop-label-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--size-2-2);
+}
+
+.swimlane-card-prop-icon {
+    color: var(--text-faint);
+    display: inline-flex;
+}
+
+.swimlane-card-prop-icon svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+}
+
+.swimlane-card-prop-value {
+    color: var(--text-normal);
+    min-width: 0;
 }
 
 .swimlane-empty {
