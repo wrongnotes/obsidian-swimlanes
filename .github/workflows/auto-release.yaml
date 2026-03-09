@@ -77,8 +77,8 @@ jobs:
               run: git push --follow-tags
 
             - name: Create release branch
-              # Cut release/X.Y.x from the new tag on major/minor releases to main
-              if: steps.bump.outputs.type != 'patch' && github.event.pull_request.base.ref == 'main'
+              # Cut release/X.Y.x for every release to main so backports always have a target
+              if: github.event.pull_request.base.ref == 'main'
               run: |
                   VERSION=$(node -p "require('./package.json').version")
                   MAJOR=$(echo $VERSION | cut -d. -f1)
