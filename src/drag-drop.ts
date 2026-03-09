@@ -288,7 +288,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         this.insertEquals = options.positionsEqual ?? ((a, b) => Object.is(a, b))
         this.onDropCallback = options.onDrop
         this.dropAnimationMs = options.dropAnimationMs ?? 200
-        this.longPressDurationMs = options.longPressDurationMs ?? 500
+        this.longPressDurationMs = options.longPressDurationMs ?? 300
 
         const normalized = normalizeDropAreaHitboxAdjustments(options.dropAreaHitboxAdjustments)
         this.dropAreaHitboxMarginTop =

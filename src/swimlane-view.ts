@@ -88,7 +88,6 @@ export class SwimlaneView extends BasesView {
                 },
             ],
         })
-        this.cardDnd.registerContainer(containerEl)
 
         this.swimlaneDnd = new DragAndDropContext<SwimlaneDragState, null, GroupKey | null>({
             draggableSelector: ".swimlane-column",
@@ -244,10 +243,13 @@ export class SwimlaneView extends BasesView {
         }
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
+
+        // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
+        // so touch scrolling on the outer container works normally.
+        this.cardDnd.registerContainer(board)
         this.cardDnd.initDropIndicator(board)
         this.cardDnd.clearDropAreas()
 
-        // Wire up column DnD on the newly created board element.
         this.swimlaneDnd.registerContainer(board)
         this.swimlaneDnd.initDropIndicator(board)
         this.swimlaneDnd.clearDropAreas()
