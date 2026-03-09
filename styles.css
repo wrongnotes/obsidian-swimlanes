@@ -13,6 +13,7 @@
     padding: var(--size-4-4);
     box-sizing: border-box;
     align-items: flex-start;
+    touch-action: pan-x;
 }
 
 .swimlane-column {
@@ -80,6 +81,7 @@
     overflow-y: auto;
     flex: 1;
     position: relative;
+    touch-action: pan-y;
 }
 
 .swimlane-card {

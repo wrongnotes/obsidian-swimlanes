@@ -516,9 +516,11 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             cancelHandler,
         }
 
-        document.addEventListener("pointermove", moveHandler, { capture: true })
-        document.addEventListener("pointerup", cancelHandler, { capture: true })
-        document.addEventListener("pointercancel", cancelHandler, { capture: true })
+        // Passive listeners: we never call preventDefault() during the pending phase,
+        // and non-passive listeners block iOS Safari from initiating scroll.
+        document.addEventListener("pointermove", moveHandler, { capture: true, passive: true })
+        document.addEventListener("pointerup", cancelHandler, { capture: true, passive: true })
+        document.addEventListener("pointercancel", cancelHandler, { capture: true, passive: true })
     }
 
     private cancelPendingTouchDrag(): void {
