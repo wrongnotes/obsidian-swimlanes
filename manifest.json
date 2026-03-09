@@ -5,5 +5,5 @@
 	"minAppVersion": "1.10.0",
 	"description": "Kanban swimlane board view for Obsidian Bases.",
 	"author": "WrongNotes",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 }
