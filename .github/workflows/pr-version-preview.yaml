@@ -42,7 +42,15 @@ jobs:
                     CONTEXT="\`bump/patch\`"
                   else
                     BUMP=patch
-                    CONTEXT="default patch (no bump label)"
+                    NEXT_MINOR=$(node -e "const [maj,min]=('$CURRENT').split('.').map(Number);process.stdout.write(maj+'.'+(min+1)+'.0')")
+                    NEXT_MAJOR=$(node -e "const [maj]=('$CURRENT').split('.').map(Number);process.stdout.write((maj+1)+'.0.0')")
+                    NEXT=$(node -e "const [maj,min,pat]=('$CURRENT').split('.').map(Number);process.stdout.write(maj+'.'+min+'.'+(pat+1))")
+                    BODY="**Version preview:** merging this PR will release \`v${NEXT}\` (no bump label — defaults to patch). To change the release version, label this PR:
+- \`bump/patch\` → \`v${NEXT}\`
+- \`bump/minor\` → \`v${NEXT_MINOR}\`
+- \`bump/major\` → \`v${NEXT_MAJOR}\`"
+                    { echo "body<<EOF"; echo "$BODY"; echo "EOF"; } >> $GITHUB_OUTPUT
+                    exit 0
                   fi
 
                   NEXT=$(node -e "
