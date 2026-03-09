@@ -1,9 +1,9 @@
 {
-    "id": "wrongnotes-swimlanes",
-    "name": "Swimlanes",
-    "version": "0.0.0",
-    "minAppVersion": "1.10.0",
-    "description": "Kanban swimlane board view for Obsidian Bases.",
-    "author": "WrongNotes",
-    "isDesktopOnly": true
+	"id": "wrongnotes-swimlanes",
+	"name": "Swimlanes",
+	"version": "0.0.1",
+	"minAppVersion": "1.10.0",
+	"description": "Kanban swimlane board view for Obsidian Bases.",
+	"author": "WrongNotes",
+	"isDesktopOnly": true
 }
