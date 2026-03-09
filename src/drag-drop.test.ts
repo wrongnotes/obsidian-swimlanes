@@ -72,7 +72,6 @@ function defaultDndOptions(
         dropAreaSelector: ".swimlane-card-list",
         dropIndicatorClass: "swimlane-drop-indicator",
         draggableIdAttribute: "path",
-        draggingClass: "is-dragging",
         getDropTarget: getDropTargetFromGeometry,
         onDrop: jest.fn<void, [{ path: string; groupKey: string }, TestDropContext, number]>(),
         ...overrides,
@@ -247,9 +246,7 @@ describe("DragAndDropContext.makeDraggable", () => {
     it("pointerdown adds swimlane-drag-and-drop--dragging class to the element", () => {
         const { dnd, card } = setupDelegation()
         startDrag(dnd, card)
-        expect(
-            card.classList.contains("swimlane-drag-and-drop--dragging"),
-        ).toBe(true)
+        expect(card.classList.contains("swimlane-drag-and-drop--dragging")).toBe(true)
     })
 
     it("pointerup clears isDragging", () => {
@@ -270,9 +267,7 @@ describe("DragAndDropContext.makeDraggable", () => {
         const { dnd, card } = setupDelegation()
         startDrag(dnd, card)
         pointerUp()
-        expect(
-            card.classList.contains("swimlane-drag-and-drop--dragging"),
-        ).toBe(false)
+        expect(card.classList.contains("swimlane-drag-and-drop--dragging")).toBe(false)
     })
 
     it("pointerup calls onEnd callback", () => {

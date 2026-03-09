@@ -48,25 +48,23 @@ export type GetDropTargetFn<TPosition = number> = (
     draggablesExcludingCurrent: HTMLElement[],
 ) => { position: TPosition; placement: DropIndicatorPlacement } | null
 
-export type DropAreaHitboxValue = number | "fill" | "undefined"
+export type DropAreaHitboxValue = number | "fill"
 
 export type DropAreaHitboxMargin =
     | DropAreaHitboxValue
     | {
-          /** Extra pixels on both left and right edges. */
-          x: DropAreaHitboxValue
-          /** Extra pixels on both top and bottom edges. */
-          y: DropAreaHitboxValue
-      }
-    | {
-          /** Extra pixels on the top edge. */
-          top: DropAreaHitboxValue
-          /** Extra pixels on the bottom edge. */
-          bottom: DropAreaHitboxValue
-          /** Extra pixels on the left edge. */
-          left: DropAreaHitboxValue
-          /** Extra pixels on the right edge. */
-          right: DropAreaHitboxValue
+          /** Extra pixels on both left and right edges. Overridden by `left`/`right`. Defaults to 0. */
+          x?: DropAreaHitboxValue
+          /** Extra pixels on both top and bottom edges. Overridden by `top`/`bottom`. Defaults to 0. */
+          y?: DropAreaHitboxValue
+          /** Extra pixels on the top edge. Overrides `y`. Defaults to 0. */
+          top?: DropAreaHitboxValue
+          /** Extra pixels on the bottom edge. Overrides `y`. Defaults to 0. */
+          bottom?: DropAreaHitboxValue
+          /** Extra pixels on the left edge. Overrides `x`. Defaults to 0. */
+          left?: DropAreaHitboxValue
+          /** Extra pixels on the right edge. Overrides `x`. Defaults to 0. */
+          right?: DropAreaHitboxValue
       }
 
 export type DropAreaHitboxAdjustment =
@@ -85,37 +83,17 @@ function normalizeDropAreaHitboxMargin(margin: DropAreaHitboxMargin | undefined)
     right: DropAreaHitboxValue
 } {
     if (typeof margin === "number" || margin === "fill") {
-        return {
-            top: margin,
-            bottom: margin,
-            left: margin,
-            right: margin,
-        }
+        return { top: margin, bottom: margin, left: margin, right: margin }
     }
     if (margin && typeof margin === "object") {
-        if ("x" in margin && "y" in margin) {
-            return {
-                top: margin.y,
-                bottom: margin.y,
-                left: margin.x,
-                right: margin.x,
-            }
-        }
-        if ("top" in margin) {
-            return {
-                top: margin.top,
-                bottom: margin.bottom,
-                left: margin.left,
-                right: margin.right,
-            }
+        return {
+            top: margin.top ?? margin.y ?? 0,
+            bottom: margin.bottom ?? margin.y ?? 0,
+            left: margin.left ?? margin.x ?? 0,
+            right: margin.right ?? margin.x ?? 0,
         }
     }
-    return {
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-    }
+    return { top: 0, bottom: 0, left: 0, right: 0 }
 }
 
 function normalizeDropAreaHitboxAdjustments(
