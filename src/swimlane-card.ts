@@ -11,16 +11,23 @@ import {
     TagValue,
     setIcon,
 } from "obsidian"
-import { getFrontmatter } from "./utils"
 
 export interface CardPropertyAlias {
     /** The BasesPropertyId to read (e.g. "note.priority", "file.mtime"). */
     propId: BasesPropertyId
     /**
-     * Label shown on the chip.
+     * Label shown on the card.
      * Empty string → derive from propId (strips the type prefix: "note.priority" → "priority").
      */
     alias: string
+}
+
+export interface CardRenderOptions {
+    rankPropId: BasesPropertyId
+    rank: string
+    properties: CardPropertyAlias[]
+    showIcons: boolean
+    imagePropId?: BasesPropertyId
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -80,6 +87,21 @@ function getIconForValue(propId: BasesPropertyId, value: Value): string {
     return "text"
 }
 
+function resolveImageUrl(app: App, rawValue: string, sourcePath: string): string | null {
+    if (rawValue.startsWith("http://") || rawValue.startsWith("https://")) {
+        return rawValue
+    }
+    const direct = app.vault.getFileByPath(rawValue)
+    if (direct) {
+        return app.vault.getResourcePath(direct)
+    }
+    const linked = app.metadataCache.getFirstLinkpathDest(rawValue, sourcePath)
+    if (linked) {
+        return app.vault.getResourcePath(linked)
+    }
+    return null
+}
+
 function formatValue(value: Value): string {
     if (value instanceof BooleanValue) {
         return value.isTruthy() ? "Yes" : "No"
@@ -87,36 +109,42 @@ function formatValue(value: Value): string {
     return value.toString()
 }
 
-/**
- * Render a swimlane card into `container`.
- * Returns the created card element.
- * @param rankOverride - If provided, used for dataset[rankProp]; otherwise rank is read from frontmatter.
- */
+/** Render a swimlane card into `container` and return the created element. */
 export function renderCard(
     container: HTMLElement,
     entry: BasesEntry,
-    rankProp: string,
-    propertyConfigs: CardPropertyAlias[],
     app: App,
-    rankOverride?: string,
-    showIcons = true,
+    options: CardRenderOptions,
 ): HTMLElement {
-    const rank =
-        rankOverride !== undefined
-            ? rankOverride
-            : (getFrontmatter<string>(app, entry.file, rankProp) ?? "")
+    const { rankPropId, rank, properties, showIcons, imagePropId } = options
+    // Dataset keys can't contain dots, so extract the raw property name from the BasesPropertyId.
+    const rawRankProp = propLabel(rankPropId, "")
 
     const card = container.createDiv({ cls: "swimlane-card" })
     card.dataset.path = entry.file.path
-    card.dataset[rankProp] = rank
+    card.dataset[rawRankProp] = rank
 
-    card.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
+    let imageUrl: string | null = null
+    if (imagePropId) {
+        const imageValue = entry.getValue(imagePropId)
+        if (imageValue !== null && !(imageValue instanceof NullValue)) {
+            imageUrl = resolveImageUrl(app, imageValue.toString(), entry.file.path)
+        }
+    }
 
-    if (propertyConfigs.length > 0) {
+    if (imageUrl) {
+        card.addClass("swimlane-card--has-image")
+        card.createEl("img", { cls: "swimlane-card-image", attr: { src: imageUrl } })
+    }
+
+    const content = imageUrl ? card.createDiv({ cls: "swimlane-card-content" }) : card
+    content.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
+
+    if (properties.length > 0) {
         const rows: { icon: string; label: string; value: string }[] = []
-        for (const cfg of propertyConfigs) {
+        for (const cfg of properties) {
             const value = entry.getValue(cfg.propId)
-            if (value === null || value instanceof NullValue) {
+            if (value === null || !value.isTruthy()) {
                 continue
             }
             rows.push({
@@ -126,7 +154,7 @@ export function renderCard(
             })
         }
         if (rows.length > 0) {
-            const table = card.createEl("table", { cls: "swimlane-card-props" })
+            const table = content.createEl("table", { cls: "swimlane-card-props" })
             const tbody = table.createEl("tbody")
             for (const { icon, label, value } of rows) {
                 const tr = tbody.createEl("tr")

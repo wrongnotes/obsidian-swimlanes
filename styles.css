@@ -34,14 +34,41 @@
     font-weight: var(--font-semibold);
     font-size: var(--font-ui-small);
     color: var(--text-muted);
-    border-bottom: 1px solid var(--background-modifier-border);
+    border-bottom: var(--border-width) solid var(--background-modifier-border);
+    cursor: grab;
+    user-select: none;
+}
+
+.swimlane-drop-indicator {
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.swimlane-board > .swimlane-drop-indicator {
+    background-color: var(--interactive-accent);
+    border-radius: var(--radius-m);
+    opacity: 0.25;
+}
+
+.swimlane-drag-clone {
+    opacity: 0.9;
+    box-shadow: var(--shadow-l);
+    cursor: grabbing;
+}
+
+.swimlane-drag-clone--dropping {
+    opacity: 0;
+}
+
+.swimlane-drag-and-drop--active .swimlane-card:hover {
+    border-color: var(--background-modifier-border);
 }
 
 .swimlane-column-count {
     background-color: var(--background-modifier-border);
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
-    padding: 1px 6px;
+    padding: 1px var(--size-2-3);
     border-radius: var(--radius-s);
 }
 
@@ -55,56 +82,52 @@
     position: relative;
 }
 
-.swimlane-card-list.swimlane-drag-over {
-    background-color: var(--background-modifier-hover);
-    border-radius: var(--radius-s);
-}
-
-/* Applied by drag controller to draggables; style in your view as needed. */
-.drag-touch-none {
+/* Applied by drag controller to all draggables. */
+.swimlane-drag-and-drop--touch-none {
     touch-action: none;
-}
-
-.is-drag-hidden {
-    display: none;
-}
-
-.drag-clone--dropping {
-    opacity: 0;
 }
 
 .swimlane-card {
     background-color: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
+    border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     padding: var(--size-4-2) var(--size-4-3);
     cursor: grab;
 }
 
-.swimlane-card.is-dragging {
+.swimlane-card.swimlane-drag-and-drop--dragging,
+.swimlane-column.swimlane-drag-and-drop--dragging {
     cursor: grabbing;
 }
 
-.drag-clone {
+.swimlane-card--has-image {
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+    overflow: hidden;
+}
+
+.swimlane-card-image {
+    width: 64px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.swimlane-card-content {
+    flex: 1;
+    min-width: 0;
+    padding: var(--size-4-2) var(--size-4-3);
+}
+
+.swimlane-card.swimlane-drag-clone {
     opacity: 0.95;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    cursor: grabbing;
     transform: rotate(2deg);
     transform-origin: top left;
-    transition: transform 120ms ease;
-}
-
-.swimlane-drop-indicator {
-    flex-shrink: 0;
-    pointer-events: none;
+    transition: transform var(--anim-duration-fast) var(--anim-motion-baseline);
 }
 
 .swimlane-card:hover {
     border-color: var(--interactive-accent);
-}
-
-.is-board-dragging .swimlane-card:hover {
-    border-color: var(--background-modifier-border);
 }
 
 .swimlane-card-title {
@@ -125,8 +148,8 @@
 }
 
 .swimlane-card-props td {
-    padding: var(--size-4-1) 8px;
-    border: 1px solid var(--background-modifier-border);
+    padding: var(--size-4-1) var(--size-4-2);
+    border: var(--border-width) solid var(--background-modifier-border);
     vertical-align: middle;
 }
 
@@ -173,4 +196,8 @@
     padding: var(--size-4-4);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
+}
+
+.swimlane-drag-and-drop--hidden {
+    display: none;
 }

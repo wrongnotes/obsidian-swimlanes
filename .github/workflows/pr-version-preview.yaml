@@ -1,0 +1,65 @@
+name: PR version preview
+
+on:
+    pull_request:
+        types: [opened, reopened, labeled, unlabeled, synchronize]
+        branches:
+            - main
+            - "release/**"
+
+jobs:
+    comment:
+        name: Post version preview
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: write
+        steps:
+            - name: Checkout base branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.base.ref }}
+
+            - name: Compute next version
+              id: preview
+              run: |
+                  CURRENT=$(node -p "require('./package.json').version")
+                  BASE_REF="${{ github.event.pull_request.base.ref }}"
+                  HAS_MAJOR="${{ contains(github.event.pull_request.labels.*.name, 'bump/major') }}"
+                  HAS_MINOR="${{ contains(github.event.pull_request.labels.*.name, 'bump/minor') }}"
+                  HAS_PATCH="${{ contains(github.event.pull_request.labels.*.name, 'bump/patch') }}"
+
+                  if [[ "$BASE_REF" == release/* ]]; then
+                    BUMP=patch
+                    CONTEXT="backport patch to \`$BASE_REF\`"
+                  elif [[ "$HAS_MAJOR" == "true" ]]; then
+                    BUMP=major
+                    CONTEXT="\`bump/major\`"
+                  elif [[ "$HAS_MINOR" == "true" ]]; then
+                    BUMP=minor
+                    CONTEXT="\`bump/minor\`"
+                  elif [[ "$HAS_PATCH" == "true" ]]; then
+                    BUMP=patch
+                    CONTEXT="\`bump/patch\`"
+                  else
+                    BUMP=none
+                  fi
+
+                  if [[ "$BUMP" != "none" ]]; then
+                    NEXT=$(node -e "
+                      const [maj, min, pat] = '$CURRENT'.split('.').map(Number);
+                      if ('$BUMP' === 'major') process.stdout.write((maj+1)+'.0.0');
+                      else if ('$BUMP' === 'minor') process.stdout.write(maj+'.'+(min+1)+'.0');
+                      else process.stdout.write(maj+'.'+min+'.'+(pat+1));
+                    ")
+                    BODY="**Version preview:** merging this PR will release \`v${NEXT}\` (${CONTEXT})."
+                  else
+                    BODY="**Version preview:** no bump label — this PR will **not** trigger a release on merge. Add one of: \`bump/patch\`, \`bump/minor\`, \`bump/major\`."
+                  fi
+
+                  { echo "body<<EOF"; echo "$BODY"; echo "EOF"; } >> $GITHUB_OUTPUT
+
+            - name: Sticky comment
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  header: version-preview
+                  message: ${{ steps.preview.outputs.body }}

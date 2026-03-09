@@ -1,6 +1,7 @@
 import {
     DragAndDropContext,
     type DragAndDropContextOptions,
+    type DragState,
     type DropIndicatorPlacement,
 } from "./drag-drop"
 
@@ -64,7 +65,7 @@ function getDropTargetFromGeometry(
 }
 
 function defaultDndOptions(
-    overrides?: Partial<DragAndDropContextOptions<TestDropContext, number>>,
+    overrides?: Partial<DragAndDropContextOptions<DragState, TestDropContext, number>>,
 ) {
     return {
         draggableSelector: ".swimlane-card",
@@ -107,11 +108,11 @@ function pointerUp(): void {
 
 /** Sets up a container with a card (with .swimlane-card) and sets delegation root. */
 function setupDelegation(): {
-    dnd: DragAndDropContext<TestDropContext, number>
+    dnd: DragAndDropContext<DragState, TestDropContext, number>
     container: HTMLElement
     card: HTMLElement
 } {
-    const dnd = new DragAndDropContext<TestDropContext, number>(defaultDndOptions())
+    const dnd = new DragAndDropContext<DragState, TestDropContext, number>(defaultDndOptions())
     const container = makeEl()
     const card = makeEl()
     card.classList.add("swimlane-card")
@@ -124,7 +125,7 @@ function setupDelegation(): {
 
 /** Sets up a card list with two cards for drop-target tests. */
 function setupCardList(): {
-    dnd: DragAndDropContext<TestDropContext, number>
+    dnd: DragAndDropContext<DragState, TestDropContext, number>
     container: HTMLElement
     cardList: HTMLElement
     cardA: HTMLElement
@@ -132,7 +133,7 @@ function setupCardList(): {
     onDrop: jest.Mock<void, [{ path: string; groupKey: string }, TestDropContext, number]>
 } {
     const onDrop = jest.fn<void, [{ path: string; groupKey: string }, TestDropContext, number]>()
-    const dnd = new DragAndDropContext<TestDropContext, number>({
+    const dnd = new DragAndDropContext<DragState, TestDropContext, number>({
         ...defaultDndOptions(),
         onDrop,
     })
@@ -162,7 +163,7 @@ afterEach(() => {
 
 /** Starts a drag via pointerdown on the card. */
 function startDrag(
-    dnd: DragAndDropContext<TestDropContext, number>,
+    dnd: DragAndDropContext<DragState, TestDropContext, number>,
     card: HTMLElement,
     state = dragState(),
 ): void {
@@ -214,19 +215,19 @@ function stubCardRect(card: HTMLElement, top = 0, height = 50): () => void {
 
 describe("DragAndDropContext.makeDraggable", () => {
     it("does not set draggable attribute (uses pointer-based drag)", () => {
-        const dnd = new DragAndDropContext<TestDropContext, number>(defaultDndOptions())
+        const dnd = new DragAndDropContext<DragState, TestDropContext, number>(defaultDndOptions())
         const card = makeEl()
         dnd.registerDraggable(card, dragState())
         expect(card.getAttribute("draggable")).toBeNull()
     })
 
     it("isDragging is false before any drag", () => {
-        const dnd = new DragAndDropContext<TestDropContext, number>(defaultDndOptions())
+        const dnd = new DragAndDropContext<DragState, TestDropContext, number>(defaultDndOptions())
         expect(dnd.isDragging).toBe(false)
     })
 
     it("state is null before any drag", () => {
-        const dnd = new DragAndDropContext<TestDropContext, number>(defaultDndOptions())
+        const dnd = new DragAndDropContext<DragState, TestDropContext, number>(defaultDndOptions())
         expect(dnd.state).toBeNull()
     })
 
@@ -243,10 +244,12 @@ describe("DragAndDropContext.makeDraggable", () => {
         expect(dnd.state).toEqual(state)
     })
 
-    it("pointerdown adds is-dragging class to the element", () => {
+    it("pointerdown adds swimlane-drag-and-drop--dragging class to the element", () => {
         const { dnd, card } = setupDelegation()
         startDrag(dnd, card)
-        expect(card.classList.contains("is-dragging")).toBe(true)
+        expect(
+            card.classList.contains("swimlane-drag-and-drop--dragging"),
+        ).toBe(true)
     })
 
     it("pointerup clears isDragging", () => {
@@ -263,11 +266,13 @@ describe("DragAndDropContext.makeDraggable", () => {
         expect(dnd.state).toBeNull()
     })
 
-    it("pointerup removes is-dragging class", () => {
+    it("pointerup removes swimlane-drag-and-drop--dragging class", () => {
         const { dnd, card } = setupDelegation()
         startDrag(dnd, card)
         pointerUp()
-        expect(card.classList.contains("is-dragging")).toBe(false)
+        expect(
+            card.classList.contains("swimlane-drag-and-drop--dragging"),
+        ).toBe(false)
     })
 
     it("pointerup calls onEnd callback", () => {

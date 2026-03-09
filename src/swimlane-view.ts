@@ -1,14 +1,36 @@
 import { BasesEntry, BasesEntryGroup, BasesView, QueryController } from "obsidian"
-import type { MultitextOption, TextOption, ToggleOption, ViewOption } from "obsidian"
+import type {
+    BasesPropertyId,
+    MultitextOption,
+    PropertyOption,
+    TextOption,
+    ToggleOption,
+    ViewOption,
+} from "obsidian"
 import { DragAndDropContext } from "./drag-drop"
-import { CardPropertyAlias, renderCard } from "./swimlane-card"
+import { CardPropertyAlias, CardRenderOptions, renderCard } from "./swimlane-card"
 import { LexorankPosition, midRank } from "./lexorank"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
 
-/** Context we pass when registering a drop area; same shape is received in onDrop. */
-interface SwimlaneDropContext {
-    groupKey: string
+/** Nominal type for swimlane column keys (the value of the swimlane property). */
+declare const _groupKey: unique symbol
+type GroupKey = string & { readonly [_groupKey]: void }
+
+/** Context we pass when registering a card drop area; same shape is received in onDrop. */
+interface CardDropContext {
+    groupKey: GroupKey
+}
+
+/** State for a dragged card. */
+interface CardDragState {
+    path: string
+    groupKey: GroupKey
+}
+
+/** State for a dragged column. */
+interface SwimlaneDragState {
+    groupKey: GroupKey
 }
 
 const CONFIG_KEYS = {
@@ -16,52 +38,85 @@ const CONFIG_KEYS = {
     swimlaneProperty: "swimlaneProperty",
     rankProperty: "rankProperty",
     showPropertyIcons: "showPropertyIcons",
+    imageProperty: "imageProperty",
 } as const
+
+function reorderKeys(
+    keys: GroupKey[],
+    dragKey: GroupKey,
+    insertBeforeKey: GroupKey | null,
+): GroupKey[] {
+    const without = keys.filter(k => k !== dragKey)
+    if (insertBeforeKey === null) {
+        return [...without, dragKey]
+    }
+    const idx = without.indexOf(insertBeforeKey)
+    without.splice(idx === -1 ? without.length : idx, 0, dragKey)
+    return without
+}
 
 export class SwimlaneView extends BasesView {
     type = "swimlane"
 
     private boardEl: HTMLElement
     private plugin: SwimlanePlugin
-    private dnd: DragAndDropContext<SwimlaneDropContext, LexorankPosition>
+    private cardDnd: DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>
+    private swimlaneDnd: DragAndDropContext<SwimlaneDragState, null, GroupKey | null>
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
-        this.dnd = new DragAndDropContext<SwimlaneDropContext, LexorankPosition>({
+
+        this.cardDnd = new DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>({
             draggableSelector: ".swimlane-card",
-            dropIndicatorClass: "swimlane-drop-indicator",
             draggableIdAttribute: "path",
-            draggingClass: "is-dragging",
-            containerDraggingClass: "is-board-dragging",
-            dragCloneClass: "drag-clone",
-            hiddenClass: "is-drag-hidden",
-            getDropTarget: (el, x, y, d) => this.getDropTarget(el, x, y, d),
             positionsEqual: (a, b) => a.beforeRank === b.beforeRank && a.afterRank === b.afterRank,
-            onDrop: (state, context, position) => this.handleDrop(state, context, position),
+            getDropTarget: (el, x, y, d) => this.getCardDropTarget(el, x, y, d),
+            onDrop: (state, context, position) => this.handleCardDrop(state, context, position),
+            // Make card drops strongly favor swimlane lists when moving across columns,
+            // while keeping in-column vertical precision tight.
+            dropAreaHitboxAdjustments: [
+                {
+                    selector: ".swimlane-card-list",
+                    // Extend horizontally for easy cross-column moves, and from above the header
+                    // all the way to the bottom of the viewport.
+                    margin: {
+                        y: "fill",
+                        x: 0,
+                    },
+                },
+            ],
         })
-        this.dnd.registerContainer(containerEl)
+        this.cardDnd.registerContainer(containerEl)
+
+        this.swimlaneDnd = new DragAndDropContext<SwimlaneDragState, null, GroupKey | null>({
+            draggableSelector: ".swimlane-column",
+            dragHandleSelector: ".swimlane-column-header",
+            draggableIdAttribute: "groupKey",
+            positionsEqual: (a, b) => a === b,
+            getDropTarget: (el, x, y, c) => this.getSwimlaneDropTarget(el, x, y, c),
+            onDrop: (state, _context, position) => this.handleSwimlaneDrop(state, position),
+        })
     }
 
     static getViewOptions(): ViewOption[] {
         return [
             {
-                type: "text",
+                type: "property",
                 key: CONFIG_KEYS.swimlaneProperty,
                 displayName: "Swimlane property",
-                placeholder: "status",
-            } satisfies TextOption,
+            } satisfies PropertyOption,
             {
-                type: "multitext",
-                key: CONFIG_KEYS.swimlaneOrder,
-                displayName: "Swimlane order",
-            } satisfies MultitextOption,
+                type: "property",
+                key: CONFIG_KEYS.imageProperty,
+                displayName: "Image property",
+            } satisfies PropertyOption,
             {
                 type: "text",
                 key: CONFIG_KEYS.rankProperty,
                 displayName: "Rank property",
-                placeholder: "rank",
+                default: "rank",
             } satisfies TextOption,
             {
                 type: "toggle",
@@ -69,6 +124,12 @@ export class SwimlaneView extends BasesView {
                 displayName: "Show property icons",
                 default: true,
             } satisfies ToggleOption,
+            {
+                type: "multitext",
+                key: CONFIG_KEYS.swimlaneOrder,
+                displayName: "Swimlane order",
+                shouldHide: () => true, // swimlane order is managed by DnD, but persisted in view options
+            } satisfies MultitextOption,
         ]
     }
 
@@ -77,14 +138,26 @@ export class SwimlaneView extends BasesView {
         return typeof val === "string" && val ? val : "rank"
     }
 
-    private get statusProp(): string {
-        const val = this.config.get(CONFIG_KEYS.swimlaneProperty)
-        return typeof val === "string" && val ? val : "status"
+    private get rankPropId(): BasesPropertyId {
+        return `note.${this.rankProp}` as BasesPropertyId
     }
 
-    private get columnOrder(): string[] {
+    private get swimlanePropId(): BasesPropertyId {
+        return (
+            this.config.getAsPropertyId(CONFIG_KEYS.swimlaneProperty) ??
+            ("note.status" as BasesPropertyId)
+        )
+    }
+
+    private get swimlaneProp(): string {
+        return this.swimlanePropId.slice(this.swimlanePropId.indexOf(".") + 1)
+    }
+
+    private get swimlaneOrder(): GroupKey[] {
         const val = this.config.get(CONFIG_KEYS.swimlaneOrder)
-        return Array.isArray(val) ? (val as string[]).filter(v => typeof v === "string") : []
+        return Array.isArray(val)
+            ? ((val as string[]).filter(v => typeof v === "string") as GroupKey[])
+            : []
     }
 
     private get showPropertyIcons(): boolean {
@@ -92,36 +165,58 @@ export class SwimlaneView extends BasesView {
         return val !== false
     }
 
+    private get imagePropId(): BasesPropertyId | undefined {
+        const val = this.config.getAsPropertyId(CONFIG_KEYS.imageProperty)
+        return val ?? undefined
+    }
+
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
-        const excluded = new Set([`note.${this.rankProp}`, `note.${this.statusProp}`, "file.name"])
+        const excluded = new Set([this.rankPropId, this.swimlanePropId, "file.name"])
         return this.data.properties
             .filter(propId => !excluded.has(propId))
             .map(propId => ({ propId, alias: "" }))
     }
 
     onUnload(): void {
-        this.dnd.destroy()
+        this.cardDnd.destroy()
+        this.swimlaneDnd.destroy()
     }
 
     onDataUpdated(): void {
-        if (this.dnd.isDragging) {
+        if (this.cardDnd.isDragging || this.swimlaneDnd.isDragging) {
             return
         }
-        const wasDropAnimating = this.dnd.isDropAnimating
-        this.dnd.flushDrag()
 
-        // After a drop, defer rebuild to the next frame so drop cleanup can paint first.
-        if (wasDropAnimating) {
+        if (this.swimlaneDnd.isDropAnimating) {
+            // config.set fires onDataUpdated nearly synchronously, so the column drop
+            // animation hasn't had time to play. Wait for it to finish before flushing
+            // and rebuilding, so the placeholder stays visible during the animation.
+            setTimeout(() => {
+                this.swimlaneDnd.flushDrag()
+                if (this.boardEl.isConnected) {
+                    this.rebuildBoard()
+                }
+            }, this.swimlaneDnd.animationMs)
+            return
+        }
+
+        const wasCardDropAnimating = this.cardDnd.isDropAnimating
+        this.cardDnd.flushDrag()
+
+        // After a card drop, defer rebuild to the next frame so drop cleanup can paint first.
+        if (wasCardDropAnimating) {
             requestAnimationFrame(() => {
                 if (!this.boardEl.isConnected) {
                     return
                 }
                 this.rebuildBoard()
             })
-        } else {
-            this.rebuildBoard()
+
+            return
         }
+
+        this.rebuildBoard()
     }
 
     private rebuildBoard(): void {
@@ -137,65 +232,73 @@ export class SwimlaneView extends BasesView {
         }
 
         // Auto-populate swimlaneOrder from observed group keys when it hasn't been configured.
-        if (this.columnOrder.length === 0) {
+        if (this.swimlaneOrder.length === 0) {
             const keys = groups
                 .filter(g => g.hasKey())
                 .map(g => g.key?.toString() ?? "")
-                .filter(Boolean)
+                .filter(Boolean) as GroupKey[]
             if (keys.length > 0) {
                 this.config.set(CONFIG_KEYS.swimlaneOrder, keys)
             }
         }
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
-        this.dnd.initDropIndicator(board)
-        this.dnd.clearDropAreas()
+        this.cardDnd.initDropIndicator(board)
+        this.cardDnd.clearDropAreas()
 
-        const orderedGroups = this.sortGroups(groups)
-        const propConfigs = this.cardPropertyAliases
+        // Wire up column DnD on the newly created board element.
+        this.swimlaneDnd.registerContainer(board)
+        this.swimlaneDnd.initDropIndicator(board)
+        this.swimlaneDnd.clearDropAreas()
+        this.swimlaneDnd.registerDropArea(board, null)
+
+        // Build a map of groupKey → group for quick lookup.
+        const groupByKey = new Map<GroupKey, BasesEntryGroup>()
+        for (const group of groups) {
+            if (group.hasKey()) {
+                groupByKey.set((group.key?.toString() ?? "") as GroupKey, group)
+            }
+        }
+
+        // Columns to render: all keys in swimlaneOrder (empty or not), then any
+        // groups from data that aren't in the configured order.
+        const order = this.swimlaneOrder
+        const orderedKeys =
+            order.length > 0
+                ? [...order, ...[...groupByKey.keys()].filter(k => !order.includes(k))]
+                : [...groupByKey.keys()]
+
         const rankProp = this.rankProp
-        const showIcons = this.showPropertyIcons
+        const cardOptions: Omit<CardRenderOptions, "rank"> = {
+            rankPropId: this.rankPropId,
+            properties: this.cardPropertyAliases,
+            showIcons: this.showPropertyIcons,
+            imagePropId: this.imagePropId,
+        }
 
-        for (const group of orderedGroups) {
-            const groupKey = group.hasKey() ? (group.key?.toString() ?? "") : ""
-            const label = group.hasKey() ? (group.key?.toString() ?? "") : "(No value)"
+        for (const groupKey of orderedKeys) {
+            const group = groupByKey.get(groupKey) ?? null
+            const label = groupKey || "(No value)"
             const col = board.createDiv({ cls: "swimlane-column" })
+            col.dataset.groupKey = groupKey
 
             const header = col.createDiv({ cls: "swimlane-column-header" })
             header.createSpan({ text: label })
-            header.createSpan({ cls: "swimlane-column-count", text: String(group.entries.length) })
+            header.createSpan({
+                cls: "swimlane-column-count",
+                text: String(group?.entries.length ?? 0),
+            })
 
             const cardList = col.createDiv({ cls: "swimlane-card-list" })
-            this.dnd.registerDropArea(cardList, { groupKey })
+            this.cardDnd.registerDropArea(cardList, { groupKey })
+            this.swimlaneDnd.registerDraggable(col, { groupKey })
 
-            const orderedEntries = this.sortEntries(group.entries)
-
-            for (const entry of orderedEntries) {
+            for (const entry of this.sortEntries(group?.entries ?? [])) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
-                const card = renderCard(
-                    cardList,
-                    entry,
-                    rankProp,
-                    propConfigs,
-                    this.app,
-                    rank,
-                    showIcons,
-                )
-                this.dnd.registerDraggable(card, { path: entry.file.path, groupKey })
+                const card = renderCard(cardList, entry, this.app, { ...cardOptions, rank })
+                this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
             }
         }
-    }
-
-    private sortGroups(groups: BasesEntryGroup[]): BasesEntryGroup[] {
-        const order = this.columnOrder
-        if (order.length === 0) {
-            return groups
-        }
-        return [...groups].sort((a, b) => {
-            const aIdx = order.indexOf(a.key?.toString() ?? "")
-            const bIdx = order.indexOf(b.key?.toString() ?? "")
-            return (aIdx === -1 ? Infinity : aIdx) - (bIdx === -1 ? Infinity : bIdx)
-        })
     }
 
     private sortEntries(entries: BasesEntry[]): BasesEntry[] {
@@ -216,7 +319,7 @@ export class SwimlaneView extends BasesView {
         })
     }
 
-    private getDropTarget(
+    private getCardDropTarget(
         dropAreaEl: HTMLElement,
         _clientX: number,
         clientY: number,
@@ -260,9 +363,37 @@ export class SwimlaneView extends BasesView {
         }
     }
 
-    private handleDrop(
-        dragState: { path: string; groupKey: string },
-        context: SwimlaneDropContext,
+    private getSwimlaneDropTarget(
+        dropAreaEl: HTMLElement,
+        clientX: number,
+        clientY: number,
+        columns: HTMLElement[],
+    ): {
+        position: GroupKey | null
+        placement: { refNode: Node | null; atStart: boolean; atEnd: boolean }
+    } | null {
+        for (let i = 0; i < columns.length; i++) {
+            const col = columns[i]
+            if (!col) {
+                continue
+            }
+            const rect = col.getBoundingClientRect()
+            if (clientX < rect.left + rect.width / 2) {
+                return {
+                    position: (col.dataset.groupKey ?? null) as GroupKey | null,
+                    placement: { refNode: col, atStart: i === 0, atEnd: false },
+                }
+            }
+        }
+        return {
+            position: null,
+            placement: { refNode: null, atStart: false, atEnd: true },
+        }
+    }
+
+    private handleCardDrop(
+        dragState: CardDragState,
+        context: CardDropContext,
         position: LexorankPosition,
     ): void {
         const file = this.app.vault.getFileByPath(dragState.path)
@@ -274,8 +405,13 @@ export class SwimlaneView extends BasesView {
         this.app.fileManager.processFrontMatter(file, fm => {
             fm[this.rankProp] = newRank
             if (context.groupKey !== dragState.groupKey) {
-                fm[this.statusProp] = context.groupKey
+                fm[this.swimlaneProp] = context.groupKey
             }
         })
+    }
+
+    private handleSwimlaneDrop(dragState: SwimlaneDragState, position: GroupKey | null): void {
+        const newOrder = reorderKeys(this.swimlaneOrder, dragState.groupKey, position)
+        this.config.set(CONFIG_KEYS.swimlaneOrder, newOrder)
     }
 }
