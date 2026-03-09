@@ -97,6 +97,7 @@ export class SwimlaneView extends BasesView {
             positionsEqual: (a, b) => a === b,
             getDropTarget: (el, x, y, c) => this.getSwimlaneDropTarget(el, x, y, c),
             onDrop: (state, _context, position) => this.handleSwimlaneDrop(state, position),
+            dropAnimationMs: 80,
         })
     }
 

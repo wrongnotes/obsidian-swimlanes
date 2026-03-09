@@ -82,11 +82,6 @@
     position: relative;
 }
 
-/* Applied by drag controller to all draggables. */
-.swimlane-drag-and-drop--touch-none {
-    touch-action: none;
-}
-
 .swimlane-card {
     background-color: var(--background-primary);
     border: var(--border-width) solid var(--background-modifier-border);

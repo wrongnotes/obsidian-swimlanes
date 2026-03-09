@@ -177,6 +177,11 @@ export interface DragAndDropContextOptions<TState, TContext = DragContext, TPosi
     /** Duration in ms of the drop animation. Defaults to 200. */
     dropAnimationMs?: number
     /**
+     * Duration in ms a touch must be held before a drag starts, allowing natural
+     * touch scrolling before drag intent is confirmed. Defaults to 500.
+     */
+    longPressDurationMs?: number
+    /**
      * Configure extra pixels to extend the hitbox of registered drop areas during hit-testing.
      *
      * - `number`: applies the same margin on all four sides for all drop areas.
@@ -253,6 +258,20 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
     private container: HTMLElement | null = null
     private boundDelegate: ((e: PointerEvent) => void) | null = null
     private dropIndicator: HTMLElement | null = null
+    private readonly longPressDurationMs: number
+    private pendingTouchDrag: {
+        timer: ReturnType<typeof setTimeout>
+        pointerId: number
+        startX: number
+        startY: number
+        latestX: number
+        latestY: number
+        draggable: HTMLElement
+        state: TState
+        options: RegisterDraggableOptions | undefined
+        moveHandler: (e: PointerEvent) => void
+        cancelHandler: () => void
+    } | null = null
 
     constructor(options: DragAndDropContextOptions<TState, TContext, TPosition>) {
         this.draggableSelector = options.draggableSelector
@@ -269,6 +288,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         this.insertEquals = options.positionsEqual ?? ((a, b) => Object.is(a, b))
         this.onDropCallback = options.onDrop
         this.dropAnimationMs = options.dropAnimationMs ?? 200
+        this.longPressDurationMs = options.longPressDurationMs ?? 500
 
         const normalized = normalizeDropAreaHitboxAdjustments(options.dropAreaHitboxAdjustments)
         this.dropAreaHitboxMarginTop =
@@ -333,7 +353,6 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         options?: RegisterDraggableOptions,
     ): void {
         this.registry.set(el, { state, options })
-        el.classList.add("swimlane-drag-and-drop--touch-none")
     }
 
     /**
@@ -404,6 +423,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             clearTimeout(this.dropSettleTimeout)
             this.dropSettleTimeout = null
         }
+        this.cancelPendingTouchDrag()
         this.cleanupListeners()
         this.container?.classList.remove(this.containerDraggingClass)
         this.container = null
@@ -439,22 +459,98 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         if (e.button !== 0) {
             return
         }
-        e.preventDefault()
-        this.startDrag(draggableEl, reg.state, reg.options, e)
+        if (e.pointerType === "touch") {
+            this.startPendingTouchDrag(draggableEl, reg.state, reg.options, e)
+        } else {
+            e.preventDefault()
+            this.startDrag(draggableEl, reg.state, reg.options, e.clientX, e.clientY)
+        }
+    }
+
+    private startPendingTouchDrag(
+        draggable: HTMLElement,
+        state: TState,
+        options: RegisterDraggableOptions | undefined,
+        e: PointerEvent,
+    ): void {
+        const pointerId = e.pointerId
+        const startX = e.clientX
+        const startY = e.clientY
+
+        const moveHandler = (ev: PointerEvent) => {
+            if (!this.pendingTouchDrag || ev.pointerId !== pointerId) {
+                return
+            }
+            this.pendingTouchDrag.latestX = ev.clientX
+            this.pendingTouchDrag.latestY = ev.clientY
+            const dx = ev.clientX - startX
+            const dy = ev.clientY - startY
+            if (Math.sqrt(dx * dx + dy * dy) > 8) {
+                this.cancelPendingTouchDrag()
+            }
+        }
+
+        const cancelHandler = () => this.cancelPendingTouchDrag()
+
+        const timer = setTimeout(() => {
+            if (!this.pendingTouchDrag) {
+                return
+            }
+            const { latestX, latestY } = this.pendingTouchDrag
+            this.cancelPendingTouchDrag()
+            draggable.setPointerCapture(pointerId)
+            this.startDrag(draggable, state, options, latestX, latestY)
+        }, this.longPressDurationMs)
+
+        this.pendingTouchDrag = {
+            timer,
+            pointerId,
+            startX,
+            startY,
+            latestX: startX,
+            latestY: startY,
+            draggable,
+            state,
+            options,
+            moveHandler,
+            cancelHandler,
+        }
+
+        document.addEventListener("pointermove", moveHandler, { capture: true })
+        document.addEventListener("pointerup", cancelHandler, { capture: true })
+        document.addEventListener("pointercancel", cancelHandler, { capture: true })
+    }
+
+    private cancelPendingTouchDrag(): void {
+        if (!this.pendingTouchDrag) {
+            return
+        }
+        clearTimeout(this.pendingTouchDrag.timer)
+        document.removeEventListener("pointermove", this.pendingTouchDrag.moveHandler, {
+            capture: true,
+        })
+        document.removeEventListener("pointerup", this.pendingTouchDrag.cancelHandler, {
+            capture: true,
+        })
+        document.removeEventListener("pointercancel", this.pendingTouchDrag.cancelHandler, {
+            capture: true,
+        })
+        this.pendingTouchDrag = null
     }
 
     private startDrag(
         draggable: HTMLElement,
         state: TState,
         options: RegisterDraggableOptions | undefined,
-        e: PointerEvent,
+        clientX: number,
+        clientY: number,
     ): void {
         this.dragging = state
         this.draggable = draggable
         this.dragOptions = options
 
         const rect = draggable.getBoundingClientRect()
-        this.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+        this.dragOffset = { x: clientX - rect.left, y: clientY - rect.top }
         if (this.dropIndicator) {
             this.dropIndicator.setCssStyles({
                 height: `${rect.height}px`,
@@ -465,6 +561,11 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         draggable.addClass(this.hiddenClass)
         draggable.addClass(this.draggingClass)
         this.container?.classList.add(this.containerDraggingClass)
+        // Insert the drop indicator immediately at the card's position so the list
+        // doesn't collapse when the card is hidden — no layout shift on pickup.
+        if (this.dropIndicator && draggable.parentElement) {
+            draggable.parentElement.insertBefore(this.dropIndicator, draggable)
+        }
         clone.setCssStyles({
             position: "fixed",
             left: `${rect.left}px`,
