@@ -19,10 +19,10 @@ This changes the product plan in a few important ways — see the [Architecture 
 ```typescript
 // In Plugin.onload():
 this.registerBasesView("swimlane", {
-  name: "Swimlane",
-  icon: "lucide-kanban",
-  factory: (controller, containerEl) => new SwimlaneView(controller, containerEl, this),
-  options: () => SwimlaneView.getViewOptions(), // exposes config fields to Bases toolbar
+    name: "Swimlane",
+    icon: "lucide-kanban",
+    factory: (controller, containerEl) => new SwimlaneView(controller, containerEl, this),
+    options: () => SwimlaneView.getViewOptions(), // exposes config fields to Bases toolbar
 })
 ```
 
@@ -35,15 +35,15 @@ this.registerBasesView("swimlane", {
 
 ```typescript
 abstract class BasesView extends Component {
-  abstract type: string // must match the viewId above
-  app: App // full Obsidian App
-  config: BasesViewConfig // per-view persistent config
-  allProperties: BasesPropertyId[] // all properties in the dataset
-  data: BasesQueryResult // current result set (replaced on each update)
+    abstract type: string // must match the viewId above
+    app: App // full Obsidian App
+    config: BasesViewConfig // per-view persistent config
+    allProperties: BasesPropertyId[] // all properties in the dataset
+    data: BasesQueryResult // current result set (replaced on each update)
 
-  protected constructor(controller: QueryController)
+    protected constructor(controller: QueryController)
 
-  abstract onDataUpdated(): void // called by Obsidian whenever data changes
+    abstract onDataUpdated(): void // called by Obsidian whenever data changes
 }
 ```
 
@@ -77,9 +77,9 @@ class BasesQueryResult {
 
 ```typescript
 class BasesEntryGroup {
-  key?: Value // the group-by value (e.g. StringValue("In Progress"))
-  entries: BasesEntry[] // cards in this column
-  hasKey(): boolean // false when key is NullValue (the "no value" group)
+    key?: Value // the group-by value (e.g. StringValue("In Progress"))
+    entries: BasesEntry[] // cards in this column
+    hasKey(): boolean // false when key is NullValue (the "no value" group)
 }
 ```
 
@@ -89,8 +89,8 @@ class BasesEntryGroup {
 
 ```typescript
 class BasesEntry implements FormulaContext {
-  file: TFile // the underlying note
-  getValue(propertyId: BasesPropertyId): Value | null // evaluated property value
+    file: TFile // the underlying note
+    getValue(propertyId: BasesPropertyId): Value | null // evaluated property value
 }
 ```
 
@@ -120,13 +120,13 @@ Examples:
 
 ```typescript
 class BasesViewConfig {
-  name: string // user-editable view name
-  get(key: string): unknown // read a stored value
-  set(key: string, value: any | null): void // write a value (stored in .base file)
-  getOrder(): BasesPropertyId[] // user-configured visible property order
-  getSort(): Array<{ property: BasesPropertyId; direction: "ASC" | "DESC" }> // sort config
-  getAsPropertyId(key: string): BasesPropertyId | null
-  getEvaluatedFormula(view: BasesView, key: string): Value
+    name: string // user-editable view name
+    get(key: string): unknown // read a stored value
+    set(key: string, value: any | null): void // write a value (stored in .base file)
+    getOrder(): BasesPropertyId[] // user-configured visible property order
+    getSort(): Array<{ property: BasesPropertyId; direction: "ASC" | "DESC" }> // sort config
+    getAsPropertyId(key: string): BasesPropertyId | null
+    getEvaluatedFormula(view: BasesView, key: string): Value
 }
 ```
 
@@ -138,14 +138,14 @@ class BasesViewConfig {
 
 ```typescript
 type ViewOption =
-  | BasesTextOption // { type: 'text', key, displayName, default, placeholder, shouldHide? }
-  | BasesDropdownOption // { type: 'dropdown', key, displayName, options: Record<string,string> }
-  | BasesPropertyOption // { type: 'property', key, displayName, filter? }
-  | BasesCheckboxOption
-  | BasesSliderOption
-  | BasesFileOption
-  | BasesFolderOption
-  | BasesFormulaOption
+    | BasesTextOption // { type: 'text', key, displayName, default, placeholder, shouldHide? }
+    | BasesDropdownOption // { type: 'dropdown', key, displayName, options: Record<string,string> }
+    | BasesPropertyOption // { type: 'property', key, displayName, filter? }
+    | BasesCheckboxOption
+    | BasesSliderOption
+    | BasesFileOption
+    | BasesFolderOption
+    | BasesFormulaOption
 ```
 
 Options returned from `BasesViewRegistration.options()` appear as controls in the Bases view config panel. Values are read via `this.config.get(key)`.
@@ -158,8 +158,8 @@ No special Bases API for writes — use the standard Obsidian file manager:
 
 ```typescript
 await this.app.fileManager.processFrontMatter(entry.file, fm => {
-  fm["status"] = "In Progress" // move card to column
-  fm["rank"] = "0|hzzzzz:" // update LexoRank
+    fm["status"] = "In Progress" // move card to column
+    fm["rank"] = "0|hzzzzz:" // update LexoRank
 })
 ```
 
@@ -212,14 +212,14 @@ Limitation: fails if the first matching entry has no frontmatter or if two field
 ```typescript
 // Import from 'obsidian'
 ;(StringValue,
-  NumberValue,
-  BooleanValue,
-  DateValue,
-  ListValue,
-  LinkValue,
-  TagValue,
-  NullValue,
-  ErrorValue)
+    NumberValue,
+    BooleanValue,
+    DateValue,
+    ListValue,
+    LinkValue,
+    TagValue,
+    NullValue,
+    ErrorValue)
 ```
 
 Usage:
@@ -227,7 +227,7 @@ Usage:
 ```typescript
 const value = entry.getValue("note.status")
 if (value === null || value instanceof NullValue) {
-  /* no value */
+    /* no value */
 }
 value.toString() // string representation
 value.isEmpty() // boolean

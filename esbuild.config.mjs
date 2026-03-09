@@ -2,6 +2,7 @@ import esbuild from "esbuild"
 import process from "process"
 import { builtinModules } from "node:module"
 import { config } from "dotenv"
+import { copyFileSync, existsSync } from "node:fs"
 
 config()
 
@@ -14,42 +15,56 @@ Source: https://github.com/wrongnotes/obsidian-swimlanes
 const prod = process.argv[2] === "production"
 const vault = process.env.VAULT
 const outfile =
-  !prod && vault ? `${vault}/.obsidian/plugins/wrongnotes-swimlanes/main.js` : "main.js"
+    !prod && vault ? `${vault}/.obsidian/plugins/wrongnotes-swimlanes/main.js` : "main.js"
+
+const pluginDir = !prod && vault ? `${vault}/.obsidian/plugins/wrongnotes-swimlanes` : null
+
+const copyAssetsPlugin = {
+    name: "copy-assets",
+    setup(build) {
+        build.onEnd(() => {
+            if (pluginDir && existsSync("styles.css")) {
+                copyFileSync("styles.css", `${pluginDir}/styles.css`)
+            }
+        })
+    },
+}
 
 const context = await esbuild.context({
-  banner: {
-    js: banner,
-  },
-  entryPoints: ["src/main.ts"],
-  bundle: true,
-  external: [
-    "obsidian",
-    "electron",
-    "@codemirror/autocomplete",
-    "@codemirror/collab",
-    "@codemirror/commands",
-    "@codemirror/language",
-    "@codemirror/lint",
-    "@codemirror/search",
-    "@codemirror/state",
-    "@codemirror/view",
-    "@lezer/common",
-    "@lezer/highlight",
-    "@lezer/lr",
-    ...builtinModules,
-  ],
-  format: "cjs",
-  target: "es2018",
-  logLevel: "info",
-  sourcemap: prod ? false : "inline",
-  treeShaking: true,
-  outfile,
-  minify: prod,
+    banner: {
+        js: banner,
+    },
+    plugins: [copyAssetsPlugin],
+    entryPoints: ["src/main.ts"],
+    bundle: true,
+    external: [
+        "obsidian",
+        "electron",
+        "@codemirror/autocomplete",
+        "@codemirror/collab",
+        "@codemirror/commands",
+        "@codemirror/language",
+        "@codemirror/lint",
+        "@codemirror/search",
+        "@codemirror/state",
+        "@codemirror/view",
+        "@lezer/common",
+        "@lezer/highlight",
+        "@lezer/lr",
+        ...builtinModules,
+    ],
+    format: "cjs",
+    target: "es2018",
+    logLevel: "info",
+    sourcemap: prod ? false : "inline",
+    treeShaking: true,
+    outfile,
+    minify: prod,
 })
 
 if (prod) {
-  await context.rebuild()
-  process.exit(0)
+    await context.rebuild()
+    process.exit(0)
 } else {
-  await context.watch()
+    await context.watch()
 }

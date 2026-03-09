@@ -1,92 +1,59 @@
-# Obsidian Sample Plugin
+# Obsidian Swimlanes
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+A Kanban-style swimlane board view for [Obsidian Bases](https://obsidian.md/bases). Cards are your notes; columns are the values of a chosen property. Drag to reorder and move cards between columns — changes are written back to each note's frontmatter.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Requirements
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+- Obsidian 1.10.0 or later (Bases is a core plugin introduced in that release)
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## Setup
 
-## First time developing plugins?
+### 1. Install the plugin
 
-Quick starting guide for new plugin devs:
+The easiest way to install is via [BRAT](https://github.com/TfTHacker/obsidian42-brat):
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. Install and enable the **BRAT** community plugin.
+2. Open BRAT settings and click **Add Beta plugin**.
+3. Enter the repository URL: `https://github.com/wrongnotes/obsidian-swimlanes`
+4. Click **Add plugin**, then enable **Obsidian Swimlanes** in Settings → Community plugins.
 
-## Releasing new releases
+### 2. Create a Base
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+1. In the file explorer, create a new file with a `.base` extension (e.g. `Tasks.base`).
+2. Open the file — Obsidian will open the Bases editor.
+3. Use the **Filter** toolbar to scope the query to the notes you want on the board (e.g. filter by folder or tag).
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### 3. Add a Group by property
 
-## Adding your plugin to the community plugin list
+In the Bases toolbar, click **Group by** and choose the property whose values should become columns (e.g. `status`). Each unique value becomes a swimlane column.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### 4. Switch to the Swimlane view
 
-## How to use
+Click the view switcher in the Bases toolbar and select **Swimlane**. The board will render one column per group.
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+### 5. Configure the view options
 
-## Manually installing the plugin
+Open the Swimlane view options panel and set:
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+| Option                | Description                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Swimlane property** | The frontmatter property used for columns (must match the Group by property, e.g. `status`).                          |
+| **Swimlane order**    | The order columns appear in. Auto-populated from observed values on first load — reorder or remove entries as needed. |
+| **Rank property**     | The frontmatter property used to persist card order within a column (e.g. `rank`). Defaults to `rank`.                |
 
-## Improve code quality with eslint
+### 6. Drag cards
 
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+- Drag a card within a column to reorder it.
+- Drag a card to a different column to change its status and reorder it.
 
-## Funding URL
+Changes are written back to each note's frontmatter immediately.
 
-You can include funding URLs where people who use your plugin can financially support it.
+## Development
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-  "fundingUrl": "https://buymeacoffee.com"
-}
+```sh
+npm install
+npm run dev     # watch mode
+npm run build   # production build
+npm run lint    # lint
+npm test        # run tests
 ```
-
-If you have multiple URLs, you can also do:
-
-```json
-{
-  "fundingUrl": {
-    "Buy Me a Coffee": "https://buymeacoffee.com",
-    "GitHub Sponsor": "https://github.com/sponsors",
-    "Patreon": "https://www.patreon.com/"
-  }
-}
-```
-
-## API Documentation
-
-See https://docs.obsidian.md
