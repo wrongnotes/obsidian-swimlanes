@@ -1,6 +1,6 @@
 {
     "name": "wrongnotes-swimlanes",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Kanban swimlane board view for Obsidian Bases.",
     "main": "main.js",
     "type": "module",
