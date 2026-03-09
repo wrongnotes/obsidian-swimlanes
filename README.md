@@ -35,11 +35,11 @@ Click the view switcher in the Bases toolbar and select **Swimlane**. The board 
 
 Open the Swimlane view options panel and set:
 
-| Option | Description |
-|---|---|
-| **Swimlane property** | The frontmatter property used for columns (must match the Group by property, e.g. `status`). |
-| **Swimlane order** | The order columns appear in. Auto-populated from observed values on first load — reorder or remove entries as needed. |
-| **Rank property** | The frontmatter property used to persist card order within a column (e.g. `rank`). Defaults to `rank`. |
+| Option                | Description                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Swimlane property** | The frontmatter property used for columns (must match the Group by property, e.g. `status`).                          |
+| **Swimlane order**    | The order columns appear in. Auto-populated from observed values on first load — reorder or remove entries as needed. |
+| **Rank property**     | The frontmatter property used to persist card order within a column (e.g. `rank`). Defaults to `rank`.                |
 
 ### 6. Drag cards
 

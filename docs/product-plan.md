@@ -62,10 +62,10 @@ Columns represent user-defined workflow stages (e.g. Backlog, In Progress, Revie
 
 - Columns map to values of a chosen **status property** in the Base database
 - The user configures columns in the **plugin settings panel** for each database:
-  - Add / remove / rename columns
-  - Reorder columns via drag-and-drop
-  - Define which property value each column represents
-  - Optionally define a "catch-all" column for unrecognised values
+    - Add / remove / rename columns
+    - Reorder columns via drag-and-drop
+    - Define which property value each column represents
+    - Optionally define a "catch-all" column for unrecognised values
 
 ### 3. Card Rendering
 
