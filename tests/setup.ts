@@ -70,3 +70,7 @@ HTMLElement.prototype.addClass = function (cls: string) {
 HTMLElement.prototype.removeClass = function (cls: string) {
     this.classList.remove(cls)
 }
+
+HTMLElement.prototype.setCssStyles = function (styles: Partial<CSSStyleDeclaration>) {
+    Object.assign(this.style, styles)
+}

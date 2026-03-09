@@ -18,13 +18,13 @@ function makeGroup(key: string | null, entries: ReturnType<typeof makeEntry>[]) 
 function makeView(groups: ReturnType<typeof makeGroup>[]) {
     const container = document.createElement("div")
     const view = new SwimlaneView({} as any, container, {} as any)
-    view.data = { groupedData: groups } as any
+    view.data = { groupedData: groups, properties: [] } as any
     view.app = {
         metadataCache: { getFileCache: () => null },
         vault: { getFileByPath: () => null },
         fileManager: { processFrontMatter: async () => {} },
     } as any
-    view.config = { get: () => null, set: () => {} } as any
+    view.config = { get: () => null, set: () => {}, getAsPropertyId: () => null } as any
     return { view, container }
 }
 
@@ -74,7 +74,10 @@ describe("SwimlaneView.onDataUpdated", () => {
     it("clears and re-renders on subsequent calls", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("Note A")])])
         view.onDataUpdated()
-        view.data = { groupedData: [makeGroup("Done", [makeEntry("Note B")])] } as any
+        view.data = {
+            groupedData: [makeGroup("Done", [makeEntry("Note B")])],
+            properties: [],
+        } as any
         view.onDataUpdated()
         const titles = container.querySelectorAll(".swimlane-card-title")
         expect(titles).toHaveLength(1)

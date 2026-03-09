@@ -14,8 +14,8 @@ export interface RegisterDraggableOptions {
  */
 export type DragContext = unknown
 
-interface DraggableRegistration {
-    state: DragState
+interface DraggableRegistration<TState> {
+    state: TState
     options?: RegisterDraggableOptions
 }
 
@@ -48,18 +48,123 @@ export type GetDropTargetFn<TPosition = number> = (
     draggablesExcludingCurrent: HTMLElement[],
 ) => { position: TPosition; placement: DropIndicatorPlacement } | null
 
-export interface DragAndDropContextOptions<TContext = DragContext, TPosition = number> {
+export type DropAreaHitboxValue = number | "fill"
+
+export type DropAreaHitboxMargin =
+    | DropAreaHitboxValue
+    | {
+          /** Extra pixels on both left and right edges. Overridden by `left`/`right`. Defaults to 0. */
+          x?: DropAreaHitboxValue
+          /** Extra pixels on both top and bottom edges. Overridden by `top`/`bottom`. Defaults to 0. */
+          y?: DropAreaHitboxValue
+          /** Extra pixels on the top edge. Overrides `y`. Defaults to 0. */
+          top?: DropAreaHitboxValue
+          /** Extra pixels on the bottom edge. Overrides `y`. Defaults to 0. */
+          bottom?: DropAreaHitboxValue
+          /** Extra pixels on the left edge. Overrides `x`. Defaults to 0. */
+          left?: DropAreaHitboxValue
+          /** Extra pixels on the right edge. Overrides `x`. Defaults to 0. */
+          right?: DropAreaHitboxValue
+      }
+
+export type DropAreaHitboxAdjustment =
+    | DropAreaHitboxMargin
+    | {
+          /** CSS selector matched against the drop area element. */
+          selector: string
+          /** Margin to apply when this selector matches. */
+          margin: DropAreaHitboxMargin
+      }
+
+function normalizeDropAreaHitboxMargin(margin: DropAreaHitboxMargin | undefined): {
+    top: DropAreaHitboxValue
+    bottom: DropAreaHitboxValue
+    left: DropAreaHitboxValue
+    right: DropAreaHitboxValue
+} {
+    if (typeof margin === "number" || margin === "fill") {
+        return { top: margin, bottom: margin, left: margin, right: margin }
+    }
+    if (margin && typeof margin === "object") {
+        return {
+            top: margin.top ?? margin.y ?? 0,
+            bottom: margin.bottom ?? margin.y ?? 0,
+            left: margin.left ?? margin.x ?? 0,
+            right: margin.right ?? margin.x ?? 0,
+        }
+    }
+    return { top: 0, bottom: 0, left: 0, right: 0 }
+}
+
+function normalizeDropAreaHitboxAdjustments(
+    adjustments: DropAreaHitboxAdjustment | DropAreaHitboxAdjustment[] | undefined,
+): {
+    base: {
+        top: DropAreaHitboxValue
+        bottom: DropAreaHitboxValue
+        left: DropAreaHitboxValue
+        right: DropAreaHitboxValue
+    }
+    overrides: {
+        selector: string
+        top: DropAreaHitboxValue
+        bottom: DropAreaHitboxValue
+        left: DropAreaHitboxValue
+        right: DropAreaHitboxValue
+    }[]
+} {
+    const list: DropAreaHitboxAdjustment[] = Array.isArray(adjustments)
+        ? adjustments
+        : adjustments !== undefined
+          ? [adjustments]
+          : []
+
+    let base = normalizeDropAreaHitboxMargin(undefined)
+    const overrides: {
+        selector: string
+        top: DropAreaHitboxValue
+        bottom: DropAreaHitboxValue
+        left: DropAreaHitboxValue
+        right: DropAreaHitboxValue
+    }[] = []
+
+    for (const adj of list) {
+        if (adj && typeof adj === "object" && "selector" in adj) {
+            const norm = normalizeDropAreaHitboxMargin(adj.margin)
+            overrides.push({
+                selector: adj.selector,
+                top: norm.top,
+                bottom: norm.bottom,
+                left: norm.left,
+                right: norm.right,
+            })
+        } else {
+            // Global/base adjustment (no selector).
+            base = normalizeDropAreaHitboxMargin(adj as DropAreaHitboxMargin)
+        }
+    }
+
+    return { base, overrides }
+}
+
+export interface DragAndDropContextOptions<TState, TContext = DragContext, TPosition = number> {
     /** CSS selector to find the draggable element from the event target (e.g. ".draggable-item"). */
     draggableSelector: string
-    /** Class name applied to the drop indicator element. */
-    dropIndicatorClass: string
+    /**
+     * Optional CSS selector for a drag handle. If set, a drag only starts when the pointer
+     * is inside a matching element within the draggable. Useful when you want the clone to be
+     * a large element (e.g. a column) but dragging should only initiate from a header strip.
+     */
+    dragHandleSelector?: string
+    /** Class name applied to the drop indicator element. Defaults to "swimlane-drop-indicator". */
+    dropIndicatorClass?: string
     /** Name of the data attribute on each draggable that holds the item id (e.g. "path"). */
     draggableIdAttribute: string
-    /** Class name applied to the element being dragged. */
-    draggingClass: string
+    /** Class name applied to the element being dragged. Defaults to "is-dragging". */
+    draggingClass?: string
     /** Class name applied to the delegation root while any drag is active. Defaults to "is-dragging-active". */
     containerDraggingClass?: string
-    /** Class name applied to the floating drag clone. Defaults to "drag-clone". The drop animation adds "<dragCloneClass>--dropping". */
+    /** Class name applied to the floating drag clone in addition to the base "swimlane-drag-clone". Defaults to "swimlane-drag-clone" (no extra class). The drop animation adds "swimlane-drag-clone--dropping". */
     dragCloneClass?: string
     /** Class name applied to the original element while it is hidden during a drag. Defaults to "is-drag-hidden". */
     hiddenClass?: string
@@ -68,9 +173,24 @@ export interface DragAndDropContextOptions<TContext = DragContext, TPosition = n
     /** Optional: compare two inserts to avoid redundant updates. Defaults to Object.is. */
     positionsEqual?: (a: TPosition, b: TPosition) => boolean
     /** Called when a draggable is dropped at (context, position). */
-    onDrop: (state: DragState, context: TContext, position: TPosition) => void
+    onDrop: (state: TState, context: TContext, position: TPosition) => void
     /** Duration in ms of the drop animation. Defaults to 200. */
     dropAnimationMs?: number
+    /**
+     * Configure extra pixels to extend the hitbox of registered drop areas during hit-testing.
+     *
+     * - `number`: applies the same margin on all four sides for all drop areas.
+     * - `{ x, y }`: configure horizontal/vertical margins for all drop areas.
+     * - `{ top, bottom, left, right }`: configure each edge independently for all drop areas.
+     * - `{ selector, margin }`: apply a margin only to drop areas matching `selector`.
+     * - Array: combine the above; later entries override earlier ones.
+     *
+     * Margins can be pixel values or the string `"fill"`; `"fill"` extends the hitbox infinitely
+     * in that direction (until it hits another drop area).
+     *
+     * Defaults to no extra margin (0 on all sides).
+     */
+    dropAreaHitboxAdjustments?: DropAreaHitboxAdjustment | DropAreaHitboxAdjustment[]
     /**
      * Called inside a requestAnimationFrame after a successful drop to animate the clone
      * flying to its destination. Receives the clone, pixel deltas (dx, dy) from clone to
@@ -86,10 +206,11 @@ export interface DragAndDropContextOptions<TContext = DragContext, TPosition = n
  * Drop areas are registered with a context (DragContext); that context is passed
  * to onDrop so the consumer can handle the drop without the controller knowing its shape.
  */
-export class DragAndDropContext<TContext = DragContext, TPosition = number> {
+export class DragAndDropContext<TState, TContext = DragContext, TPosition = number> {
     private readonly draggableSelector: string
+    private readonly dragHandleSelector: string | null
     private readonly dropIndicatorClass: string
-    private readonly pathAttribute: string
+    private readonly idAttribute: string
     private readonly draggingClass: string
     private readonly containerDraggingClass: string
     private readonly dragCloneClass: string
@@ -97,19 +218,26 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
     private readonly hiddenClass: string
     private readonly getDropTarget: GetDropTargetFn<TPosition>
     private readonly insertEquals: (a: TPosition, b: TPosition) => boolean
-    private readonly onDropCallback: (
-        state: DragState,
-        context: TContext,
-        insert: TPosition,
-    ) => void
+    private readonly onDropCallback: (state: TState, context: TContext, insert: TPosition) => void
     private readonly dropAnimationMs: number
+    private readonly dropAreaHitboxMarginLeft: number
+    private readonly dropAreaHitboxMarginRight: number
+    private readonly dropAreaHitboxMarginTop: number
+    private readonly dropAreaHitboxMarginBottom: number
+    private readonly dropAreaHitboxOverrides: {
+        selector: string
+        left: number
+        right: number
+        top: number
+        bottom: number
+    }[]
     private readonly onDropAnimate: (
         clone: HTMLElement,
         dx: number,
         dy: number,
         durationMs: number,
     ) => void
-    private dragging: DragState | null = null
+    private dragging: TState | null = null
     private dropAnimating = false
     private dropSettleTimeout: ReturnType<typeof setTimeout> | null = null
     private droppingEl: HTMLElement | null = null
@@ -120,25 +248,44 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
     private dragOffset = { x: 0, y: 0 }
     private boundMove: ((e: PointerEvent) => void) | null = null
     private boundUp: ((e: PointerEvent) => void) | null = null
-    private readonly registry = new WeakMap<HTMLElement, DraggableRegistration>()
+    private readonly registry = new WeakMap<HTMLElement, DraggableRegistration<TState>>()
     private readonly dropAreaContexts = new Map<HTMLElement, TContext>()
     private container: HTMLElement | null = null
     private boundDelegate: ((e: PointerEvent) => void) | null = null
     private dropIndicator: HTMLElement | null = null
 
-    constructor(options: DragAndDropContextOptions<TContext, TPosition>) {
+    constructor(options: DragAndDropContextOptions<TState, TContext, TPosition>) {
         this.draggableSelector = options.draggableSelector
-        this.dropIndicatorClass = options.dropIndicatorClass
-        this.pathAttribute = options.draggableIdAttribute
-        this.draggingClass = options.draggingClass
-        this.containerDraggingClass = options.containerDraggingClass ?? "is-dragging-active"
-        this.dragCloneClass = options.dragCloneClass ?? "drag-clone"
-        this.dragCloneDroppingClass = `${this.dragCloneClass}--dropping`
-        this.hiddenClass = options.hiddenClass ?? "is-drag-hidden"
+        this.dragHandleSelector = options.dragHandleSelector ?? null
+        this.dropIndicatorClass = options.dropIndicatorClass ?? "swimlane-drop-indicator"
+        this.idAttribute = options.draggableIdAttribute
+        this.draggingClass = options.draggingClass ?? "swimlane-drag-and-drop--dragging"
+        this.containerDraggingClass =
+            options.containerDraggingClass ?? "swimlane-drag-and-drop--active"
+        this.dragCloneClass = options.dragCloneClass ?? "swimlane-drag-clone"
+        this.dragCloneDroppingClass = "swimlane-drag-clone--dropping"
+        this.hiddenClass = options.hiddenClass ?? "swimlane-drag-and-drop--hidden"
         this.getDropTarget = options.getDropTarget
         this.insertEquals = options.positionsEqual ?? ((a, b) => Object.is(a, b))
         this.onDropCallback = options.onDrop
         this.dropAnimationMs = options.dropAnimationMs ?? 200
+
+        const normalized = normalizeDropAreaHitboxAdjustments(options.dropAreaHitboxAdjustments)
+        this.dropAreaHitboxMarginTop =
+            normalized.base.top === "fill" ? Number.POSITIVE_INFINITY : normalized.base.top
+        this.dropAreaHitboxMarginBottom =
+            normalized.base.bottom === "fill" ? Number.POSITIVE_INFINITY : normalized.base.bottom
+        this.dropAreaHitboxMarginLeft =
+            normalized.base.left === "fill" ? Number.POSITIVE_INFINITY : normalized.base.left
+        this.dropAreaHitboxMarginRight =
+            normalized.base.right === "fill" ? Number.POSITIVE_INFINITY : normalized.base.right
+        this.dropAreaHitboxOverrides = normalized.overrides.map(o => ({
+            selector: o.selector,
+            top: o.top === "fill" ? Number.POSITIVE_INFINITY : o.top,
+            bottom: o.bottom === "fill" ? Number.POSITIVE_INFINITY : o.bottom,
+            left: o.left === "fill" ? Number.POSITIVE_INFINITY : o.left,
+            right: o.right === "fill" ? Number.POSITIVE_INFINITY : o.right,
+        }))
         this.onDropAnimate =
             options.onDropAnimate ??
             ((clone, dx, dy, durationMs) => {
@@ -148,7 +295,7 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
             })
     }
 
-    get state(): DragState | null {
+    get state(): TState | null {
         return this.dragging
     }
 
@@ -158,6 +305,10 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
 
     get isDropAnimating(): boolean {
         return this.dropAnimating
+    }
+
+    get animationMs(): number {
+        return this.dropAnimationMs
     }
 
     /**
@@ -178,11 +329,11 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
 
     public registerDraggable(
         el: HTMLElement,
-        state: DragState,
+        state: TState,
         options?: RegisterDraggableOptions,
     ): void {
         this.registry.set(el, { state, options })
-        el.classList.add("drag-touch-none")
+        el.classList.add("swimlane-drag-and-drop--touch-none")
     }
 
     /**
@@ -273,6 +424,14 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         if (!draggableEl) {
             return
         }
+        // If a drag handle selector is configured, only start dragging when the pointer
+        // is inside a matching handle element within the draggable.
+        if (this.dragHandleSelector) {
+            const handle = (e.target as HTMLElement).closest(this.dragHandleSelector)
+            if (!handle || !draggableEl.contains(handle)) {
+                return
+            }
+        }
         const reg = this.registry.get(draggableEl)
         if (!reg) {
             return
@@ -286,7 +445,7 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
 
     private startDrag(
         draggable: HTMLElement,
-        state: DragState,
+        state: TState,
         options: RegisterDraggableOptions | undefined,
         e: PointerEvent,
     ): void {
@@ -297,23 +456,26 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         const rect = draggable.getBoundingClientRect()
         this.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top }
         if (this.dropIndicator) {
-            this.dropIndicator.style.height = `${rect.height}px`
+            this.dropIndicator.setCssStyles({
+                height: `${rect.height}px`,
+                width: `${rect.width}px`,
+            })
         }
         const clone = draggable.cloneNode(true) as HTMLElement
         draggable.addClass(this.hiddenClass)
         draggable.addClass(this.draggingClass)
         this.container?.classList.add(this.containerDraggingClass)
-        clone.style.cssText = `
-            position: fixed;
-            left: ${rect.left}px;
-            top: ${rect.top}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
-            pointer-events: none;
-            z-index: 9999;
-            margin: 0;
-        `
-        clone.classList.add(this.dragCloneClass)
+        clone.setCssStyles({
+            position: "fixed",
+            left: `${rect.left}px`,
+            top: `${rect.top}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            pointerEvents: "none",
+            zIndex: "9999",
+            margin: "0",
+        })
+        clone.classList.add("swimlane-drag-clone", this.dragCloneClass)
         document.body.appendChild(clone)
         this.dragClone = clone
 
@@ -341,7 +503,7 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
                 !this.insertEquals(this.currentTarget.dropPosition, target.dropPosition))
         ) {
             this.currentTarget = target
-            this.showDropIndicator(e.clientX, e.clientY, target)
+            this.showDropIndicator(target)
         } else if (!target) {
             this.currentTarget = null
             this.hideDropIndicator()
@@ -358,12 +520,24 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         let dropAreaEl: HTMLElement | null = null
         for (const el of this.dropAreaContexts.keys()) {
             const rect = el.getBoundingClientRect()
-            if (
-                clientX >= rect.left &&
-                clientX <= rect.right &&
-                clientY >= rect.top &&
-                clientY <= rect.bottom
-            ) {
+            let marginLeft = this.dropAreaHitboxMarginLeft
+            let marginRight = this.dropAreaHitboxMarginRight
+            let marginTop = this.dropAreaHitboxMarginTop
+            let marginBottom = this.dropAreaHitboxMarginBottom
+            for (const override of this.dropAreaHitboxOverrides) {
+                if (el.matches(override.selector)) {
+                    marginLeft = override.left
+                    marginRight = override.right
+                    marginTop = override.top
+                    marginBottom = override.bottom
+                    break
+                }
+            }
+            const left = rect.left - marginLeft
+            const right = rect.right + marginRight
+            const top = rect.top - marginTop
+            const bottom = rect.bottom + marginBottom
+            if (clientX >= left && clientX <= right && clientY >= top && clientY <= bottom) {
                 dropAreaEl = el
                 break
             }
@@ -380,10 +554,11 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         const draggables = Array.from(
             dropAreaEl.querySelectorAll(this.draggableSelector),
         ) as HTMLElement[]
-        const draggingPath = this.dragging?.path ?? ""
-        const pathAttr = this.pathAttribute
+        // Identify the current draggable by its dataset attribute so this works
+        // regardless of the TState shape.
+        const draggingId = this.draggable?.dataset[this.idAttribute] ?? ""
         const draggablesExcludingCurrent = draggables.filter(
-            d => (d.dataset[pathAttr as keyof DOMStringMap] as string) !== draggingPath,
+            d => d.dataset[this.idAttribute] !== draggingId,
         )
 
         const result = this.getDropTarget(dropAreaEl, clientX, clientY, draggablesExcludingCurrent)
@@ -398,11 +573,7 @@ export class DragAndDropContext<TContext = DragContext, TPosition = number> {
         }
     }
 
-    private showDropIndicator(
-        _clientX: number,
-        _clientY: number,
-        target: DropTarget<TContext, TPosition>,
-    ): void {
+    private showDropIndicator(target: DropTarget<TContext, TPosition>): void {
         const dropAreaEl = target.dropAreaEl
         if (!dropAreaEl || !this.dropIndicator) {
             return

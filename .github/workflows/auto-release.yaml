@@ -1,0 +1,93 @@
+name: Auto-release on merge
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+            - "release/**"
+
+env:
+    NODE_VERSION: 22.x
+
+jobs:
+    release:
+        name: Bump version & release
+        # Fire on any merged PR to main or release/**. No label = patch.
+        if: github.event.pull_request.merged == true
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.base.ref }}
+                  fetch-depth: 0
+
+            - name: Set up Node.js ${{ env.NODE_VERSION }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Determine bump type
+              id: bump
+              run: |
+                  if [[ "${{ startsWith(github.event.pull_request.base.ref, 'release/') }}" == "true" ]]; then
+                    echo "type=patch" >> $GITHUB_OUTPUT
+                  elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bump/major') }}" == "true" ]]; then
+                    echo "type=major" >> $GITHUB_OUTPUT
+                  elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bump/minor') }}" == "true" ]]; then
+                    echo "type=minor" >> $GITHUB_OUTPUT
+                  else
+                    echo "type=patch" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Configure git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Bump version
+              id: version
+              # --no-git-tag-version lets us control exactly which files go into the commit.
+              # The `version` npm script (version-bump.ts) still runs and stages manifest.json
+              # and versions.json; we then explicitly add the remaining version files and commit.
+              run: |
+                  npm version ${{ steps.bump.outputs.type }} --no-git-tag-version
+                  TAG="v$(node -p "require('./package.json').version")"
+                  git add package.json package-lock.json manifest.json versions.json
+                  git commit -m "chore: release ${TAG}"
+                  git tag "${TAG}"
+                  echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+            - name: Push commit & tag
+              run: git push --follow-tags
+
+            - name: Create release branch
+              # Cut release/X.Y.x from the new tag on major/minor releases to main
+              if: steps.bump.outputs.type != 'patch' && github.event.pull_request.base.ref == 'main'
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  MAJOR=$(echo $VERSION | cut -d. -f1)
+                  MINOR=$(echo $VERSION | cut -d. -f2)
+                  git checkout -b "release/${MAJOR}.${MINOR}.x"
+                  git push origin "release/${MAJOR}.${MINOR}.x"
+                  git checkout main
+
+            - name: Build
+              run: npm run build
+
+            - name: Create GitHub release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.version.outputs.tag }}
+                  files: |
+                      main.js
+                      manifest.json
+                      styles.css
+                  generate_release_notes: true
