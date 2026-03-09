@@ -366,12 +366,18 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         if (this.boundDelegate) {
             this.container?.removeEventListener("pointerdown", this.boundDelegate, {
                 capture: true,
-            })
+                passive: true,
+            } as EventListenerOptions)
             this.boundDelegate = null
         }
         this.container = containerEl
         this.boundDelegate = (e: PointerEvent) => this.onDelegatedPointerDown(e)
-        containerEl.addEventListener("pointerdown", this.boundDelegate, { capture: true })
+        // Passive so the browser can start scroll gestures immediately without waiting
+        // for this handler. Text selection is suppressed via CSS user-select instead.
+        containerEl.addEventListener("pointerdown", this.boundDelegate, {
+            capture: true,
+            passive: true,
+        })
     }
 
     /**
@@ -462,7 +468,6 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         if (e.pointerType === "touch") {
             this.startPendingTouchDrag(draggableEl, reg.state, reg.options, e)
         } else {
-            e.preventDefault()
             this.startDrag(draggableEl, reg.state, reg.options, e.clientX, e.clientY)
         }
     }

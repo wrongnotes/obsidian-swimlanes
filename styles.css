@@ -90,6 +90,7 @@
     border-radius: var(--radius-s);
     padding: var(--size-4-2) var(--size-4-3);
     cursor: grab;
+    user-select: none;
 }
 
 .swimlane-card.swimlane-drag-and-drop--dragging,
