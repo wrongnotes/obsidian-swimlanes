@@ -68,6 +68,11 @@ export class SwimlaneView extends BasesView {
         this.boardEl = containerEl
         this.plugin = plugin
 
+        // Prevent Obsidian's scroll container from competing with the board's
+        // own horizontal scroll. On iOS, nested scrollable elements cause the
+        // browser to swallow touch gestures entirely.
+        containerEl.setCssStyles({ overflow: "hidden" })
+
         this.cardDnd = new DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>({
             draggableSelector: ".swimlane-card",
             draggableIdAttribute: "path",

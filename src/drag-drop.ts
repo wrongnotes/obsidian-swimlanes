@@ -372,12 +372,11 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             this.boundDelegate = null
         }
         this.container = containerEl
-        // DEBUG: Uncomment the lines below to re-enable DnD. Testing if scroll works without listeners.
-        // this.boundDelegate = (e: PointerEvent) => this.onDelegatedPointerDown(e)
-        // containerEl.addEventListener("pointerdown", this.boundDelegate, {
-        //     capture: true,
-        //     passive: true,
-        // })
+        this.boundDelegate = (e: PointerEvent) => this.onDelegatedPointerDown(e)
+        containerEl.addEventListener("pointerdown", this.boundDelegate, {
+            capture: true,
+            passive: true,
+        })
     }
 
     /**
