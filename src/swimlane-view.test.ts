@@ -259,3 +259,240 @@ describe("card context menu", () => {
         expect(spy).toHaveBeenCalled()
     })
 })
+
+describe("swimlane order", () => {
+    it("auto-populates swimlaneOrder when not configured", () => {
+        const { view, configStore } = makeView([
+            makeGroup("Backlog", [makeEntry("A")]),
+            makeGroup("Done", [makeEntry("B")]),
+        ])
+        view.onDataUpdated()
+        expect(configStore.swimlaneOrder).toEqual(["Backlog", "Done"])
+    })
+
+    it("respects configured swimlane order", () => {
+        const { view, container } = makeView(
+            [
+                makeGroup("Backlog", [makeEntry("A")]),
+                makeGroup("Done", [makeEntry("B")]),
+            ],
+            { swimlaneOrder: ["Done", "Backlog"] },
+        )
+        view.onDataUpdated()
+        const headers = Array.from(container.querySelectorAll(".swimlane-column-header"))
+        const labels = headers.map(h => h.firstElementChild?.textContent)
+        expect(labels).toEqual(["Done", "Backlog"])
+    })
+
+    it("renders groups not in swimlaneOrder after ordered ones", () => {
+        const { view, container } = makeView(
+            [
+                makeGroup("Backlog", [makeEntry("A")]),
+                makeGroup("Done", [makeEntry("B")]),
+                makeGroup("Archive", [makeEntry("C")]),
+            ],
+            { swimlaneOrder: ["Done"] },
+        )
+        view.onDataUpdated()
+        const headers = Array.from(container.querySelectorAll(".swimlane-column-header"))
+        const labels = headers.map(h => h.firstElementChild?.textContent)
+        expect(labels[0]).toBe("Done")
+        expect(labels).toContain("Backlog")
+        expect(labels).toContain("Archive")
+    })
+
+    it("renders empty columns from swimlaneOrder that have no data", () => {
+        const { view, container } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")])],
+            { swimlaneOrder: ["Backlog", "EmptyCol"] },
+        )
+        view.onDataUpdated()
+        const headers = Array.from(container.querySelectorAll(".swimlane-column-header"))
+        const labels = headers.map(h => h.firstElementChild?.textContent)
+        expect(labels).toContain("EmptyCol")
+    })
+})
+
+describe("add card input", () => {
+    it("clicking add card button replaces it with an input", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-card-btn")! as HTMLElement
+        btn.click()
+        expect(container.querySelector(".swimlane-add-card-btn")).toBeNull()
+        expect(container.querySelector(".swimlane-add-card-input")).not.toBeNull()
+    })
+
+    it("pressing Escape dismisses the input and restores the button", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-card-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-card-input")! as HTMLInputElement
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(container.querySelector(".swimlane-add-card-input")).toBeNull()
+        expect(container.querySelector(".swimlane-add-card-btn")).not.toBeNull()
+    })
+
+    it("pressing Enter with text creates a card via vault.create", async () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-card-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-card-input")! as HTMLInputElement
+        input.value = "New Card"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // vault.create should be called
+        await new Promise(r => setTimeout(r, 0))
+        expect(view.app.vault.create).toHaveBeenCalled()
+    })
+
+    it("pressing Enter with empty text dismisses the input", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-card-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-card-input")! as HTMLInputElement
+        input.value = ""
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(container.querySelector(".swimlane-add-card-input")).toBeNull()
+        expect(container.querySelector(".swimlane-add-card-btn")).not.toBeNull()
+    })
+
+    it("blur with text commits the card", async () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-card-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-card-input")! as HTMLInputElement
+        input.value = "Blur Card"
+        input.dispatchEvent(new Event("blur"))
+        await new Promise(r => setTimeout(r, 0))
+        expect(view.app.vault.create).toHaveBeenCalled()
+    })
+})
+
+describe("add column input", () => {
+    it("clicking add column button replaces it with an input", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
+        btn.click()
+        expect(container.querySelector(".swimlane-add-column-btn")).toBeNull()
+        expect(container.querySelector(".swimlane-add-column-input")).not.toBeNull()
+    })
+
+    it("pressing Enter with name adds to swimlaneOrder", () => {
+        const { view, container, configStore } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")])],
+            { swimlaneOrder: ["Backlog"] },
+        )
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-column-input")! as HTMLInputElement
+        input.value = "New Column"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(configStore.swimlaneOrder).toContain("New Column")
+    })
+
+    it("pressing Escape dismisses the input", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-column-input")! as HTMLInputElement
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+        expect(container.querySelector(".swimlane-add-column-input")).toBeNull()
+        expect(container.querySelector(".swimlane-add-column-btn")).not.toBeNull()
+    })
+
+    it("duplicate column name triggers Notice and highlight", () => {
+        const { view, container } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")])],
+            { swimlaneOrder: ["Backlog"] },
+        )
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-column-input")! as HTMLInputElement
+        input.value = "Backlog"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // Should have restored the button (not input)
+        expect(container.querySelector(".swimlane-add-column-input")).toBeNull()
+        expect(container.querySelector(".swimlane-add-column-btn")).not.toBeNull()
+    })
+
+    it("empty name dismisses the input on blur", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
+        btn.click()
+        const input = container.querySelector(".swimlane-add-column-input")! as HTMLInputElement
+        input.value = ""
+        input.dispatchEvent(new Event("blur"))
+        expect(container.querySelector(".swimlane-add-column-input")).toBeNull()
+        expect(container.querySelector(".swimlane-add-column-btn")).not.toBeNull()
+    })
+})
+
+describe("remove column", () => {
+    it("removes empty column immediately from swimlaneOrder", () => {
+        const { view, container, configStore } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")])],
+            { swimlaneOrder: ["Backlog", "EmptyCol"] },
+        )
+        view.onDataUpdated()
+        // Find the remove button for EmptyCol
+        const cols = container.querySelectorAll(".swimlane-column")
+        let emptyColRemoveBtn: HTMLElement | null = null
+        cols.forEach(col => {
+            if (col.getAttribute("data-group-key") === "EmptyCol") {
+                emptyColRemoveBtn = col.querySelector(".swimlane-column-remove")
+            }
+        })
+        expect(emptyColRemoveBtn).not.toBeNull()
+        emptyColRemoveBtn!.click()
+        expect(configStore.swimlaneOrder).not.toContain("EmptyCol")
+    })
+})
+
+describe("onUnload", () => {
+    it("calls destroy without errors", () => {
+        const { view } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        expect(() => (view as any).onUnload()).not.toThrow()
+    })
+})
+
+describe("getViewOptions", () => {
+    it("returns an array of view options", () => {
+        const options = SwimlaneView.getViewOptions()
+        expect(Array.isArray(options)).toBe(true)
+        expect(options.length).toBeGreaterThan(0)
+    })
+
+    it("includes swimlaneProperty option", () => {
+        const options = SwimlaneView.getViewOptions()
+        expect(options.find(o => o.key === "swimlaneProperty")).toBeDefined()
+    })
+
+    it("includes rankProperty option", () => {
+        const options = SwimlaneView.getViewOptions()
+        expect(options.find(o => o.key === "rankProperty")).toBeDefined()
+    })
+})
+
+describe("data-group-key attribute", () => {
+    it("sets data-group-key on each column", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("A")]),
+            makeGroup("Done", [makeEntry("B")]),
+        ])
+        view.onDataUpdated()
+        const cols = container.querySelectorAll(".swimlane-column")
+        const keys = Array.from(cols).map(c => c.getAttribute("data-group-key"))
+        expect(keys).toContain("Backlog")
+        expect(keys).toContain("Done")
+    })
+})
