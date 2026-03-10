@@ -1,0 +1,106 @@
+name: Alpha release
+
+on:
+    pull_request:
+        types: [labeled, synchronize, closed]
+
+env:
+    NODE_VERSION: 22.x
+
+jobs:
+    build:
+        name: Build & publish alpha
+        if: |
+            github.event.action != 'closed' &&
+            contains(join(github.event.pull_request.labels.*.name, ','), 'alpha/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+        steps:
+            - name: Resolve alpha label
+              id: label
+              run: |
+                  LABEL=$(echo '${{ toJSON(github.event.pull_request.labels.*.name) }}' \
+                    | jq -r '.[] | select(startswith("alpha/"))' | head -1)
+                  SUFFIX="${LABEL#alpha/}"
+                  echo "name=${LABEL}" >> $GITHUB_OUTPUT
+                  echo "suffix=${SUFFIX}" >> $GITHUB_OUTPUT
+                  echo "tag=alpha-${SUFFIX}" >> $GITHUB_OUTPUT
+
+            - name: Checkout PR branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.head.sha }}
+
+            - name: Set up Node.js ${{ env.NODE_VERSION }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Patch manifest version for alpha
+              id: alpha-version
+              run: |
+                  SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+                  SHORT_SHA="${SHORT_SHA:0:7}"
+                  BASE_VERSION=$(node -p "require('./package.json').version")
+                  ALPHA_VERSION="${BASE_VERSION}-alpha.${SHORT_SHA}"
+                  node -e "
+                    const fs = require('fs');
+                    const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+                    m.version = '${ALPHA_VERSION}';
+                    fs.writeFileSync('manifest.json', JSON.stringify(m, null, '\t') + '\n');
+                  "
+                  echo "version=${ALPHA_VERSION}" >> $GITHUB_OUTPUT
+
+            - name: Build
+              run: npm run build
+
+            - name: Publish pre-release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.label.outputs.tag }}
+                  name: "Alpha (${{ steps.label.outputs.name }}, ${{ steps.alpha-version.outputs.version }})"
+                  prerelease: true
+                  make_latest: false
+                  files: |
+                      main.js
+                      manifest.json
+                      styles.css
+
+            - name: Comment on PR
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  header: alpha
+                  message: |
+                      **Alpha build ready** — `${{ steps.alpha-version.outputs.version }}` (`${{ steps.label.outputs.name }}`)
+
+                      Install via [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+                      1. Open BRAT settings → *Add Beta plugin for testing*
+                      2. Enter: `wrongnotes/obsidian-swimlanes`
+                      3. Enable *"Install pre-release version"*
+
+    cleanup:
+        name: Delete alpha release on merge
+        if: |
+            github.event.action == 'closed' &&
+            contains(join(github.event.pull_request.labels.*.name, ','), 'alpha/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Resolve alpha tag
+              id: label
+              run: |
+                  LABEL=$(echo '${{ toJSON(github.event.pull_request.labels.*.name) }}' \
+                    | jq -r '.[] | select(startswith("alpha/"))' | head -1)
+                  echo "tag=alpha-${LABEL#alpha/}" >> $GITHUB_OUTPUT
+
+            - name: Delete alpha release and tag
+              run: gh release delete "${{ steps.label.outputs.tag }}" --yes --cleanup-tag || true
+              env:
+                  GH_TOKEN: ${{ github.token }}

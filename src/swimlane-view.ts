@@ -68,6 +68,11 @@ export class SwimlaneView extends BasesView {
         this.boardEl = containerEl
         this.plugin = plugin
 
+        // Prevent Obsidian's scroll container from competing with the board's
+        // own horizontal scroll. On iOS, nested scrollable elements cause the
+        // browser to swallow touch gestures entirely.
+        containerEl.setCssStyles({ overflow: "hidden" })
+
         this.cardDnd = new DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>({
             draggableSelector: ".swimlane-card",
             draggableIdAttribute: "path",
@@ -88,7 +93,6 @@ export class SwimlaneView extends BasesView {
                 },
             ],
         })
-        this.cardDnd.registerContainer(containerEl)
 
         this.swimlaneDnd = new DragAndDropContext<SwimlaneDragState, null, GroupKey | null>({
             draggableSelector: ".swimlane-column",
@@ -97,6 +101,7 @@ export class SwimlaneView extends BasesView {
             positionsEqual: (a, b) => a === b,
             getDropTarget: (el, x, y, c) => this.getSwimlaneDropTarget(el, x, y, c),
             onDrop: (state, _context, position) => this.handleSwimlaneDrop(state, position),
+            dropAnimationMs: 80,
         })
     }
 
@@ -243,10 +248,13 @@ export class SwimlaneView extends BasesView {
         }
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
+
+        // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
+        // so touch scrolling on the outer container works normally.
+        this.cardDnd.registerContainer(board)
         this.cardDnd.initDropIndicator(board)
         this.cardDnd.clearDropAreas()
 
-        // Wire up column DnD on the newly created board element.
         this.swimlaneDnd.registerContainer(board)
         this.swimlaneDnd.initDropIndicator(board)
         this.swimlaneDnd.clearDropAreas()
