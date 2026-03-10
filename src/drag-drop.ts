@@ -253,6 +253,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
     private dragOffset = { x: 0, y: 0 }
     private boundMove: ((e: PointerEvent) => void) | null = null
     private boundUp: ((e: PointerEvent) => void) | null = null
+    private boundTouchMove: ((e: TouchEvent) => void) | null = null
     private readonly registry = new WeakMap<HTMLElement, DraggableRegistration<TState>>()
     private readonly dropAreaContexts = new Map<HTMLElement, TContext>()
     private container: HTMLElement | null = null
@@ -503,7 +504,6 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             }
             const { latestX, latestY } = this.pendingTouchDrag
             this.cancelPendingTouchDrag()
-            draggable.setPointerCapture(pointerId)
             this.startDrag(draggable, state, options, latestX, latestY)
         }, this.longPressDurationMs)
 
@@ -589,9 +589,14 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
 
         this.boundMove = (e: PointerEvent) => this.onPointerMove(e)
         this.boundUp = (e: PointerEvent) => this.onPointerUp(e)
+        // Prevent the browser from scrolling while actively dragging. Non-passive so
+        // we can call preventDefault(). Only added during active drag, never during
+        // the pending long-press phase, so normal touch scrolling is unaffected.
+        this.boundTouchMove = (e: TouchEvent) => e.preventDefault()
         document.addEventListener("pointermove", this.boundMove, { capture: true })
         document.addEventListener("pointerup", this.boundUp, { capture: true })
         document.addEventListener("pointercancel", this.boundUp, { capture: true })
+        document.addEventListener("touchmove", this.boundTouchMove, { passive: false })
     }
 
     private onPointerMove(e: PointerEvent): void {
@@ -753,6 +758,10 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             document.removeEventListener("pointerup", this.boundUp, { capture: true })
             document.removeEventListener("pointercancel", this.boundUp, { capture: true })
             this.boundUp = null
+        }
+        if (this.boundTouchMove) {
+            document.removeEventListener("touchmove", this.boundTouchMove)
+            this.boundTouchMove = null
         }
     }
 }

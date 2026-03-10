@@ -80,7 +80,6 @@
     overflow-y: auto;
     flex: 1;
     position: relative;
-    touch-action: pan-x pan-y;
 }
 
 .swimlane-card {
