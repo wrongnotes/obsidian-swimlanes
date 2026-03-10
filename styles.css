@@ -196,3 +196,40 @@
 .swimlane-drag-and-drop--hidden {
     display: none;
 }
+
+/* Create base modal */
+
+.create-base-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-2-2);
+    padding: 0 var(--size-4-4) var(--size-4-2);
+}
+
+.create-base-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-2-2);
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-2-1) var(--size-2-3);
+    border-radius: var(--radius-s);
+    cursor: default;
+}
+
+.create-base-tag-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-weight: var(--font-bold);
+}
+
+.create-base-tag-remove:hover {
+    opacity: 1;
+}
+
+.create-base-error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+    padding: var(--size-4-2) var(--size-4-4);
+}

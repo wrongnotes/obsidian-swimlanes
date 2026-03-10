@@ -74,3 +74,7 @@ HTMLElement.prototype.removeClass = function (cls: string) {
 HTMLElement.prototype.setCssStyles = function (styles: Partial<CSSStyleDeclaration>) {
     Object.assign(this.style, styles)
 }
+
+HTMLElement.prototype.setText = function (text: string) {
+    this.textContent = text
+}
