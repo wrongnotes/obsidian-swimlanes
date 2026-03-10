@@ -15,7 +15,7 @@ export default class SwimlanePlugin extends Plugin {
 
         this.addCommand({
             id: "create-board",
-            name: "Create new board",
+            name: "Create",
             callback: () => new CreateBaseModal(this.app).open(),
         })
 
