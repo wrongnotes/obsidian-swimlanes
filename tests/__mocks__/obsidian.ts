@@ -23,45 +23,144 @@ export abstract class BasesView extends Component {
 export class QueryController extends Component {}
 
 export class Modal {
-    app: unknown
+    app: any
+    containerEl: HTMLElement
+    modalEl: HTMLElement
+    titleEl: HTMLElement
     contentEl: HTMLElement
-    constructor(app: unknown) {
+
+    constructor(app: any) {
         this.app = app
+        this.containerEl = document.createElement("div")
+        this.modalEl = document.createElement("div")
+        this.titleEl = document.createElement("div")
         this.contentEl = document.createElement("div")
+        this.containerEl.appendChild(this.modalEl)
+        this.modalEl.appendChild(this.titleEl)
+        this.modalEl.appendChild(this.contentEl)
     }
-    open() {}
-    close() {}
+
+    open() {
+        this.onOpen()
+    }
+
+    close() {
+        this.onClose()
+    }
+
     onOpen() {}
     onClose() {}
-    setTitle(_title: string) {}
+
+    setTitle(title: string) {
+        this.titleEl.textContent = title
+        return this
+    }
+
+    setContent(content: string) {
+        this.contentEl.textContent = content
+        return this
+    }
 }
 
 export class Setting {
     settingEl: HTMLElement
-    constructor(_containerEl: HTMLElement) {
-        this.settingEl = document.createElement("div")
+    nameEl: HTMLElement
+    descEl: HTMLElement
+    controlEl: HTMLElement
+
+    constructor(containerEl: HTMLElement) {
+        this.settingEl = containerEl.createDiv({ cls: "setting-item" })
+        this.nameEl = this.settingEl.createDiv({ cls: "setting-item-name" })
+        this.descEl = this.settingEl.createDiv({ cls: "setting-item-description" })
+        this.controlEl = this.settingEl.createDiv({ cls: "setting-item-control" })
     }
-    addButton(cb: (btn: ButtonComponent) => void): this {
-        cb(new ButtonComponent(document.createElement("button")))
+
+    setName(name: string) {
+        this.nameEl.textContent = name
+        return this
+    }
+
+    setDesc(desc: string) {
+        this.descEl.textContent = desc
+        return this
+    }
+
+    addText(cb: (component: TextComponent) => void) {
+        const component = new TextComponent(this.controlEl)
+        cb(component)
+        return this
+    }
+
+    addButton(cb: (component: ButtonComponent) => void) {
+        const component = new ButtonComponent(this.controlEl)
+        cb(component)
+        return this
+    }
+
+    setClass(_cls: string) {
+        return this
+    }
+}
+
+export class TextComponent {
+    inputEl: HTMLInputElement
+    private _onChange?: (value: string) => void
+
+    constructor(containerEl: HTMLElement) {
+        this.inputEl = document.createElement("input")
+        this.inputEl.type = "text"
+        containerEl.appendChild(this.inputEl)
+        this.inputEl.addEventListener("input", () => {
+            this._onChange?.(this.inputEl.value)
+        })
+    }
+
+    setPlaceholder(placeholder: string) {
+        this.inputEl.placeholder = placeholder
+        return this
+    }
+
+    getValue() {
+        return this.inputEl.value
+    }
+
+    setValue(value: string) {
+        this.inputEl.value = value
+        this._onChange?.(value)
+        return this
+    }
+
+    onChange(callback: (value: string) => void) {
+        this._onChange = callback
         return this
     }
 }
 
 export class ButtonComponent {
     buttonEl: HTMLButtonElement
-    constructor(el: HTMLButtonElement) {
-        this.buttonEl = el
+
+    constructor(containerEl: HTMLElement) {
+        this.buttonEl = document.createElement("button")
+        containerEl.appendChild(this.buttonEl)
     }
-    setButtonText(_text: string): this {
+
+    setButtonText(text: string) {
+        this.buttonEl.textContent = text
         return this
     }
-    setCta(): this {
+
+    setCta() {
+        this.buttonEl.classList.add("mod-cta")
         return this
     }
-    onClick(_cb: () => void): this {
+
+    onClick(callback: () => void) {
+        this.buttonEl.addEventListener("click", callback)
         return this
     }
-    setDisabled(_disabled: boolean): this {
+
+    setDisabled(disabled: boolean) {
+        this.buttonEl.disabled = disabled
         return this
     }
 }
@@ -177,4 +276,49 @@ export class TagValue {
     toString() {
         return ""
     }
+}
+
+export class AbstractInputSuggest<T> {
+    app: any
+    inputEl: HTMLInputElement | HTMLDivElement
+
+    constructor(app: any, inputEl: HTMLInputElement | HTMLDivElement) {
+        this.app = app
+        this.inputEl = inputEl
+    }
+
+    setValue(value: string) {
+        if (this.inputEl instanceof HTMLInputElement) {
+            this.inputEl.value = value
+        }
+    }
+
+    getValue() {
+        if (this.inputEl instanceof HTMLInputElement) {
+            return this.inputEl.value
+        }
+        return ""
+    }
+
+    close() {}
+
+    renderSuggestion(_value: T, _el: HTMLElement) {}
+    selectSuggestion(_value: T, _evt?: MouseEvent | KeyboardEvent) {}
+}
+
+export class TFolder {
+    path: string
+    children: unknown[] = []
+
+    constructor(path: string) {
+        this.path = path
+    }
+
+    isRoot() {
+        return this.path === "" || this.path === "/"
+    }
+}
+
+export function normalizePath(path: string): string {
+    return path.replace(/\/+/g, "/").replace(/^\/|\/$/g, "")
 }
