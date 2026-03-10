@@ -5,6 +5,7 @@ import {
     DateValue,
     LinkValue,
     ListValue,
+    Menu,
     NullValue,
     NumberValue,
     StringValue,
@@ -28,6 +29,12 @@ export interface CardRenderOptions {
     properties: CardPropertyAlias[]
     showIcons: boolean
     imagePropId?: BasesPropertyId
+    /** The frontmatter property used for swimlane grouping (e.g. "status"). */
+    swimlaneProp: string
+    /** Returns the current swimlane columns and this card's group key at call time. */
+    getSwimlaneContext: () => { columns: string[]; currentSwimlane: string }
+    /** Highlight a swimlane column on the board (scroll into view + flash). */
+    highlightColumn: (column: string) => void
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -170,5 +177,62 @@ export function renderCard(
         }
     }
 
+    card.addEventListener("contextmenu", e => {
+        e.preventDefault()
+        showCardMenu(e, entry, app, options)
+    })
+
     return card
+}
+
+function showCardMenu(
+    evt: MouseEvent,
+    entry: BasesEntry,
+    app: App,
+    options: CardRenderOptions,
+): void {
+    const menu = new Menu()
+
+    menu.addItem(item => {
+        item.setTitle("Open note")
+            .setIcon("lucide-file-text")
+            .onClick(() => {
+                app.workspace.openLinkText(entry.file.path, "")
+            })
+    })
+
+    const { columns, currentSwimlane } = options.getSwimlaneContext()
+
+    menu.addItem(item => {
+        item.setTitle("Move to").setIcon("lucide-arrow-right")
+        // setSubmenu is undocumented but stable — returns a Menu to populate.
+        const submenu: Menu = (item as any).setSubmenu()
+        for (const col of columns) {
+            submenu.addItem(sub => {
+                sub.setTitle(col)
+                    .setChecked(col === currentSwimlane)
+                    .onClick(() => {
+                        if (col !== currentSwimlane) {
+                            app.fileManager.processFrontMatter(entry.file, fm => {
+                                fm[options.swimlaneProp] = col
+                            })
+                        }
+                        options.highlightColumn(col)
+                    })
+            })
+        }
+    })
+
+    menu.addSeparator()
+
+    menu.addItem(item => {
+        item.setTitle("Delete card")
+            .setIcon("lucide-trash-2")
+            .setWarning(true)
+            .onClick(() => {
+                app.fileManager.trashFile(entry.file)
+            })
+    })
+
+    menu.showAtMouseEvent(evt)
 }

@@ -1,4 +1,4 @@
-import { BasesEntry, BasesEntryGroup, BasesView, QueryController } from "obsidian"
+import { BasesEntry, BasesEntryGroup, BasesView, Notice, QueryController, setIcon } from "obsidian"
 import type {
     BasesPropertyId,
     MultitextOption,
@@ -10,6 +10,7 @@ import type {
 import { DragAndDropContext } from "./drag-drop"
 import { CardPropertyAlias, CardRenderOptions, renderCard } from "./swimlane-card"
 import { LexorankPosition, midRank } from "./lexorank"
+import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
 
@@ -39,7 +40,13 @@ const CONFIG_KEYS = {
     rankProperty: "rankProperty",
     showPropertyIcons: "showPropertyIcons",
     imageProperty: "imageProperty",
+    showAddCard: "showAddCard",
+    showAddColumn: "showAddColumn",
+    hiddenSwimlanes: "hiddenSwimlanes",
 } as const
+
+/** Sentinel groupKey used when a card is dropped onto the "Add column" button. */
+const ADD_COLUMN_DROP_KEY = "__swimlane_add_column__" as GroupKey
 
 function reorderKeys(
     keys: GroupKey[],
@@ -62,6 +69,7 @@ export class SwimlaneView extends BasesView {
     private plugin: SwimlanePlugin
     private cardDnd: DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>
     private swimlaneDnd: DragAndDropContext<SwimlaneDragState, null, GroupKey | null>
+    private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -79,13 +87,18 @@ export class SwimlaneView extends BasesView {
             positionsEqual: (a, b) => a.beforeRank === b.beforeRank && a.afterRank === b.afterRank,
             getDropTarget: (el, x, y, d) => this.getCardDropTarget(el, x, y, d),
             onDrop: (state, context, position) => this.handleCardDrop(state, context, position),
+            onDropSettle: () => {
+                if (this.boardEl.isConnected) {
+                    this.rebuildBoard()
+                }
+            },
             // Make card drops strongly favor swimlane lists when moving across columns,
             // while keeping in-column vertical precision tight.
             dropAreaHitboxAdjustments: [
                 {
                     selector: ".swimlane-card-list",
-                    // Extend horizontally for easy cross-column moves, and from above the header
-                    // all the way to the bottom of the viewport.
+                    // Extend from above the header all the way to the bottom of the
+                    // viewport for easy cross-column moves.
                     margin: {
                         y: "fill",
                         x: 0,
@@ -101,6 +114,11 @@ export class SwimlaneView extends BasesView {
             positionsEqual: (a, b) => a === b,
             getDropTarget: (el, x, y, c) => this.getSwimlaneDropTarget(el, x, y, c),
             onDrop: (state, _context, position) => this.handleSwimlaneDrop(state, position),
+            onDropSettle: () => {
+                if (this.boardEl.isConnected) {
+                    this.rebuildBoard()
+                }
+            },
             dropAnimationMs: 80,
         })
     }
@@ -127,6 +145,18 @@ export class SwimlaneView extends BasesView {
                 type: "toggle",
                 key: CONFIG_KEYS.showPropertyIcons,
                 displayName: "Show property icons",
+                default: true,
+            } satisfies ToggleOption,
+            {
+                type: "toggle",
+                key: CONFIG_KEYS.showAddCard,
+                displayName: "Show add card button",
+                default: true,
+            } satisfies ToggleOption,
+            {
+                type: "toggle",
+                key: CONFIG_KEYS.showAddColumn,
+                displayName: "Show add swimlane button",
                 default: true,
             } satisfies ToggleOption,
             {
@@ -173,6 +203,28 @@ export class SwimlaneView extends BasesView {
     private get imagePropId(): BasesPropertyId | undefined {
         const val = this.config.getAsPropertyId(CONFIG_KEYS.imageProperty)
         return val ?? undefined
+    }
+
+    private get showAddCard(): boolean {
+        const val = this.config.get(CONFIG_KEYS.showAddCard)
+        return val !== false
+    }
+
+    private get showAddColumn(): boolean {
+        const val = this.config.get(CONFIG_KEYS.showAddColumn)
+        return val !== false
+    }
+
+    private get hiddenSwimlanes(): Set<GroupKey> {
+        const val = this.config.get(CONFIG_KEYS.hiddenSwimlanes)
+        if (!Array.isArray(val)) {
+            return new Set()
+        }
+        return new Set(val.filter((v): v is GroupKey => typeof v === "string"))
+    }
+
+    private setHiddenSwimlanes(hidden: Set<GroupKey>): void {
+        this.config.set(CONFIG_KEYS.hiddenSwimlanes, [...hidden])
     }
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
@@ -269,19 +321,23 @@ export class SwimlaneView extends BasesView {
         }
 
         // Columns to render: all keys in swimlaneOrder (empty or not), then any
-        // groups from data that aren't in the configured order.
+        // groups from data that aren't in the configured order. Skip hidden columns.
         const order = this.swimlaneOrder
-        const orderedKeys =
+        const hidden = this.hiddenSwimlanes
+        const orderedKeys = (
             order.length > 0
                 ? [...order, ...[...groupByKey.keys()].filter(k => !order.includes(k))]
                 : [...groupByKey.keys()]
+        ).filter(k => !hidden.has(k))
 
         const rankProp = this.rankProp
-        const cardOptions: Omit<CardRenderOptions, "rank"> = {
+        const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
             properties: this.cardPropertyAliases,
             showIcons: this.showPropertyIcons,
             imagePropId: this.imagePropId,
+            swimlaneProp: this.swimlaneProp,
+            highlightColumn: col => this.highlightColumn(col as GroupKey),
         }
 
         for (const groupKey of orderedKeys) {
@@ -292,10 +348,22 @@ export class SwimlaneView extends BasesView {
 
             const header = col.createDiv({ cls: "swimlane-column-header" })
             header.createSpan({ text: label })
-            header.createSpan({
+            const headerRight = header.createDiv({ cls: "swimlane-column-header-right" })
+            headerRight.createSpan({
                 cls: "swimlane-column-count",
                 text: String(group?.entries.length ?? 0),
             })
+            if (this.showAddColumn) {
+                const removeBtn = headerRight.createSpan({
+                    cls: "swimlane-column-remove",
+                    attr: { "data-no-drag": "" },
+                })
+                setIcon(removeBtn, "x")
+                removeBtn.addEventListener("click", e => {
+                    e.stopPropagation()
+                    this.removeColumn(board, groupKey, group?.entries.length ?? 0)
+                })
+            }
 
             const cardList = col.createDiv({ cls: "swimlane-card-list" })
             this.cardDnd.registerDropArea(cardList, { groupKey })
@@ -303,10 +371,260 @@ export class SwimlaneView extends BasesView {
 
             for (const entry of this.sortEntries(group?.entries ?? [])) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
-                const card = renderCard(cardList, entry, this.app, { ...cardOptions, rank })
+                const currentGroupKey = groupKey
+                const card = renderCard(cardList, entry, this.app, {
+                    ...cardOptions,
+                    rank,
+                    getSwimlaneContext: () => ({
+                        columns: this.swimlaneOrder as string[],
+                        currentSwimlane: currentGroupKey,
+                    }),
+                })
                 this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
             }
+
+            if (this.showAddCard) {
+                this.renderAddCardButton(col, groupKey)
+            }
         }
+
+        if (this.showAddColumn) {
+            this.renderAddColumnButton(board)
+        }
+
+        this.applyPendingHighlight()
+    }
+
+    private renderAddCardButton(columnEl: HTMLElement, groupKey: GroupKey): void {
+        const btn = columnEl.createDiv({ cls: "swimlane-add-card-btn" })
+        setIcon(btn.createSpan({ cls: "swimlane-add-card-icon" }), "plus")
+        btn.createSpan({ text: "Add card" })
+        btn.addEventListener("click", () => {
+            btn.remove()
+            this.renderAddCardInput(columnEl, groupKey)
+        })
+    }
+
+    private renderAddCardInput(columnEl: HTMLElement, groupKey: GroupKey): void {
+        const input = columnEl.createEl("input", {
+            cls: "swimlane-add-card-input",
+            attr: { type: "text", placeholder: "Card title…" },
+        })
+        input.focus()
+
+        let settled = false
+        const dismiss = () => {
+            if (settled) {
+                return
+            }
+            settled = true
+            input.remove()
+            this.renderAddCardButton(columnEl, groupKey)
+        }
+
+        const commit = () => {
+            if (settled) {
+                return
+            }
+            const title = input.value.trim()
+            if (!title) {
+                dismiss()
+                return
+            }
+            settled = true
+            input.remove()
+            this.createCard(title, groupKey)
+        }
+
+        input.addEventListener("keydown", (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+                e.preventDefault()
+                commit()
+            } else if (e.key === "Escape") {
+                dismiss()
+            }
+        })
+        input.addEventListener("blur", commit)
+    }
+
+    private async createCard(title: string, groupKey: GroupKey): Promise<void> {
+        // Determine the rank: append after the last card in this column.
+        const group = this.data.groupedData.find(
+            g => g.hasKey() && (g.key?.toString() ?? "") === groupKey,
+        )
+        let lastRank: string | null = null
+        if (group) {
+            for (const entry of group.entries) {
+                const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
+                if (r && (lastRank === null || r > lastRank)) {
+                    lastRank = r
+                }
+            }
+        }
+        const newRank = midRank(lastRank, null)
+        const swimlaneProp = this.swimlaneProp
+        const rankProp = this.rankProp
+
+        // createFileForView does everything we want (folder resolution, frontmatter
+        // processing) but has no option to suppress the "New note" popover at this
+        // time, so we replicate the behavior manually with vault.create.
+        // Use the parent folder of an existing entry to match the Base's configured
+        // source folder. Fall back to the user's global new-file-location setting.
+        const firstEntry = this.data.data[0]
+        const folder = firstEntry?.file?.parent ?? this.app.fileManager.getNewFileParent("")
+        const prefix = folder.isRoot() ? "" : folder.path + "/"
+        let path = `${prefix}${title}.md`
+        // Deduplicate: append a numeric suffix if the path is taken.
+        let n = 1
+        while (this.app.vault.getAbstractFileByPath(path)) {
+            path = `${prefix}${title} ${++n}.md`
+        }
+        const file = await this.app.vault.create(path, "")
+        await this.app.fileManager.processFrontMatter(file, fm => {
+            fm[swimlaneProp] = groupKey
+            fm[rankProp] = newRank
+        })
+    }
+
+    private renderAddColumnButton(board: HTMLElement): void {
+        const btn = board.createDiv({ cls: "swimlane-add-column-btn" })
+        setIcon(btn.createSpan({ cls: "swimlane-add-column-icon" }), "plus")
+        btn.createSpan({ text: "Add swimlane" })
+        btn.addEventListener("click", () => {
+            btn.remove()
+            this.renderAddColumnInput(board)
+        })
+        this.cardDnd.registerDropArea(btn, { groupKey: ADD_COLUMN_DROP_KEY })
+    }
+
+    private renderAddColumnInput(board: HTMLElement): void {
+        const wrapper = board.createDiv({ cls: "swimlane-add-column-input-wrapper" })
+        const input = wrapper.createEl("input", {
+            cls: "swimlane-add-column-input",
+            attr: { type: "text", placeholder: "Swimlane name…" },
+        })
+        input.focus()
+
+        let settled = false
+        const dismiss = () => {
+            if (settled) {
+                return
+            }
+            settled = true
+            wrapper.remove()
+            this.renderAddColumnButton(board)
+        }
+
+        const commit = () => {
+            if (settled) {
+                return
+            }
+            const name = input.value.trim()
+            if (!name) {
+                dismiss()
+                return
+            }
+            const key = name as GroupKey
+            const order = this.swimlaneOrder
+            if (order.includes(key)) {
+                settled = true
+                wrapper.remove()
+                this.renderAddColumnButton(board)
+                new Notice(`Swimlane "${name}" already exists.`)
+                this.highlightColumn(key, true)
+                return
+            }
+            settled = true
+            wrapper.remove()
+            this.config.set(CONFIG_KEYS.swimlaneOrder, [...order, key])
+        }
+
+        input.addEventListener("keydown", (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+                e.preventDefault()
+                commit()
+            } else if (e.key === "Escape") {
+                dismiss()
+            }
+        })
+        input.addEventListener("blur", commit)
+    }
+
+    private hideColumn(groupKey: GroupKey): void {
+        const hidden = this.hiddenSwimlanes
+        hidden.add(groupKey)
+        this.setHiddenSwimlanes(hidden)
+    }
+
+    private removeColumn(_board: HTMLElement, groupKey: GroupKey, entryCount: number): void {
+        if (entryCount === 0) {
+            const order = this.swimlaneOrder.filter(k => k !== groupKey)
+            this.config.set(CONFIG_KEYS.swimlaneOrder, order)
+            return
+        }
+
+        const group = this.data.groupedData.find(
+            g => g.hasKey() && (g.key?.toString() ?? "") === groupKey,
+        )
+        const files = group?.entries.map(e => e.file) ?? []
+        const otherColumns = this.swimlaneOrder.filter(k => k !== groupKey)
+
+        new RmSwimlaneModal({
+            app: this.app,
+            columnName: groupKey,
+            files,
+            swimlaneProp: this.swimlaneProp,
+            otherColumns,
+            onConfirm: async op => {
+                if (op.kind === "hide") {
+                    this.hideColumn(groupKey)
+                    return
+                }
+                await executeRmSwimlane(this.app, files, this.swimlaneProp, op)
+                const order = this.swimlaneOrder.filter(k => k !== groupKey)
+                this.config.set(CONFIG_KEYS.swimlaneOrder, order)
+            },
+        }).open()
+    }
+
+    /**
+     * @param immediate If true, apply the highlight now. If false (default),
+     * defer until the next rebuildBoard so the animation plays on fresh DOM.
+     */
+    highlightColumn(groupKey: GroupKey, immediate = false): void {
+        this.pendingHighlight = { groupKey, expiry: Date.now() + 800 }
+        if (immediate) {
+            this.applyPendingHighlight()
+        }
+    }
+
+    private applyPendingHighlight(): void {
+        if (!this.pendingHighlight) {
+            return
+        }
+        if (Date.now() > this.pendingHighlight.expiry) {
+            this.pendingHighlight = null
+            return
+        }
+        const { groupKey } = this.pendingHighlight
+        const col = this.boardEl.querySelector(
+            `.swimlane-column[data-group-key="${CSS.escape(groupKey)}"]`,
+        ) as HTMLElement | null
+        if (!col) {
+            return
+        }
+        col.removeClass("swimlane-column--flash")
+        void col.offsetWidth
+        col.addClass("swimlane-column--flash")
+        col.addEventListener(
+            "animationend",
+            () => {
+                col.removeClass("swimlane-column--flash")
+                this.pendingHighlight = null
+            },
+            { once: true },
+        )
+        col.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
     }
 
     private sortEntries(entries: BasesEntry[]): BasesEntry[] {
@@ -404,6 +722,11 @@ export class SwimlaneView extends BasesView {
         context: CardDropContext,
         position: LexorankPosition,
     ): void {
+        if (context.groupKey === ADD_COLUMN_DROP_KEY) {
+            this.handleCardDropOnNewColumn(dragState)
+            return
+        }
+
         const file = this.app.vault.getFileByPath(dragState.path)
         if (!file) {
             return
@@ -416,6 +739,40 @@ export class SwimlaneView extends BasesView {
                 fm[this.swimlaneProp] = context.groupKey
             }
         })
+    }
+
+    private handleCardDropOnNewColumn(dragState: CardDragState): void {
+        const file = this.app.vault.getFileByPath(dragState.path)
+        if (!file) {
+            return
+        }
+
+        const releaseDrop = this.cardDnd.holdDrop()
+
+        const modal = new AddSwimlaneViaDropModal({
+            app: this.app,
+            swimlaneProp: this.swimlaneProp,
+            existingColumns: this.swimlaneOrder as string[],
+            onConfirm: columnName => {
+                const key = columnName as GroupKey
+                const order = this.swimlaneOrder
+                if (!order.includes(key)) {
+                    this.config.set(CONFIG_KEYS.swimlaneOrder, [...order, key])
+                }
+                this.app.fileManager.processFrontMatter(file, fm => {
+                    fm[this.swimlaneProp] = columnName
+                    fm[this.rankProp] = midRank(null, null)
+                })
+            },
+        })
+
+        const origOnClose = modal.onClose.bind(modal)
+        modal.onClose = () => {
+            origOnClose()
+            releaseDrop()
+        }
+
+        modal.open()
     }
 
     private handleSwimlaneDrop(dragState: SwimlaneDragState, position: GroupKey | null): void {

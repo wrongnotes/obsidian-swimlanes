@@ -197,6 +197,11 @@ export interface DragAndDropContextOptions<TState, TContext = DragContext, TPosi
      */
     dropAreaHitboxAdjustments?: DropAreaHitboxAdjustment | DropAreaHitboxAdjustment[]
     /**
+     * Called when the drop settle timeout fires without the view calling flushDrag first.
+     * Use this to trigger a board rebuild when onDataUpdated didn't fire after a drop.
+     */
+    onDropSettle?: () => void
+    /**
      * Called inside a requestAnimationFrame after a successful drop to animate the clone
      * flying to its destination. Receives the clone, pixel deltas (dx, dy) from clone to
      * indicator, and the configured duration. Defaults to a translate + fade animation.
@@ -242,8 +247,10 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         dy: number,
         durationMs: number,
     ) => void
+    private readonly onDropSettle: (() => void) | null
     private dragging: TState | null = null
     private dropAnimating = false
+    private dropHeld = false
     private dropSettleTimeout: ReturnType<typeof setTimeout> | null = null
     private droppingEl: HTMLElement | null = null
     private currentTarget: DropTarget<TContext, TPosition> | null = null
@@ -307,6 +314,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             left: o.left === "fill" ? Number.POSITIVE_INFINITY : o.left,
             right: o.right === "fill" ? Number.POSITIVE_INFINITY : o.right,
         }))
+        this.onDropSettle = options.onDropSettle ?? null
         this.onDropAnimate =
             options.onDropAnimate ??
             ((clone, dx, dy, durationMs) => {
@@ -391,6 +399,35 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
     }
 
     /**
+     * Pause the drop-settle timeout so the clone stays visible (and the original
+     * card stays hidden) until the caller releases. Cancels any in-flight drop
+     * animation so the clone stays where it currently is. Returns a release
+     * function that cleans up the clone and fires onDropSettle.
+     *
+     * Useful when a drop opens a modal — the card should stay "gone" until the
+     * modal resolves.
+     */
+    public holdDrop(): () => void {
+        if (this.dropSettleTimeout !== null) {
+            clearTimeout(this.dropSettleTimeout)
+            this.dropSettleTimeout = null
+        }
+        // Prevent the rAF animation callback from running, and freeze the
+        // clone in its current position.
+        this.dropHeld = true
+        if (this.dragClone) {
+            this.dragClone.setCssStyles({ transition: "none", transform: "none" })
+            this.dragClone.removeClass(this.dragCloneDroppingClass)
+        }
+        this.hideDropIndicator()
+        return () => {
+            this.dropHeld = false
+            this.flushDrag()
+            this.onDropSettle?.()
+        }
+    }
+
+    /**
      * Call this after the board has been rebuilt following a drop. Removes the
      * drop clone so it never outlives the new card render.
      */
@@ -456,6 +493,10 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             if (!handle || !draggableEl.contains(handle)) {
                 return
             }
+        }
+        // Allow interactive elements inside draggables/handles to opt out of drag.
+        if ((e.target as HTMLElement).closest("[data-no-drag]")) {
+            return
         }
         const reg = this.registry.get(draggableEl)
         if (!reg) {
@@ -728,9 +769,16 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             // animation so cards don't shift. flushDrag() removes it just
             // before the board rebuild, batching both into one render frame.
             this.dropAnimating = true
-            requestAnimationFrame(() => this.onDropAnimate(clone, dx, dy, this.dropAnimationMs))
+            requestAnimationFrame(() => {
+                if (!this.dropHeld) {
+                    this.onDropAnimate(clone, dx, dy, this.dropAnimationMs)
+                }
+            })
             // Fallback: clean up if the view never calls flushDrag.
-            this.dropSettleTimeout = setTimeout(() => this.flushDrag(), this.dropAnimationMs * 3)
+            this.dropSettleTimeout = setTimeout(() => {
+                this.flushDrag()
+                this.onDropSettle?.()
+            }, this.dropAnimationMs * 3)
         } else {
             this.hideDropIndicator()
             clone?.remove()

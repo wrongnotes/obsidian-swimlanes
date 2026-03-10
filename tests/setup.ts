@@ -1,3 +1,10 @@
+// jsdom does not implement CSS.escape — polyfill it.
+if (typeof globalThis.CSS === "undefined") {
+    ;(globalThis as any).CSS = {
+        escape: (s: string) => s.replace(/([^\w-])/g, "\\$1"),
+    }
+}
+
 // jsdom does not implement DragEvent — polyfill it as a cancelable MouseEvent.
 // dataTransfer is left null since our source code guards with `if (e.dataTransfer)`.
 class DragEventPolyfill extends MouseEvent {
@@ -22,7 +29,7 @@ global.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent
 // Adds Obsidian's HTMLElement DOM extension methods to jsdom's HTMLElement.
 // Keep in sync with the methods used in source files.
 
-type CreateElOptions = { cls?: string; text?: string }
+type CreateElOptions = { cls?: string; text?: string; attr?: Record<string, string> }
 
 function createObsidianEl<K extends keyof HTMLElementTagNameMap>(
     this: HTMLElement,
@@ -38,6 +45,11 @@ function createObsidianEl<K extends keyof HTMLElementTagNameMap>(
         }
         if (options.text) {
             el.textContent = options.text
+        }
+        if (options.attr) {
+            for (const [k, v] of Object.entries(options.attr)) {
+                el.setAttribute(k, v)
+            }
         }
     }
     this.appendChild(el)
@@ -71,6 +83,25 @@ HTMLElement.prototype.removeClass = function (cls: string) {
     this.classList.remove(cls)
 }
 
+HTMLElement.prototype.toggleClass = function (cls: string, force?: boolean) {
+    this.classList.toggle(cls, force)
+}
+
+HTMLElement.prototype.setText = function (text: string) {
+    this.textContent = text
+}
+
+HTMLElement.prototype.show = function () {
+    this.style.display = ""
+}
+
+HTMLElement.prototype.hide = function () {
+    this.style.display = "none"
+}
+
 HTMLElement.prototype.setCssStyles = function (styles: Partial<CSSStyleDeclaration>) {
     Object.assign(this.style, styles)
 }
+
+// jsdom does not implement scrollIntoView.
+Element.prototype.scrollIntoView = function () {}
