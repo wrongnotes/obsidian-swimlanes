@@ -474,12 +474,12 @@ describe("getViewOptions", () => {
 
     it("includes swimlaneProperty option", () => {
         const options = SwimlaneView.getViewOptions()
-        expect(options.find(o => o.key === "swimlaneProperty")).toBeDefined()
+        expect(options.find(o => "key" in o && o.key === "swimlaneProperty")).toBeDefined()
     })
 
     it("includes rankProperty option", () => {
         const options = SwimlaneView.getViewOptions()
-        expect(options.find(o => o.key === "rankProperty")).toBeDefined()
+        expect(options.find(o => "key" in o && o.key === "rankProperty")).toBeDefined()
     })
 })
 

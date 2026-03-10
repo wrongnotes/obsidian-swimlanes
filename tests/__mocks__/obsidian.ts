@@ -119,11 +119,15 @@ export class NullValue {
     }
 }
 export class StringValue {
+    private _value: string
+    constructor(value: string = "") {
+        this._value = value
+    }
     isTruthy() {
         return true
     }
     toString() {
-        return ""
+        return this._value
     }
 }
 export class NumberValue {

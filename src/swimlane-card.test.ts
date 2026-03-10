@@ -152,7 +152,7 @@ describe("renderCard", () => {
 
     it("renders properties table with truthy values", () => {
         const container = document.createElement("div")
-        const entry = makeEntry("Note", undefined, () => new StringValue())
+        const entry = makeEntry("Note", undefined, () => new StringValue("high"))
         const card = renderCard(
             container,
             entry,
@@ -167,7 +167,7 @@ describe("renderCard", () => {
 
     it("renders property icons when showIcons is true", () => {
         const container = document.createElement("div")
-        const entry = makeEntry("Note", undefined, () => new StringValue())
+        const entry = makeEntry("Note", undefined, () => new StringValue("high"))
         const card = renderCard(
             container,
             entry,
@@ -182,7 +182,7 @@ describe("renderCard", () => {
 
     it("does not render property icons when showIcons is false", () => {
         const container = document.createElement("div")
-        const entry = makeEntry("Note", undefined, () => new StringValue())
+        const entry = makeEntry("Note", undefined, () => new StringValue("high"))
         const card = renderCard(
             container,
             entry,
@@ -197,7 +197,7 @@ describe("renderCard", () => {
 
     it("formats BooleanValue as Yes/No", () => {
         const container = document.createElement("div")
-        const entry = makeEntry("Note", undefined, () => new BooleanValue())
+        const entry = makeEntry("Note", undefined, () => new BooleanValue(true))
         const card = renderCard(
             container,
             entry,
@@ -215,7 +215,7 @@ describe("renderCard", () => {
         const container = document.createElement("div")
         const entry = makeEntry("Note", undefined, (propId: BasesPropertyId) => {
             if (propId === ("note.cover" as BasesPropertyId)) {
-                return new StringValueWithString("https://example.com/img.png")
+                return new StringValue("https://example.com/img.png")
             }
             return null
         })
@@ -234,7 +234,7 @@ describe("renderCard", () => {
         const container = document.createElement("div")
         const entry = makeEntry("Note", undefined, (propId: BasesPropertyId) => {
             if (propId === ("note.cover" as BasesPropertyId)) {
-                return new StringValueWithString("images/photo.png")
+                return new StringValue("images/photo.png")
             }
             return null
         })
@@ -269,7 +269,7 @@ describe("renderCard", () => {
         const container = document.createElement("div")
         const entry = makeEntry("Note", undefined, (propId: BasesPropertyId) => {
             if (propId === ("note.cover" as BasesPropertyId)) {
-                return new StringValueWithString("https://example.com/img.png")
+                return new StringValue("https://example.com/img.png")
             }
             return null
         })
@@ -282,18 +282,6 @@ describe("renderCard", () => {
         expect(card.querySelector(".swimlane-card-content .swimlane-card-title")).not.toBeNull()
     })
 })
-
-// Helper: StringValue that returns a specific string
-class StringValueWithString extends StringValue {
-    private val: string
-    constructor(val: string) {
-        super()
-        this.val = val
-    }
-    toString() {
-        return this.val
-    }
-}
 
 describe("card context menu actions", () => {
     it("calls getSwimlaneContext lazily on contextmenu", () => {
