@@ -1027,8 +1027,15 @@ describe("DragAndDropContext hitbox adjustments", () => {
         // Card list rect is 0,0,200,200. With 50px margin, hitbox extends to -50..-50..250..250
         // Place pointer at 220, 100 — inside extended hitbox but outside original rect
         cardList.getBoundingClientRect = () => ({
-            top: 0, left: 0, width: 200, height: 200, bottom: 200, right: 200,
-            x: 0, y: 0, toJSON: () => ({}),
+            top: 0,
+            left: 0,
+            width: 200,
+            height: 200,
+            bottom: 200,
+            right: 200,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
         })
 
         pointerDown(card)
@@ -1044,9 +1051,7 @@ describe("DragAndDropContext hitbox adjustments", () => {
         const dnd = new DragAndDropContext<DragState, TestDropContext, number>({
             ...defaultDndOptions(),
             onDrop,
-            dropAreaHitboxAdjustments: [
-                { selector: ".special-list", margin: 100 },
-            ],
+            dropAreaHitboxAdjustments: [{ selector: ".special-list", margin: 100 }],
         })
         const container = makeEl()
         const cardList = makeEl()
@@ -1063,8 +1068,15 @@ describe("DragAndDropContext hitbox adjustments", () => {
         dnd.registerDraggable(card, dragState())
 
         cardList.getBoundingClientRect = () => ({
-            top: 0, left: 0, width: 200, height: 200, bottom: 200, right: 200,
-            x: 0, y: 0, toJSON: () => ({}),
+            top: 0,
+            left: 0,
+            width: 200,
+            height: 200,
+            bottom: 200,
+            right: 200,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
         })
 
         pointerDown(card)
@@ -1097,8 +1109,15 @@ describe("DragAndDropContext hitbox adjustments", () => {
         dnd.registerDraggable(card, dragState())
 
         cardList.getBoundingClientRect = () => ({
-            top: 0, left: 0, width: 200, height: 200, bottom: 200, right: 200,
-            x: 0, y: 0, toJSON: () => ({}),
+            top: 0,
+            left: 0,
+            width: 200,
+            height: 200,
+            bottom: 200,
+            right: 200,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
         })
 
         pointerDown(card)

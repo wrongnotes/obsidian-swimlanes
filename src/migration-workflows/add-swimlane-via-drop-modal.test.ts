@@ -36,9 +36,9 @@ function pressEnter(input: HTMLInputElement) {
 describe("AddSwimlaneViaDropModal", () => {
     it("renders title and description", () => {
         const modal = openModal(makeCtx())
-        expect(modal.contentEl.querySelector(".swimlane-migration-description")?.textContent).toContain(
-            'Enter a new "status" value',
-        )
+        expect(
+            modal.contentEl.querySelector(".swimlane-migration-description")?.textContent,
+        ).toContain('Enter a new "status" value')
     })
 
     it("renders an input field", () => {

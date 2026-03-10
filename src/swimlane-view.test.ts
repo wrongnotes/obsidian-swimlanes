@@ -272,10 +272,7 @@ describe("swimlane order", () => {
 
     it("respects configured swimlane order", () => {
         const { view, container } = makeView(
-            [
-                makeGroup("Backlog", [makeEntry("A")]),
-                makeGroup("Done", [makeEntry("B")]),
-            ],
+            [makeGroup("Backlog", [makeEntry("A")]), makeGroup("Done", [makeEntry("B")])],
             { swimlaneOrder: ["Done", "Backlog"] },
         )
         view.onDataUpdated()
@@ -302,10 +299,9 @@ describe("swimlane order", () => {
     })
 
     it("renders empty columns from swimlaneOrder that have no data", () => {
-        const { view, container } = makeView(
-            [makeGroup("Backlog", [makeEntry("A")])],
-            { swimlaneOrder: ["Backlog", "EmptyCol"] },
-        )
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])], {
+            swimlaneOrder: ["Backlog", "EmptyCol"],
+        })
         view.onDataUpdated()
         const headers = Array.from(container.querySelectorAll(".swimlane-column-header"))
         const labels = headers.map(h => h.firstElementChild?.textContent)
@@ -408,10 +404,9 @@ describe("add column input", () => {
     })
 
     it("duplicate column name triggers Notice and highlight", () => {
-        const { view, container } = makeView(
-            [makeGroup("Backlog", [makeEntry("A")])],
-            { swimlaneOrder: ["Backlog"] },
-        )
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])], {
+            swimlaneOrder: ["Backlog"],
+        })
         view.onDataUpdated()
         const btn = container.querySelector(".swimlane-add-column-btn")! as HTMLElement
         btn.click()
