@@ -24,3 +24,6 @@ memory/
 
 # Local dev config
 .env
+
+# Test coverage reports
+coverage/

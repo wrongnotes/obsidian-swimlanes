@@ -58,6 +58,7 @@ export default tseslint.config(
     globalIgnores([
         "node_modules",
         "dist",
+        "coverage",
         "*.mjs",
         "eslint.config.js",
         "scripts/",
