@@ -4,8 +4,8 @@ function makeApp() {
     return {
         vault: {
             getAllFolders: () => [],
-            getFileByPath: jest.fn().mockReturnValue({ path: "test.base" }),
-            create: jest.fn().mockResolvedValue(undefined),
+
+            create: jest.fn().mockResolvedValue({ path: "test.base" }),
             adapter: {
                 exists: jest.fn().mockResolvedValue(false),
             },
@@ -30,7 +30,7 @@ describe("CreateBaseModal", () => {
 
     it("sets the modal title", () => {
         modal.open()
-        expect(modal.titleEl.textContent).toBe("Create base")
+        expect(modal.titleEl.textContent).toBe("Create swimlanes")
     })
 
     it("renders folder, name, group key, and group values settings", () => {

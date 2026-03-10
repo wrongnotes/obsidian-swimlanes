@@ -14,12 +14,12 @@ export default class SwimlanePlugin extends Plugin {
         })
 
         this.addCommand({
-            id: "create-base",
-            name: "Create new base",
+            id: "create-board",
+            name: "Create new board",
             callback: () => new CreateBaseModal(this.app).open(),
         })
 
-        this.addRibbonIcon("database", "Create new base", () => {
+        this.addRibbonIcon("database", "Create swimlane board", () => {
             new CreateBaseModal(this.app).open()
         })
     }

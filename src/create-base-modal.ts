@@ -13,7 +13,7 @@ export class CreateBaseModal extends Modal {
     }
 
     onOpen(): void {
-        this.setTitle("Create base")
+        this.setTitle("Create swimlanes")
 
         this.buildFolderSetting()
         this.buildNameSetting()
@@ -142,12 +142,8 @@ export class CreateBaseModal extends Modal {
         }
 
         const config = this.buildBaseConfig(folder)
-        await this.app.vault.create(filePath, JSON.stringify(config, null, "\t"))
-
-        const file = this.app.vault.getFileByPath(filePath)
-        if (file) {
-            await this.app.workspace.getLeaf().openFile(file)
-        }
+        const file = await this.app.vault.create(filePath, JSON.stringify(config, null, "\t"))
+        await this.app.workspace.getLeaf().openFile(file)
 
         this.close()
     }
