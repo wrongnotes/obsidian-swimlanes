@@ -20,8 +20,8 @@ function getInput(modal: AddSwimlaneViaDropModal): HTMLInputElement {
     return modal.contentEl.querySelector("input")!
 }
 
-function getErrorEl(modal: AddSwimlaneViaDropModal): HTMLElement {
-    return modal.contentEl.querySelector(".swimlane-migration-error")!
+function getErrorEl(modal: AddSwimlaneViaDropModal): HTMLElement | null {
+    return modal.contentEl.querySelector(".swimlane-modal-error")
 }
 
 function type(input: HTMLInputElement, value: string) {
@@ -36,9 +36,9 @@ function pressEnter(input: HTMLInputElement) {
 describe("AddSwimlaneViaDropModal", () => {
     it("renders title and description", () => {
         const modal = openModal(makeCtx())
-        expect(
-            modal.contentEl.querySelector(".swimlane-migration-description")?.textContent,
-        ).toContain('Enter a new "status" value')
+        expect(modal.contentEl.querySelector(".setting-item-description")?.textContent).toContain(
+            'Enter a new "status" value',
+        )
     })
 
     it("renders an input field", () => {
@@ -49,9 +49,6 @@ describe("AddSwimlaneViaDropModal", () => {
     it("confirm button starts disabled", () => {
         const ctx = makeCtx()
         const modal = openModal(ctx)
-        // The Setting mock creates buttons via addButton callback. Since our mock
-        // doesn't fully wire up the confirm button, we test the public behavior:
-        // typing an empty string and pressing Enter should NOT call onConfirm.
         const input = getInput(modal)
         pressEnter(input)
         expect(ctx.onConfirm).not.toHaveBeenCalled()
@@ -75,12 +72,12 @@ describe("AddSwimlaneViaDropModal", () => {
         expect(ctx.onConfirm).not.toHaveBeenCalled()
     })
 
-    it("shows error when value matches an existing column", () => {
+    it("shows error when trying to confirm a duplicate value", () => {
         const modal = openModal(makeCtx({ existingColumns: ["Backlog", "Done"] }))
         const input = getInput(modal)
         type(input, "Done")
-        const error = getErrorEl(modal)
-        expect(error.textContent).toContain('Swimlane "Done" already exists')
+        pressEnter(input)
+        expect(getErrorEl(modal)?.textContent).toContain('Swimlane "Done" already exists')
     })
 
     it("calls onConfirm with trimmed value on Enter", () => {
@@ -96,14 +93,5 @@ describe("AddSwimlaneViaDropModal", () => {
         const modal = openModal(makeCtx())
         modal.onClose()
         expect(modal.contentEl.innerHTML).toBe("")
-    })
-
-    it("hides error when value is cleared after showing error", () => {
-        const modal = openModal(makeCtx({ existingColumns: ["Done"] }))
-        const input = getInput(modal)
-        type(input, "Done")
-        expect(getErrorEl(modal).style.display).not.toBe("none")
-        type(input, "New Column")
-        expect(getErrorEl(modal).style.display).toBe("none")
     })
 })

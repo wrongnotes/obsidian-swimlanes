@@ -4,7 +4,7 @@ function makeApp() {
     return {
         vault: {
             getAllFolders: () => [],
-
+            getMarkdownFiles: () => [],
             create: jest.fn().mockResolvedValue({ path: "test.base" }),
             adapter: {
                 exists: jest.fn().mockResolvedValue(false),
@@ -15,7 +15,9 @@ function makeApp() {
                 openFile: jest.fn().mockResolvedValue(undefined),
             }),
         },
-        metadataCache: {},
+        metadataCache: {
+            getFileCache: () => null,
+        },
     } as any
 }
 
@@ -33,14 +35,28 @@ describe("CreateBaseModal", () => {
         expect(modal.titleEl.textContent).toBe("Create swimlanes")
     })
 
-    it("renders folder, name, group key, and group values settings", () => {
+    it("renders name, folder, and swimlanes settings", () => {
         modal.open()
         const names = modal.contentEl.querySelectorAll(".setting-item-name")
         const labels = Array.from(names).map(n => n.textContent)
+        expect(labels).toContain("Name")
         expect(labels).toContain("Folder")
-        expect(labels).toContain("Base name")
-        expect(labels).toContain("Group property")
-        expect(labels).toContain("Group values")
+        expect(labels).toContain("Swimlanes")
+        expect(labels).toContain("Property")
+        expect(labels).toContain("Values")
+    })
+
+    it("renders name as the first field", () => {
+        modal.open()
+        const names = modal.contentEl.querySelectorAll(".setting-item-name")
+        expect(names[0]?.textContent).toBe("Name")
+    })
+
+    it("defaults group property to swimlane", () => {
+        modal.open()
+        const inputs = modal.contentEl.querySelectorAll("input")
+        // name=0, folder=1, group key=2
+        expect(inputs[2]?.value).toBe("swimlane")
     })
 
     it("renders a create button", () => {
@@ -50,77 +66,66 @@ describe("CreateBaseModal", () => {
         expect(button?.textContent).toBe("Create")
     })
 
-    it("shows validation error when base name is empty", async () => {
+    it("shows validation error when name is empty", async () => {
         modal.open()
         const button = modal.contentEl.querySelector("button")!
         button.click()
         await flush()
-        const error = modal.contentEl.querySelector(".create-base-error")
+        const error = modal.contentEl.querySelector(".swimlane-modal-error")
         expect(error).not.toBeNull()
-        expect(error?.textContent).toBe("Base name is required.")
+        expect(error?.textContent).toBe("Name is required.")
     })
 
     it("shows validation error when group key is empty", async () => {
         modal.open()
-        setInputValue(modal.contentEl, 1, "My Base")
+        setInputValue(modal.contentEl, 0, "My Base")
+        setInputValue(modal.contentEl, 2, "")
         const button = modal.contentEl.querySelector("button")!
         button.click()
         await flush()
-        const error = modal.contentEl.querySelector(".create-base-error")
-        expect(error?.textContent).toBe("Group property is required.")
+        const error = modal.contentEl.querySelector(".swimlane-modal-error")
+        expect(error?.textContent).toBe("Grouping property is required.")
     })
 
     it("shows validation error when no group values are added", async () => {
         modal.open()
-        setInputValue(modal.contentEl, 1, "My Base")
-        setInputValue(modal.contentEl, 2, "status")
+        setInputValue(modal.contentEl, 0, "My Base")
         const button = modal.contentEl.querySelector("button")!
         button.click()
         await flush()
-        const error = modal.contentEl.querySelector(".create-base-error")
-        expect(error?.textContent).toBe("Add at least one group value.")
+        const error = modal.contentEl.querySelector(".swimlane-modal-error")
+        expect(error?.textContent).toBe("Add at least one swimlane.")
     })
 
     it("adds group values via Enter key", () => {
         modal.open()
-        const inputs = modal.contentEl.querySelectorAll("input")
-        const groupValueInput = inputs[3]! // folder, name, group key, group values
-        groupValueInput.value = "To Do"
-        groupValueInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
-        const tags = modal.contentEl.querySelectorAll(".create-base-tag")
+        addGroupValue(modal.contentEl, "To Do")
+        const tags = modal.contentEl.querySelectorAll(".swimlane-multi-value-text-tag")
         expect(tags.length).toBe(1)
         expect(tags[0]?.textContent).toContain("To Do")
     })
 
     it("prevents duplicate group values", () => {
         modal.open()
-        const inputs = modal.contentEl.querySelectorAll("input")
-        const groupValueInput = inputs[3]!
-        groupValueInput.value = "To Do"
-        groupValueInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
-        groupValueInput.value = "To Do"
-        groupValueInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
-        const tags = modal.contentEl.querySelectorAll(".create-base-tag")
+        addGroupValue(modal.contentEl, "To Do")
+        addGroupValue(modal.contentEl, "To Do")
+        const tags = modal.contentEl.querySelectorAll(".swimlane-multi-value-text-tag")
         expect(tags.length).toBe(1)
     })
 
     it("removes group values when clicking remove button", () => {
         modal.open()
-        const inputs = modal.contentEl.querySelectorAll("input")
-        const groupValueInput = inputs[3]!
-        groupValueInput.value = "To Do"
-        groupValueInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
-        const removeBtn = modal.contentEl.querySelector(".create-base-tag-remove")!
+        addGroupValue(modal.contentEl, "To Do")
+        const removeBtn = modal.contentEl.querySelector(".swimlane-multi-value-text-tag-remove")!
         ;(removeBtn as HTMLElement).click()
-        const tags = modal.contentEl.querySelectorAll(".create-base-tag")
+        const tags = modal.contentEl.querySelectorAll(".swimlane-multi-value-text-tag")
         expect(tags.length).toBe(0)
     })
 
     it("creates the base file on submit", async () => {
         modal.open()
-        setInputValue(modal.contentEl, 0, "Projects")
-        setInputValue(modal.contentEl, 1, "Task board")
-        setInputValue(modal.contentEl, 2, "status")
+        setInputValue(modal.contentEl, 0, "Task board")
+        setInputValue(modal.contentEl, 1, "Projects")
         addGroupValue(modal.contentEl, "To Do")
         addGroupValue(modal.contentEl, "Done")
 
@@ -137,8 +142,7 @@ describe("CreateBaseModal", () => {
     it("shows error when file already exists", async () => {
         app.vault.adapter.exists.mockResolvedValue(true)
         modal.open()
-        setInputValue(modal.contentEl, 1, "Existing")
-        setInputValue(modal.contentEl, 2, "status")
+        setInputValue(modal.contentEl, 0, "Existing")
         addGroupValue(modal.contentEl, "To Do")
 
         const button = modal.contentEl.querySelector("button")!
@@ -146,7 +150,7 @@ describe("CreateBaseModal", () => {
         await flush()
 
         expect(app.vault.create).not.toHaveBeenCalled()
-        const error = modal.contentEl.querySelector(".create-base-error")
+        const error = modal.contentEl.querySelector(".swimlane-modal-error")
         expect(error?.textContent).toContain("already exists")
     })
 
@@ -156,7 +160,6 @@ describe("CreateBaseModal", () => {
         })
 
         it("creates config with folder filter", () => {
-            setInputValue(modal.contentEl, 2, "status")
             addGroupValue(modal.contentEl, "To Do")
             addGroupValue(modal.contentEl, "Done")
 
@@ -165,11 +168,10 @@ describe("CreateBaseModal", () => {
             expect(config.views).toHaveLength(1)
             expect(config.views![0]!.type).toBe("sheet")
             expect(config.views![0]!.name).toBe("Sheet")
-            expect(config.views![0]!.order).toContain("note.status")
+            expect(config.views![0]!.order).toContain("note.swimlane")
         })
 
         it("omits filter when folder is empty", () => {
-            setInputValue(modal.contentEl, 2, "status")
             addGroupValue(modal.contentEl, "To Do")
 
             const config = modal.buildBaseConfig("")
@@ -195,7 +197,7 @@ function setInputValue(container: HTMLElement, index: number, value: string): vo
 
 function addGroupValue(container: HTMLElement, value: string): void {
     const inputs = container.querySelectorAll("input")
-    const groupValueInput = inputs[3]!
+    const groupValueInput = inputs[3]! // name, folder, group key, group values
     groupValueInput.value = value
     groupValueInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
 }

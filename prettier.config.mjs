@@ -9,6 +9,7 @@ const config = {
     arrowParens: "avoid",
     bracketSpacing: true,
     bracketSameLine: true,
+    endOfLine: "lf",
 }
 
 export default config

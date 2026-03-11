@@ -97,7 +97,17 @@ export class Setting {
         return this
     }
 
+    addExtraButton(cb: (component: ExtraButtonComponent) => void) {
+        const component = new ExtraButtonComponent(this.controlEl)
+        cb(component)
+        return this
+    }
+
     setClass(_cls: string) {
+        return this
+    }
+
+    setHeading() {
         return this
     }
 }
@@ -161,6 +171,33 @@ export class ButtonComponent {
 
     setDisabled(disabled: boolean) {
         this.buttonEl.disabled = disabled
+        return this
+    }
+}
+
+export class ExtraButtonComponent {
+    extraSettingsEl: HTMLElement
+
+    constructor(containerEl: HTMLElement) {
+        this.extraSettingsEl = document.createElement("div")
+        this.extraSettingsEl.classList.add("clickable-icon")
+        containerEl.appendChild(this.extraSettingsEl)
+    }
+
+    setIcon(_icon: string) {
+        return this
+    }
+
+    setTooltip(_tooltip: string) {
+        return this
+    }
+
+    onClick(callback: () => void) {
+        this.extraSettingsEl.addEventListener("click", callback)
+        return this
+    }
+
+    setDisabled(_disabled: boolean) {
         return this
     }
 }
@@ -304,6 +341,22 @@ export class AbstractInputSuggest<T> {
 
     renderSuggestion(_value: T, _el: HTMLElement) {}
     selectSuggestion(_value: T, _evt?: MouseEvent | KeyboardEvent) {}
+}
+
+export class TFile {
+    path: string
+    basename: string
+    extension: string
+
+    constructor(path: string) {
+        this.path = path
+        this.basename =
+            path
+                .split("/")
+                .pop()
+                ?.replace(/\.[^.]+$/, "") ?? ""
+        this.extension = path.split(".").pop() ?? ""
+    }
 }
 
 export class TFolder {

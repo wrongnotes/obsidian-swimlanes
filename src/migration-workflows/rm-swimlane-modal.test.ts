@@ -1,5 +1,4 @@
 import { RmSwimlaneModal, RmSwimlaneContext } from "./rm-swimlane-modal"
-import type { RmSwimlaneOp } from "./operations"
 
 function makeCtx(overrides?: Partial<RmSwimlaneContext>): RmSwimlaneContext {
     return {
@@ -20,7 +19,7 @@ function openModal(ctx: RmSwimlaneContext) {
 }
 
 function getOptions(modal: RmSwimlaneModal): HTMLElement[] {
-    return Array.from(modal.contentEl.querySelectorAll(".swimlane-migration-option"))
+    return Array.from(modal.contentEl.querySelectorAll(".swimlane-modal-option"))
 }
 
 function getSelect(modal: RmSwimlaneModal): HTMLSelectElement {
@@ -28,20 +27,19 @@ function getSelect(modal: RmSwimlaneModal): HTMLSelectElement {
 }
 
 function getInput(modal: RmSwimlaneModal): HTMLInputElement {
-    return modal.contentEl.querySelector(".swimlane-migration-input")!
+    return modal.contentEl.querySelector(".swimlane-modal-move-input")!
 }
 
 describe("RmSwimlaneModal", () => {
     it("renders title with column name", () => {
         const modal = openModal(makeCtx({ columnName: "Archive" }))
-        // setTitle is a no-op in mock, but description should reference card count
-        const desc = modal.contentEl.querySelector(".swimlane-migration-description")
+        const desc = modal.contentEl.querySelector(".swimlane-modal-description")
         expect(desc?.textContent).toContain("2 cards")
     })
 
     it("renders singular 'card' for 1 file", () => {
         const modal = openModal(makeCtx({ files: [{ path: "a.md" }] as any }))
-        const desc = modal.contentEl.querySelector(".swimlane-migration-description")
+        const desc = modal.contentEl.querySelector(".swimlane-modal-description")
         expect(desc?.textContent).toContain("1 card.")
         expect(desc?.textContent).not.toContain("1 cards")
     })
@@ -54,35 +52,35 @@ describe("RmSwimlaneModal", () => {
     it("defaults to 'move' selected", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
-        expect(options[0]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[0]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("clicking hide row selects it and deselects move", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
         options[1]?.click() // hide row
-        expect(options[0]?.classList.contains("swimlane-migration-option--selected")).toBe(false)
-        expect(options[1]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[0]?.classList.contains("swimlane-modal-option--selected")).toBe(false)
+        expect(options[1]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("clicking clear row selects it", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
         options[2]?.click() // clear row
-        expect(options[2]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[2]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("clicking delete row selects it", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
         options[3]?.click() // delete row
-        expect(options[3]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[3]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("delete option has danger class", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
-        expect(options[3]?.classList.contains("swimlane-migration-option--danger")).toBe(true)
+        expect(options[3]?.classList.contains("swimlane-modal-option--danger")).toBe(true)
     })
 
     it("renders select with other columns", () => {
@@ -106,7 +104,7 @@ describe("RmSwimlaneModal", () => {
         select.value = "__swimlane_new_value__"
         select.dispatchEvent(new Event("change"))
         const input = getInput(modal)
-        expect(input.classList.contains("swimlane-migration-input--hidden")).toBe(false)
+        expect(input.classList.contains("swimlane-modal-move-input--hidden")).toBe(false)
     })
 
     it("hides text input when an existing column is selected", () => {
@@ -114,7 +112,7 @@ describe("RmSwimlaneModal", () => {
         const select = getSelect(modal)
         // Default should be "Done" which hides the input
         const input = getInput(modal)
-        expect(input.classList.contains("swimlane-migration-input--hidden")).toBe(true)
+        expect(input.classList.contains("swimlane-modal-move-input--hidden")).toBe(true)
     })
 
     it("onClose empties contentEl", () => {
@@ -125,27 +123,27 @@ describe("RmSwimlaneModal", () => {
 
     it("renders option labels with icons", () => {
         const modal = openModal(makeCtx())
-        const icons = modal.contentEl.querySelectorAll(".swimlane-migration-option-icon")
+        const icons = modal.contentEl.querySelectorAll(".swimlane-modal-option-icon")
         expect(icons.length).toBeGreaterThanOrEqual(4)
     })
 
     it("renders hint text on hide option", () => {
         const modal = openModal(makeCtx())
-        const hints = modal.contentEl.querySelectorAll(".swimlane-migration-option-hint")
+        const hints = modal.contentEl.querySelectorAll(".swimlane-modal-option-hint")
         const hintTexts = Array.from(hints).map(h => h.textContent)
         expect(hintTexts).toContain("Cards are unchanged; swimlane is hidden from this view")
     })
 
     it("renders hint text on clear option", () => {
         const modal = openModal(makeCtx())
-        const hints = modal.contentEl.querySelectorAll(".swimlane-migration-option-hint")
+        const hints = modal.contentEl.querySelectorAll(".swimlane-modal-option-hint")
         const hintTexts = Array.from(hints).map(h => h.textContent)
         expect(hintTexts).toContain("Cards will no longer appear on the board")
     })
 
     it("renders hint text on delete option", () => {
         const modal = openModal(makeCtx())
-        const hints = modal.contentEl.querySelectorAll(".swimlane-migration-option-hint")
+        const hints = modal.contentEl.querySelectorAll(".swimlane-modal-option-hint")
         const hintTexts = Array.from(hints).map(h => h.textContent)
         expect(hintTexts).toContain("Moves note files to trash")
     })
@@ -154,11 +152,11 @@ describe("RmSwimlaneModal", () => {
         const modal = openModal(makeCtx())
         const options = getOptions(modal)
         options[1]?.click() // select hide first
-        expect(options[1]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[1]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
         const select = getSelect(modal)
         select.dispatchEvent(new Event("change"))
         // Should be back to move selected
-        expect(options[0]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[0]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("input typing sets selection to move", () => {
@@ -172,7 +170,7 @@ describe("RmSwimlaneModal", () => {
         const input = getInput(modal)
         input.value = "New Column"
         input.dispatchEvent(new Event("input"))
-        expect(options[0]?.classList.contains("swimlane-migration-option--selected")).toBe(true)
+        expect(options[0]?.classList.contains("swimlane-modal-option--selected")).toBe(true)
     })
 
     it("select click stops propagation to prevent row selection", () => {

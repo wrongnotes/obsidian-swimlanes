@@ -406,7 +406,8 @@ export class SwimlaneView extends BasesView {
     }
 
     private renderAddCardInput(columnEl: HTMLElement, groupKey: GroupKey): void {
-        const input = columnEl.createEl("input", {
+        const wrapper = columnEl.createDiv({ cls: "swimlane-add-card-wrapper" })
+        const input = wrapper.createEl("input", {
             cls: "swimlane-add-card-input",
             attr: { type: "text", placeholder: "Card title…" },
         })
@@ -418,7 +419,7 @@ export class SwimlaneView extends BasesView {
                 return
             }
             settled = true
-            input.remove()
+            wrapper.remove()
             this.renderAddCardButton(columnEl, groupKey)
         }
 
@@ -432,7 +433,7 @@ export class SwimlaneView extends BasesView {
                 return
             }
             settled = true
-            input.remove()
+            wrapper.remove()
             this.createCard(title, groupKey)
         }
 
