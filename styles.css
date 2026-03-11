@@ -73,13 +73,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: var(--size-2-1);
     color: var(--text-faint);
+    background-color: transparent;
     border-radius: var(--radius-s);
     cursor: pointer;
     opacity: 0;
     transition:
         opacity var(--anim-duration-fast) ease,
-        color var(--anim-duration-fast) ease;
+        color var(--anim-duration-fast) ease,
+        background-color var(--anim-duration-fast) ease;
 }
 
 .swimlane-column-remove svg {
@@ -93,6 +96,7 @@
 
 .swimlane-column-remove:hover {
     color: var(--text-error);
+    background-color: var(--background-modifier-hover);
 }
 
 .swimlane-column-count {
@@ -113,8 +117,8 @@
     position: relative;
 }
 
-.swimlane-card-list:has(~ .swimlane-add-card-btn),
-.swimlane-card-list:has(~ .swimlane-add-card-input) {
+.swimlane-card-list:empty:has(~ .swimlane-add-card-btn),
+.swimlane-card-list:empty:has(~ .swimlane-add-card-wrapper) {
     padding-bottom: 0;
 }
 
@@ -235,7 +239,7 @@
     align-items: center;
     gap: var(--size-4-1);
     padding: var(--size-4-1) var(--size-4-2);
-    margin: var(--size-4-2);
+    margin: 0 var(--size-4-2) var(--size-4-2);
     border-radius: var(--radius-s);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
@@ -263,18 +267,26 @@
     height: var(--icon-xs);
 }
 
-.swimlane-add-card-input {
-    width: calc(100% - 2 * var(--size-4-2));
-    margin: 0 var(--size-4-2) var(--size-4-2);
-    padding: var(--size-4-2) var(--size-4-3);
-    border: var(--input-border-width) solid var(--interactive-accent);
-    border-radius: var(--input-radius);
+.swimlane-add-card-wrapper {
     background-color: var(--background-primary);
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    margin: var(--border-width) calc(var(--size-4-2) + var(--border-width)) var(--size-4-2);
+}
+
+.swimlane-add-card-input {
+    width: calc(100% - 2 * var(--border-width));
+    margin-left: var(--border-width);
+    padding: var(--size-4-2) var(--size-4-3);
+    border: none;
+    border-radius: var(--radius-s);
+    background: none;
     color: var(--text-normal);
     font-size: var(--font-ui-small);
     font-weight: var(--input-font-weight);
     outline: none;
     box-sizing: border-box;
+    box-shadow: none;
 }
 
 .swimlane-add-column-btn {
@@ -341,19 +353,21 @@
     }
 }
 
-.swimlane-migration-description {
+/* Modal description text */
+.swimlane-modal-description {
     color: var(--text-muted);
     margin-bottom: var(--size-4-2);
 }
 
-.swimlane-migration-options {
+/* Option picker — reusable radio-card group */
+.swimlane-modal-options {
     display: flex;
     flex-direction: column;
     gap: var(--size-4-2);
     margin-bottom: var(--size-4-4);
 }
 
-.swimlane-migration-option {
+.swimlane-modal-option {
     display: flex;
     flex-direction: column;
     gap: var(--size-2-2);
@@ -366,44 +380,44 @@
         background-color var(--anim-duration-moderate) ease;
 }
 
-.swimlane-migration-option:hover {
+.swimlane-modal-option:hover {
     background-color: var(--background-modifier-hover);
 }
 
-.swimlane-migration-option--selected {
+.swimlane-modal-option--selected {
     border-color: var(--interactive-accent);
     background-color: var(--background-modifier-hover);
 }
 
-.swimlane-migration-option-label {
+.swimlane-modal-option-label {
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    font-size: var(--font-ui-small);
     color: var(--text-normal);
 }
 
-.swimlane-migration-option-icon {
+.swimlane-modal-option-icon {
     display: inline-flex;
     color: var(--text-faint);
 }
 
-.swimlane-migration-option-icon svg {
+.swimlane-modal-option-icon svg {
     width: var(--icon-s);
     height: var(--icon-s);
 }
 
-.swimlane-migration-option--danger .swimlane-migration-option-label,
-.swimlane-migration-option--danger .swimlane-migration-option-icon {
+.swimlane-modal-option--danger .swimlane-modal-option-label,
+.swimlane-modal-option--danger .swimlane-modal-option-icon {
     color: var(--text-error);
 }
 
-.swimlane-migration-option-hint {
+.swimlane-modal-option-hint {
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
 }
 
-.swimlane-migration-move-controls {
+/* Move controls (inline select + text input inside an option card) */
+.swimlane-modal-move-controls {
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
@@ -411,48 +425,23 @@
     min-width: 0;
 }
 
-.swimlane-migration-select {
+.swimlane-modal-move-select {
     flex-shrink: 1;
     min-width: 0;
 }
 
-.swimlane-migration-select--has-input {
+.swimlane-modal-move-select--has-input {
     flex-shrink: 0;
     width: auto;
 }
 
-.swimlane-migration-input {
+.swimlane-modal-move-input {
     flex: 1;
     min-width: 0;
-    padding: var(--size-2-2) var(--size-4-2);
-    border: var(--input-border-width) solid var(--background-modifier-border);
-    border-radius: var(--input-radius);
-    background-color: var(--background-primary);
-    color: var(--text-normal);
-    font-size: var(--font-ui-small);
-    font-weight: var(--input-font-weight);
-    outline: none;
 }
 
-.swimlane-migration-input:focus {
-    border-color: var(--interactive-accent);
-}
-
-.swimlane-migration-input--block {
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: var(--size-4-4);
-}
-
-.swimlane-migration-input--hidden {
+.swimlane-modal-move-input--hidden {
     display: none;
-}
-
-.swimlane-migration-error {
-    color: var(--text-error);
-    font-size: var(--font-ui-smaller);
-    margin-top: calc(-1 * var(--size-4-3));
-    margin-bottom: var(--size-4-4);
 }
 
 .swimlane-add-column-btn > .swimlane-drop-indicator {
@@ -461,4 +450,130 @@
 
 .swimlane-drag-and-drop--hidden {
     display: none;
+}
+
+/* Create base modal */
+
+/* ── Modal-level grid ──────────────────────────────────────────────
+   Columns: [info 1fr] [input auto] [extra-button auto]
+   Top-level settings use subgrid so they keep their box (borders,
+   padding) while their children align with the modal columns.     */
+.swimlane-modal > .modal-content {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    padding-top: var(--size-4-4);
+}
+
+/* Top-level settings: subgrid preserves the setting-item box */
+.swimlane-modal > .modal-content > .setting-item {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+}
+
+/* Controls dissolve so inputs/buttons become grid items */
+.swimlane-modal .setting-item-control {
+    display: contents;
+}
+
+/* Text inputs span both control columns */
+.swimlane-modal .setting-item-control input[type="text"] {
+    grid-column: 2 / -1;
+}
+
+/* In multi-value text, the input shares the row with the add button */
+.swimlane-modal .swimlane-multi-value-text .setting-item-control input[type="text"] {
+    grid-column: 2;
+}
+
+/* MultiValueText wrapper dissolves into its parent grid */
+.swimlane-modal .swimlane-multi-value-text {
+    display: contents;
+}
+
+/* Tag chips span full width */
+.swimlane-modal .swimlane-multi-value-text-tags {
+    grid-column: 1 / -1;
+}
+
+/* Full-width non-setting elements */
+.swimlane-modal .swimlane-modal-description,
+.swimlane-modal .swimlane-modal-options,
+.swimlane-modal .swimlane-modal-error {
+    grid-column: 1 / -1;
+}
+
+/* Button-bar settings keep their own flex layout */
+.swimlane-modal > .modal-content > .setting-item:has(button):not(:has(input)) {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.swimlane-modal
+    > .modal-content
+    > .setting-item:has(button):not(:has(input))
+    > .setting-item-control {
+    display: flex;
+    gap: var(--size-4-2);
+}
+
+/* ── InputSection ─────────────────────────────────────────────────
+   Subgrid inherits the modal's column tracks so inputs align
+   exactly with top-level settings. Labels are indented via
+   padding on the info element, not on the section container.      */
+.swimlane-input-section {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    row-gap: var(--size-4-2);
+    padding-bottom: var(--size-4-4);
+}
+
+/* Settings inside InputSection dissolve into its subgrid */
+.swimlane-input-section > .setting-item,
+.swimlane-input-section > .swimlane-multi-value-text,
+.swimlane-input-section > .swimlane-multi-value-text > .setting-item {
+    display: contents;
+}
+
+/* Indent labels within the section */
+.swimlane-input-section .setting-item-info {
+    padding-left: var(--size-4-4);
+}
+
+/* ── Multi-value text tags ─────────────────────────────────────── */
+.swimlane-multi-value-text-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-2-2);
+}
+
+.swimlane-multi-value-text-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-2-2);
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-2-1) var(--size-2-3);
+    border-radius: var(--radius-s);
+    cursor: default;
+}
+
+.swimlane-multi-value-text-tag-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-weight: var(--font-bold);
+}
+
+.swimlane-multi-value-text-tag-remove:hover {
+    opacity: 1;
+}
+
+.swimlane-modal-error {
+    color: var(--text-error);
+    font-size: var(--font-ui-small);
+    padding: var(--size-4-2) var(--size-4-4);
 }

@@ -1,5 +1,7 @@
-import { Modal, Setting, setIcon } from "obsidian"
+import { Setting } from "obsidian"
 import type { App, TFile } from "obsidian"
+import { WrongNotesModal } from "../inputs/wrong-notes-modal"
+import type { OptionPicker } from "../inputs/option-picker"
 import type { RmSwimlaneOp } from "./operations"
 
 export interface RmSwimlaneContext {
@@ -15,12 +17,11 @@ const NEW_VALUE_SENTINEL = "__swimlane_new_value__"
 
 type SelectionKind = "move" | "hide" | "clear" | "delete"
 
-export class RmSwimlaneModal extends Modal {
+export class RmSwimlaneModal extends WrongNotesModal {
     private ctx: RmSwimlaneContext
-    private selection: SelectionKind | null = null
+    private picker!: OptionPicker
     private moveTarget: string
     private confirmBtn: HTMLButtonElement | null = null
-    private optionEls: Map<SelectionKind, HTMLElement> = new Map()
 
     constructor(ctx: RmSwimlaneContext) {
         super(ctx.app)
@@ -34,115 +35,42 @@ export class RmSwimlaneModal extends Modal {
 
         this.setTitle(`Remove swimlane "${columnName}"`)
 
-        contentEl.createEl("p", {
-            cls: "swimlane-migration-description",
-            text: `This swimlane has ${files.length} card${files.length === 1 ? "" : "s"}. What should happen to them?`,
+        this.setDescription(
+            `This swimlane has ${files.length} card${files.length === 1 ? "" : "s"}. What should happen to them?`,
+        )
+
+        this.picker = this.addOptionPicker({
+            options: [
+                {
+                    id: "move",
+                    icon: "lucide-arrow-right",
+                    label: `Set "${swimlaneProp}" to`,
+                    onRender: labelEl => this.buildMoveControls(labelEl, otherColumns),
+                },
+                {
+                    id: "hide",
+                    icon: "lucide-eye-off",
+                    label: "Hide swimlane",
+                    hint: "Cards are unchanged; swimlane is hidden from this view",
+                },
+                {
+                    id: "clear",
+                    icon: "lucide-eraser",
+                    label: `Clear "${swimlaneProp}" property`,
+                    hint: "Cards will no longer appear on the board",
+                },
+                {
+                    id: "delete",
+                    icon: "lucide-trash-2",
+                    label: "Delete cards",
+                    hint: "Moves note files to trash",
+                    danger: true,
+                },
+            ],
+            defaultId: "move",
+            onSelect: [() => this.updateConfirmState()],
         })
 
-        const options = contentEl.createDiv({ cls: "swimlane-migration-options" })
-
-        // Move / set value option
-        const moveRow = options.createDiv({ cls: "swimlane-migration-option" })
-        this.optionEls.set("move", moveRow)
-        const moveLabel = moveRow.createDiv({ cls: "swimlane-migration-option-label" })
-        const moveIcon = moveLabel.createSpan({ cls: "swimlane-migration-option-icon" })
-        setIcon(moveIcon, "lucide-arrow-right")
-        moveLabel.createSpan({ text: `Set "${swimlaneProp}" to` })
-
-        const controlsEl = moveLabel.createDiv({ cls: "swimlane-migration-move-controls" })
-
-        const select = controlsEl.createEl("select", { cls: "swimlane-migration-select dropdown" })
-        for (const col of otherColumns) {
-            select.createEl("option", { text: col, attr: { value: col } })
-        }
-        select.createEl("option", { text: "New value…", attr: { value: NEW_VALUE_SENTINEL } })
-
-        const input = controlsEl.createEl("input", {
-            cls: "swimlane-migration-input swimlane-migration-input--hidden",
-            attr: { type: "text", placeholder: "New value…" },
-        })
-
-        const showingInput = () => select.value === NEW_VALUE_SENTINEL
-
-        const updateMoveTarget = () => {
-            if (showingInput()) {
-                this.moveTarget = input.value.trim()
-            } else {
-                this.moveTarget = select.value
-            }
-            this.updateConfirmState()
-        }
-
-        const firstCol = otherColumns[0] ?? ""
-        select.value = firstCol || NEW_VALUE_SENTINEL
-        this.moveTarget = firstCol
-
-        const syncInputVisibility = () => {
-            input.toggleClass("swimlane-migration-input--hidden", !showingInput())
-            select.toggleClass("swimlane-migration-select--has-input", showingInput())
-            if (showingInput()) {
-                input.focus()
-            }
-        }
-        syncInputVisibility()
-
-        select.addEventListener("change", () => {
-            syncInputVisibility()
-            updateMoveTarget()
-            this.setSelection("move")
-        })
-        select.addEventListener("click", e => e.stopPropagation())
-
-        input.addEventListener("input", () => {
-            updateMoveTarget()
-            this.setSelection("move")
-        })
-        input.addEventListener("click", e => e.stopPropagation())
-
-        moveRow.addEventListener("click", () => this.setSelection("move"))
-
-        // Hide option
-        const hideRow = options.createDiv({ cls: "swimlane-migration-option" })
-        this.optionEls.set("hide", hideRow)
-        const hideLabel = hideRow.createDiv({ cls: "swimlane-migration-option-label" })
-        const hideIcon = hideLabel.createSpan({ cls: "swimlane-migration-option-icon" })
-        setIcon(hideIcon, "lucide-eye-off")
-        hideLabel.createSpan({ text: "Hide swimlane" })
-        hideRow.createDiv({
-            cls: "swimlane-migration-option-hint",
-            text: "Cards are unchanged; swimlane is hidden from this view",
-        })
-        hideRow.addEventListener("click", () => this.setSelection("hide"))
-
-        // Clear option
-        const clearRow = options.createDiv({ cls: "swimlane-migration-option" })
-        this.optionEls.set("clear", clearRow)
-        const clearLabel = clearRow.createDiv({ cls: "swimlane-migration-option-label" })
-        const clearIcon = clearLabel.createSpan({ cls: "swimlane-migration-option-icon" })
-        setIcon(clearIcon, "lucide-eraser")
-        clearLabel.createSpan({ text: `Clear "${swimlaneProp}" property` })
-        clearRow.createDiv({
-            cls: "swimlane-migration-option-hint",
-            text: "Cards will no longer appear on the board",
-        })
-        clearRow.addEventListener("click", () => this.setSelection("clear"))
-
-        // Delete option
-        const deleteRow = options.createDiv({
-            cls: "swimlane-migration-option swimlane-migration-option--danger",
-        })
-        this.optionEls.set("delete", deleteRow)
-        const deleteLabel = deleteRow.createDiv({ cls: "swimlane-migration-option-label" })
-        const deleteIcon = deleteLabel.createSpan({ cls: "swimlane-migration-option-icon" })
-        setIcon(deleteIcon, "lucide-trash-2")
-        deleteLabel.createSpan({ text: "Delete cards" })
-        deleteRow.createDiv({
-            cls: "swimlane-migration-option-hint",
-            text: "Moves note files to trash",
-        })
-        deleteRow.addEventListener("click", () => this.setSelection("delete"))
-
-        // Buttons
         new Setting(contentEl)
             .addButton(btn => {
                 btn.setButtonText("Cancel").onClick(() => this.close())
@@ -153,40 +81,78 @@ export class RmSwimlaneModal extends Modal {
                     .onClick(() => this.confirm())
                 this.confirmBtn = btn.buttonEl
             })
-
-        // Default to "move" selected
-        this.setSelection("move")
     }
 
     onClose(): void {
         this.contentEl.empty()
     }
 
-    private setSelection(kind: SelectionKind): void {
-        this.selection = kind
-        for (const [k, el] of this.optionEls) {
-            el.toggleClass("swimlane-migration-option--selected", k === kind)
+    private buildMoveControls(labelEl: HTMLElement, otherColumns: string[]): void {
+        const controlsEl = labelEl.createDiv({ cls: "swimlane-modal-move-controls" })
+
+        const select = controlsEl.createEl("select", { cls: "swimlane-modal-move-select dropdown" })
+        for (const col of otherColumns) {
+            select.createEl("option", { text: col, attr: { value: col } })
         }
-        this.updateConfirmState()
+        select.createEl("option", { text: "New value…", attr: { value: NEW_VALUE_SENTINEL } })
+
+        const input = controlsEl.createEl("input", {
+            cls: "swimlane-modal-move-input swimlane-modal-move-input--hidden",
+            attr: { type: "text", placeholder: "New value…" },
+        })
+
+        const showingInput = () => select.value === NEW_VALUE_SENTINEL
+
+        const updateMoveTarget = () => {
+            this.moveTarget = showingInput() ? input.value.trim() : select.value
+            this.updateConfirmState()
+        }
+
+        const firstCol = otherColumns[0] ?? ""
+        select.value = firstCol || NEW_VALUE_SENTINEL
+        this.moveTarget = firstCol
+
+        const syncInputVisibility = () => {
+            input.toggleClass("swimlane-modal-move-input--hidden", !showingInput())
+            select.toggleClass("swimlane-modal-move-select--has-input", showingInput())
+            if (showingInput()) {
+                input.focus()
+            }
+        }
+        syncInputVisibility()
+
+        select.addEventListener("change", () => {
+            syncInputVisibility()
+            updateMoveTarget()
+            this.picker.select("move")
+        })
+        select.addEventListener("click", e => e.stopPropagation())
+
+        input.addEventListener("input", () => {
+            updateMoveTarget()
+            this.picker.select("move")
+        })
+        input.addEventListener("click", e => e.stopPropagation())
     }
 
     private updateConfirmState(): void {
         if (!this.confirmBtn) {
             return
         }
-        const canConfirm =
-            this.selection !== null && (this.selection !== "move" || !!this.moveTarget)
+        const selection = this.picker.selected as SelectionKind | null
+        const canConfirm = selection !== null && (selection !== "move" || !!this.moveTarget)
         this.confirmBtn.disabled = !canConfirm
-        this.confirmBtn.toggleClass("mod-warning", this.selection === "delete")
+        this.confirmBtn.toggleClass("mod-warning", selection === "delete")
     }
 
     private confirm(): void {
-        if (!this.selection) {
+        const selection = this.picker.selected as SelectionKind | null
+        if (!selection) {
             return
         }
 
         let op: RmSwimlaneOp
-        switch (this.selection) {
+        switch (selection) {
             case "move":
                 if (!this.moveTarget) {
                     return
