@@ -493,7 +493,7 @@ export class KanbanImportModal extends WrongNotesModal {
             return
         }
 
-        const hasArchive = this.archiveSection?.enabled && this.board!.archive.length > 0
+        const hasArchive = !!this.archiveSection?.enabled && this.board!.archive.length > 0
         const baseConfig = this.buildBaseConfig(folder, prop, columnNames, hasArchive)
         const baseFile = await this.app.vault.create(
             basePath,

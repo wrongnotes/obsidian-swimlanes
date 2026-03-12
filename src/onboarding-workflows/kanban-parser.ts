@@ -72,7 +72,7 @@ export function parseKanbanMarkdown(markdown: string): KanbanBoard {
                 current = null
             } else {
                 current = {
-                    name: headingMatch[1].trim(),
+                    name: headingMatch[1]!.trim(),
                     cards: [],
                     shouldMarkItemsComplete: false,
                 }
@@ -90,7 +90,7 @@ export function parseKanbanMarkdown(markdown: string): KanbanBoard {
         if (cardMatch) {
             const checked = cardMatch[1] === "x"
             const card = parseCard(
-                cardMatch[2],
+                cardMatch[2]!,
                 checked,
                 inArchive,
                 current?.shouldMarkItemsComplete ?? false,
@@ -122,12 +122,12 @@ function parseCard(
 
     const linkMatch = raw.match(WIKILINK_RE)
     if (linkMatch) {
-        const linkContent = linkMatch[1]
+        const linkContent = linkMatch[1]!
         const hasAlias = linkContent.includes("|")
-        link = hasAlias ? linkContent.split("|")[0] : linkContent
+        link = hasAlias ? linkContent.split("|")[0]! : linkContent
         text = raw.replace(WIKILINK_RE, "").trim()
         if (!text) {
-            text = hasAlias ? linkContent.split("|")[1] : (link.split("/").pop() ?? link)
+            text = hasAlias ? linkContent.split("|")[1]! : (link!.split("/").pop() ?? link!)
         }
     }
 
@@ -136,14 +136,14 @@ function parseCard(
     let time: string | null = null
     const timeMatch = text.match(/@@\{(\d{1,2}:\d{2})\}/)
     if (timeMatch) {
-        time = timeMatch[1]
+        time = timeMatch[1]!
         text = text.replace(TIME_RE, "").trim()
     }
 
     let date: string | null = null
     const dateMatch = text.match(/@\{(\d{4}-\d{2}-\d{2})\}/)
     if (dateMatch) {
-        date = dateMatch[1]
+        date = dateMatch[1]!
         text = text.replace(DATE_RE, "").trim()
     }
 
@@ -152,7 +152,7 @@ function parseCard(
     let tagMatch: RegExpExecArray | null
     const tagRe = new RegExp(TAG_RE.source, "g")
     while ((tagMatch = tagRe.exec(text)) !== null) {
-        tags.push(tagMatch[1])
+        tags.push(tagMatch[1]!)
     }
     if (tags.length > 0) {
         text = text.replace(TAG_RE, "").trim()
