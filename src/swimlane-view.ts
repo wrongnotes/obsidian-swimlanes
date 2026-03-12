@@ -913,18 +913,23 @@ export class SwimlaneView extends BasesView {
         }
 
         const colRect = visibleCol.getBoundingClientRect()
+        // Hysteresis band: finger must cross 30px past column edge to trigger,
+        // and return 30px inside the column to re-arm. Prevents oscillation.
+        const outerMargin = 30
 
         let direction: 1 | -1 | null = null
-        if (clientX < colRect.left) {
+        if (clientX < colRect.left - outerMargin) {
             direction = -1
-        } else if (clientX > colRect.right) {
+        } else if (clientX > colRect.right + outerMargin) {
             direction = 1
         }
 
         if (direction === null) {
             this.cancelMobileSwipeDwell()
-            // Finger is back inside the column — re-arm swipe detection.
-            this.mobileSwipeNeedsReturn = false
+            // Only re-arm once finger is well inside the column.
+            if (clientX > colRect.left + outerMargin && clientX < colRect.right - outerMargin) {
+                this.mobileSwipeNeedsReturn = false
+            }
             return
         }
 
