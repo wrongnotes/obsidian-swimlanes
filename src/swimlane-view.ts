@@ -913,27 +913,25 @@ export class SwimlaneView extends BasesView {
         }
 
         const colRect = visibleCol.getBoundingClientRect()
-        // Hysteresis band: finger must cross 30px past column edge to trigger,
-        // and return 30px inside the column to re-arm. Prevents oscillation.
-        const outerMargin = 30
+        // Use 15% of column width as the edge zone. Finger must enter the
+        // outer 15% to trigger, and return to the inner 70% to re-arm.
+        const edgeZone = colRect.width * 0.15
 
         let direction: 1 | -1 | null = null
-        if (clientX < colRect.left - outerMargin) {
+        if (clientX < colRect.left + edgeZone) {
             direction = -1
-        } else if (clientX > colRect.right + outerMargin) {
+        } else if (clientX > colRect.right - edgeZone) {
             direction = 1
         }
 
         if (direction === null) {
             this.cancelMobileSwipeDwell()
-            // Only re-arm once finger is well inside the column.
-            if (clientX > colRect.left + outerMargin && clientX < colRect.right - outerMargin) {
-                this.mobileSwipeNeedsReturn = false
-            }
+            // Re-arm once finger is in the center 70% of the column.
+            this.mobileSwipeNeedsReturn = false
             return
         }
 
-        // After a swipe fires, block further swipes until finger returns inside the column.
+        // After a swipe fires, block further swipes until finger returns to center.
         if (this.mobileSwipeNeedsReturn) {
             return
         }
@@ -943,7 +941,7 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        // Start a new dwell: finger must stay outside the column for 300ms.
+        // Start a new dwell: finger must stay in the edge zone for 500ms.
         this.cancelMobileSwipeDwell()
         const dir = direction
         this.mobileSwipeDwell = {
@@ -952,7 +950,7 @@ export class SwimlaneView extends BasesView {
                 this.mobileSwipeDwell = null
                 this.mobileSwipeNeedsReturn = true
                 this.scrollToAdjacentColumn(dir)
-            }, 300),
+            }, 500),
         }
     }
 
