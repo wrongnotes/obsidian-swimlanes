@@ -83,7 +83,8 @@ export class SwimlaneView extends BasesView {
     private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
     private currentBoard: HTMLElement | null = null
     private carouselObserver: IntersectionObserver | null = null
-    private mobileSwipeCooldown = 0
+    /** When true, swipe is blocked until the finger returns inside the column. */
+    private mobileSwipeNeedsReturn = false
     private mobileSwipeDwell: { direction: 1 | -1; timer: ReturnType<typeof setTimeout> } | null =
         null
     private autoScrollRaf: number | null = null
@@ -900,29 +901,35 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        if (Date.now() < this.mobileSwipeCooldown) {
+        // Find the currently snapped column and use its edges as the trigger zone.
+        const visibleKey = this.getVisibleColumnKey()
+        const visibleCol = visibleKey
+            ? board.querySelector<HTMLElement>(
+                  `.swimlane-column[data-group-key="${CSS.escape(visibleKey)}"]`,
+              )
+            : null
+        if (!visibleCol) {
             return
         }
 
-        // Use the drag clone's leading edge rather than the finger position,
-        // so the card visually crossing the edge triggers the swipe.
-        const cloneRect = this.cardDnd.cloneRect
-        const leftEdge = cloneRect ? cloneRect.left : clientX
-        const rightEdge = cloneRect ? cloneRect.right : clientX
-
-        const edgeThreshold = 40
-        const boardRect = board.getBoundingClientRect()
+        const colRect = visibleCol.getBoundingClientRect()
 
         let direction: 1 | -1 | null = null
-        if (leftEdge < boardRect.left + edgeThreshold) {
+        if (clientX < colRect.left) {
             direction = -1
-        } else if (rightEdge > boardRect.right - edgeThreshold) {
+        } else if (clientX > colRect.right) {
             direction = 1
         }
 
         if (direction === null) {
-            // Card left the edge zone — cancel any pending dwell.
             this.cancelMobileSwipeDwell()
+            // Finger is back inside the column — re-arm swipe detection.
+            this.mobileSwipeNeedsReturn = false
+            return
+        }
+
+        // After a swipe fires, block further swipes until finger returns inside the column.
+        if (this.mobileSwipeNeedsReturn) {
             return
         }
 
@@ -931,16 +938,16 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        // Start a new dwell: card must stay in the edge zone for 400ms.
+        // Start a new dwell: finger must stay outside the column for 300ms.
         this.cancelMobileSwipeDwell()
         const dir = direction
         this.mobileSwipeDwell = {
             direction: dir,
             timer: setTimeout(() => {
                 this.mobileSwipeDwell = null
+                this.mobileSwipeNeedsReturn = true
                 this.scrollToAdjacentColumn(dir)
-                this.mobileSwipeCooldown = Date.now() + 1000
-            }, 400),
+            }, 300),
         }
     }
 
