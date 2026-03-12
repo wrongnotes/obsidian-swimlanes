@@ -1,5 +1,5 @@
 import { Setting, normalizePath } from "obsidian"
-import type { App, BasesConfigFile } from "obsidian"
+import type { App, BasesConfigFile, BasesConfigFileView } from "obsidian"
 import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import { FolderSuggest } from "../inputs/folder-suggest"
 import { MultiValueText } from "../inputs/multi-value-text"
@@ -29,7 +29,7 @@ export class CreateBaseModal extends WrongNotesModal {
     private buildNameSetting(): void {
         new Setting(this.contentEl)
             .setName("Name")
-            .setDesc("Name for your new swimlane base.")
+            .setDesc("Path for your new swimlane base, e.g. Projects/My board.")
             .addText(text => {
                 text.setPlaceholder("My swimlanes")
                 text.onChange(value => {
@@ -40,8 +40,8 @@ export class CreateBaseModal extends WrongNotesModal {
 
     private buildFolderSetting(): void {
         const setting = new Setting(this.contentEl)
-            .setName("Folder")
-            .setDesc("Select the location for notes that will populate your swimlanes.")
+            .setName("Source folder")
+            .setDesc("Folder containing the notes that will populate your swimlanes.")
 
         setting.addText(text => {
             text.setPlaceholder("Projects/tasks")
@@ -86,12 +86,14 @@ export class CreateBaseModal extends WrongNotesModal {
             onChange: values => {
                 this.groupValues = values
             },
-            setupInput: inputEl => {
+            setupInput: (inputEl, hooks) => {
                 const suggest = new PropertyValueSuggest(
                     this.app,
                     inputEl,
                     () => this.folderPath,
                     () => this.groupKey,
+                    [],
+                    hooks,
                 )
                 suggest.close()
             },
@@ -102,7 +104,11 @@ export class CreateBaseModal extends WrongNotesModal {
         new Setting(this.contentEl).addButton(btn => {
             btn.setButtonText("Create")
             btn.setCta()
-            btn.onClick(() => this.submit())
+            btn.onClick(() => {
+                this.submit().catch(err => {
+                    this.showValidationError(String(err))
+                })
+            })
         })
     }
 
@@ -120,9 +126,8 @@ export class CreateBaseModal extends WrongNotesModal {
             return
         }
 
-        const folder = this.folderPath.trim()
-        const fileName = this.baseName.trim()
-        const filePath = normalizePath(folder ? `${folder}/${fileName}.base` : `${fileName}.base`)
+        const sourceFolder = this.folderPath.trim()
+        const filePath = normalizePath(`${this.baseName.trim()}.base`)
 
         const exists = await this.app.vault.adapter.exists(filePath)
         if (exists) {
@@ -130,7 +135,7 @@ export class CreateBaseModal extends WrongNotesModal {
             return
         }
 
-        const config = this.buildBaseConfig(folder)
+        const config = this.buildBaseConfig(sourceFolder)
         const file = await this.app.vault.create(filePath, JSON.stringify(config, null, "\t"))
         await this.app.workspace.getLeaf().openFile(file)
 
@@ -138,19 +143,24 @@ export class CreateBaseModal extends WrongNotesModal {
     }
 
     buildBaseConfig(folder: string): BasesConfigFile {
+        const prop = this.groupKey.trim()
+        const propId = `note.${prop}`
         return {
-            filters: folder || undefined,
+            filters: folder ? { and: [`file.folder == "${folder}"`] } : undefined,
             properties: {
-                [this.groupKey.trim()]: {
-                    displayName: this.groupKey.trim(),
+                [prop]: {
+                    displayName: prop,
                 },
             },
             views: [
                 {
-                    type: "sheet",
-                    name: "Sheet",
-                    order: [`note.${this.groupKey.trim()}`],
-                },
+                    type: "swimlane",
+                    name: "Swimlane",
+                    groupBy: { property: prop, direction: "ASC" },
+                    order: [propId],
+                    swimlaneProperty: propId,
+                    swimlaneOrder: this.groupValues,
+                } as BasesConfigFileView & Record<string, unknown>,
             ],
         }
     }

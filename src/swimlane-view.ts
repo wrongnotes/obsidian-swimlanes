@@ -111,6 +111,7 @@ export class SwimlaneView extends BasesView {
             draggableSelector: ".swimlane-column",
             dragHandleSelector: ".swimlane-column-header",
             draggableIdAttribute: "groupKey",
+            containerDraggingClass: "swimlane-drag-and-drop--column-active",
             positionsEqual: (a, b) => a === b,
             getDropTarget: (el, x, y, c) => this.getSwimlaneDropTarget(el, x, y, c),
             onDrop: (state, _context, position) => this.handleSwimlaneDrop(state, position),
@@ -282,7 +283,7 @@ export class SwimlaneView extends BasesView {
         const groups = this.data.groupedData
         const hasGroups = groups.some(g => g.hasKey())
 
-        if (!hasGroups) {
+        if (!hasGroups && this.swimlaneOrder.length === 0) {
             const msg = 'Set a "Group by" property in the Bases toolbar to use the Swimlane view.'
             this.boardEl.createEl("p", { cls: "swimlane-empty", text: msg })
             return

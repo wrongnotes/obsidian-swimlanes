@@ -35,12 +35,12 @@ describe("CreateBaseModal", () => {
         expect(modal.titleEl.textContent).toBe("Create swimlanes")
     })
 
-    it("renders name, folder, and swimlanes settings", () => {
+    it("renders name, source folder, and swimlanes settings", () => {
         modal.open()
         const names = modal.contentEl.querySelectorAll(".setting-item-name")
         const labels = Array.from(names).map(n => n.textContent)
         expect(labels).toContain("Name")
-        expect(labels).toContain("Folder")
+        expect(labels).toContain("Source folder")
         expect(labels).toContain("Swimlanes")
         expect(labels).toContain("Property")
         expect(labels).toContain("Values")
@@ -122,10 +122,10 @@ describe("CreateBaseModal", () => {
         expect(tags.length).toBe(0)
     })
 
-    it("creates the base file on submit", async () => {
+    it("creates the base file at the path from name", async () => {
         modal.open()
-        setInputValue(modal.contentEl, 0, "Task board")
-        setInputValue(modal.contentEl, 1, "Projects")
+        setInputValue(modal.contentEl, 0, "Projects/Task board")
+        setInputValue(modal.contentEl, 1, "Tasks")
         addGroupValue(modal.contentEl, "To Do")
         addGroupValue(modal.contentEl, "Done")
 
@@ -137,6 +137,18 @@ describe("CreateBaseModal", () => {
             "Projects/Task board.base",
             expect.any(String),
         )
+    })
+
+    it("creates the base file at root when name has no folder", async () => {
+        modal.open()
+        setInputValue(modal.contentEl, 0, "My board")
+        addGroupValue(modal.contentEl, "To Do")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        expect(app.vault.create).toHaveBeenCalledWith("My board.base", expect.any(String))
     })
 
     it("shows error when file already exists", async () => {
@@ -164,11 +176,15 @@ describe("CreateBaseModal", () => {
             addGroupValue(modal.contentEl, "Done")
 
             const config = modal.buildBaseConfig("Projects")
-            expect(config.filters).toBe("Projects")
+            expect(config.filters).toEqual({ and: ['file.folder == "Projects"'] })
             expect(config.views).toHaveLength(1)
-            expect(config.views![0]!.type).toBe("sheet")
-            expect(config.views![0]!.name).toBe("Sheet")
-            expect(config.views![0]!.order).toContain("note.swimlane")
+            const view = config.views![0] as any
+            expect(view.type).toBe("swimlane")
+            expect(view.name).toBe("Swimlane")
+            expect(view.groupBy).toEqual({ property: "swimlane", direction: "ASC" })
+            expect(view.order).toContain("note.swimlane")
+            expect(view.swimlaneProperty).toBe("note.swimlane")
+            expect(view.swimlaneOrder).toEqual(["To Do", "Done"])
         })
 
         it("omits filter when folder is empty", () => {

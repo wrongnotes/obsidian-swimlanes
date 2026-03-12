@@ -59,7 +59,8 @@
     opacity: 0;
 }
 
-.swimlane-drag-and-drop--active .swimlane-card:hover {
+.swimlane-drag-and-drop--active .swimlane-card:hover,
+.swimlane-drag-and-drop--column-active .swimlane-card:hover {
     border-color: var(--background-modifier-border);
 }
 
@@ -253,7 +254,8 @@
     background-color: var(--background-modifier-hover);
 }
 
-.swimlane-drag-and-drop--active .swimlane-add-card-btn:hover {
+.swimlane-drag-and-drop--active .swimlane-add-card-btn:hover,
+.swimlane-drag-and-drop--column-active .swimlane-add-card-btn:hover {
     color: var(--text-muted);
     background-color: transparent;
 }
@@ -306,11 +308,15 @@
     flex-shrink: 0;
 }
 
-.swimlane-add-column-btn:hover,
-.swimlane-drag-and-drop--active .swimlane-add-column-btn {
+.swimlane-add-column-btn:hover {
     color: var(--text-normal);
     background-color: var(--background-secondary);
     border-color: var(--text-muted);
+}
+
+.swimlane-drag-and-drop--column-active .swimlane-add-column-btn,
+.swimlane-drag-and-drop--column-active .swimlane-add-column-input-wrapper {
+    display: none;
 }
 
 .swimlane-add-column-icon {
@@ -353,10 +359,11 @@
     }
 }
 
-/* Modal description text */
+/* Modal description text — tight against title, spaced below */
 .swimlane-modal-description {
     color: var(--text-muted);
-    margin-bottom: var(--size-4-2);
+    margin-top: calc(-1 * var(--size-4-2));
+    margin-bottom: var(--size-4-4);
 }
 
 /* Option picker — reusable radio-card group */
@@ -492,9 +499,13 @@
     display: contents;
 }
 
-/* Tag chips span full width */
+/* Tag chips align under the input (second column).
+   width: 0 + min-width: 100% prevents chips from widening the auto column —
+   the column is sized by the input alone, then chips fill that width and wrap. */
 .swimlane-modal .swimlane-multi-value-text-tags {
-    grid-column: 1 / -1;
+    grid-column: 2;
+    width: 0;
+    min-width: 100%;
 }
 
 /* Full-width non-setting elements */
@@ -543,6 +554,59 @@
     padding-left: var(--size-4-4);
 }
 
+/* ── ToggleableInputSection ──────────────────────────────────────
+   A toggle header + collapsible body of indented settings.
+   Uses subgrid so inputs stay aligned with top-level settings.    */
+.swimlane-toggleable-section {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    border-top: var(--border-width) solid var(--background-modifier-border);
+    padding-top: var(--size-4-3);
+    padding-bottom: var(--size-4-3);
+}
+
+/* The toggle header is a top-level setting spanning all columns */
+.swimlane-toggleable-section > .setting-item {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    border-top: none;
+}
+
+.swimlane-toggleable-section > .setting-item > .setting-item-control {
+    display: contents;
+}
+
+/* Body dissolves into the subgrid; its settings also dissolve */
+.swimlane-toggleable-section-body {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    row-gap: var(--size-4-2);
+}
+
+.swimlane-toggleable-section-body > .setting-item {
+    display: contents;
+}
+
+.swimlane-toggleable-section-body .setting-item-control {
+    display: contents;
+}
+
+/* Text inputs in body span both control columns */
+.swimlane-toggleable-section-body .setting-item-control input[type="text"] {
+    grid-column: 2 / -1;
+}
+
+/* Indent labels within the body */
+.swimlane-toggleable-section-body .setting-item-info {
+    padding-left: var(--size-4-4);
+}
+
 /* ── Multi-value text tags ─────────────────────────────────────── */
 .swimlane-multi-value-text-tags {
     display: flex;
@@ -576,4 +640,107 @@
     color: var(--text-error);
     font-size: var(--font-ui-small);
     padding: var(--size-4-2) var(--size-4-4);
+}
+
+/* ── Move confirmation ─────────────────────────────────────────── */
+.swimlane-move-confirmation {
+    grid-column: 1 / -1;
+    background-color: var(--background-modifier-warning);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-3);
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-move-confirmation p {
+    margin: 0 0 var(--size-4-2);
+}
+
+.swimlane-move-confirmation p:last-of-type {
+    margin-bottom: var(--size-4-3);
+}
+
+.swimlane-move-confirmation-buttons {
+    display: flex;
+    gap: var(--size-4-2);
+    justify-content: flex-end;
+}
+
+/* ── Kanban import preview ──────────────────────────────────────── */
+.swimlane-import-preview {
+    grid-column: 1 / -1;
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-m);
+    border-top: var(--border-width) solid var(--background-modifier-border);
+    margin-top: var(--size-4-3);
+    padding: var(--size-4-4) var(--size-4-3) var(--size-4-3);
+}
+
+.swimlane-import-preview-empty {
+    color: var(--text-faint);
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-import-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-import-preview-title {
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+}
+
+.swimlane-import-preview-summary {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.swimlane-import-preview-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-2-3);
+}
+
+.swimlane-import-preview-column {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-2-2);
+    background-color: var(--background-primary);
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-2-2) var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+    user-select: none;
+    transition:
+        opacity var(--anim-duration-fast) ease,
+        border-color var(--anim-duration-fast) ease;
+}
+
+.swimlane-import-preview-column:hover {
+    border-color: var(--interactive-accent);
+}
+
+.swimlane-import-preview-column--excluded {
+    opacity: 0.45;
+}
+
+.swimlane-import-preview-column--excluded:hover {
+    opacity: 0.65;
+}
+
+.swimlane-import-preview-column-checkbox {
+    margin: 0;
+    pointer-events: none;
+}
+
+.swimlane-import-preview-column-name {
+    color: var(--text-normal);
+}
+
+.swimlane-import-preview-column-count {
+    color: var(--text-faint);
 }
