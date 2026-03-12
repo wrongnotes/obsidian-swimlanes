@@ -97,6 +97,12 @@ export class Setting {
         return this
     }
 
+    addToggle(cb: (component: ToggleComponent) => void) {
+        const component = new ToggleComponent(this.controlEl)
+        cb(component)
+        return this
+    }
+
     addExtraButton(cb: (component: ExtraButtonComponent) => void) {
         const component = new ExtraButtonComponent(this.controlEl)
         cb(component)
@@ -141,6 +147,32 @@ export class TextComponent {
     }
 
     onChange(callback: (value: string) => void) {
+        this._onChange = callback
+        return this
+    }
+}
+
+export class ToggleComponent {
+    toggleEl: HTMLElement
+    private _value = false
+    private _onChange?: (value: boolean) => void
+
+    constructor(containerEl: HTMLElement) {
+        this.toggleEl = document.createElement("div")
+        this.toggleEl.classList.add("checkbox-container")
+        containerEl.appendChild(this.toggleEl)
+        this.toggleEl.addEventListener("click", () => {
+            this._value = !this._value
+            this._onChange?.(this._value)
+        })
+    }
+
+    setValue(value: boolean) {
+        this._value = value
+        return this
+    }
+
+    onChange(callback: (value: boolean) => void) {
         this._onChange = callback
         return this
     }

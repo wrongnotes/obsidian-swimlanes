@@ -6,7 +6,13 @@ export interface MultiValueTextOptions {
     placeholder?: string
     containerEl: HTMLElement
     onChange?: (values: string[]) => void
-    setupInput?: (inputEl: HTMLInputElement) => void
+    setupInput?: (inputEl: HTMLInputElement, hooks: MultiValueTextHooks) => void
+}
+
+export interface MultiValueTextHooks {
+    commit: () => void
+    getValues: () => string[]
+    onFocusOrClick: (cb: () => void) => void
 }
 
 export class MultiValueText {
@@ -16,6 +22,7 @@ export class MultiValueText {
     private readonly opts: MultiValueTextOptions
     private textGetter: (() => string) | null = null
     private textClearer: (() => void) | null = null
+    private inputEl: HTMLInputElement | null = null
 
     constructor(opts: MultiValueTextOptions) {
         this.opts = opts
@@ -34,9 +41,16 @@ export class MultiValueText {
             if (this.opts.placeholder) {
                 text.setPlaceholder(this.opts.placeholder)
             }
-            this.opts.setupInput?.(text.inputEl)
+            this.inputEl = text.inputEl
             this.textGetter = () => text.getValue()
             this.textClearer = () => text.setValue("")
+            this.opts.setupInput?.(text.inputEl, {
+                commit: () => this.addCurrentValue(),
+                getValues: () => this.values,
+                onFocusOrClick: cb => {
+                    text.inputEl.addEventListener("click", cb)
+                },
+            })
             text.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
                 if (e.key !== "Enter") {
                     return
