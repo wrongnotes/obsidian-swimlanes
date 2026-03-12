@@ -84,6 +84,8 @@ export class SwimlaneView extends BasesView {
     private currentBoard: HTMLElement | null = null
     private carouselObserver: IntersectionObserver | null = null
     private mobileSwipeCooldown = 0
+    private mobileSwipeDwell: { direction: 1 | -1; timer: ReturnType<typeof setTimeout> } | null =
+        null
     private autoScrollRaf: number | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
@@ -302,6 +304,7 @@ export class SwimlaneView extends BasesView {
             cancelAnimationFrame(this.autoScrollRaf)
             this.autoScrollRaf = null
         }
+        this.cancelMobileSwipeDwell()
         this.cardDnd.destroy()
         this.swimlaneDnd.destroy()
     }
@@ -896,8 +899,7 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        const now = Date.now()
-        if (now < this.mobileSwipeCooldown) {
+        if (Date.now() < this.mobileSwipeCooldown) {
             return
         }
 
@@ -907,15 +909,44 @@ export class SwimlaneView extends BasesView {
         const leftEdge = cloneRect ? cloneRect.left : clientX
         const rightEdge = cloneRect ? cloneRect.right : clientX
 
-        const edgeThreshold = 20
+        const edgeThreshold = 40
         const boardRect = board.getBoundingClientRect()
 
+        let direction: 1 | -1 | null = null
         if (leftEdge < boardRect.left + edgeThreshold) {
-            this.scrollToAdjacentColumn(-1)
-            this.mobileSwipeCooldown = now + 800
+            direction = -1
         } else if (rightEdge > boardRect.right - edgeThreshold) {
-            this.scrollToAdjacentColumn(1)
-            this.mobileSwipeCooldown = now + 800
+            direction = 1
+        }
+
+        if (direction === null) {
+            // Card left the edge zone — cancel any pending dwell.
+            this.cancelMobileSwipeDwell()
+            return
+        }
+
+        // If already dwelling in this direction, let the timer run.
+        if (this.mobileSwipeDwell?.direction === direction) {
+            return
+        }
+
+        // Start a new dwell: card must stay in the edge zone for 400ms.
+        this.cancelMobileSwipeDwell()
+        const dir = direction
+        this.mobileSwipeDwell = {
+            direction: dir,
+            timer: setTimeout(() => {
+                this.mobileSwipeDwell = null
+                this.scrollToAdjacentColumn(dir)
+                this.mobileSwipeCooldown = Date.now() + 1000
+            }, 400),
+        }
+    }
+
+    private cancelMobileSwipeDwell(): void {
+        if (this.mobileSwipeDwell) {
+            clearTimeout(this.mobileSwipeDwell.timer)
+            this.mobileSwipeDwell = null
         }
     }
 
