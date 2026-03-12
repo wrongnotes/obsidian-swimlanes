@@ -125,6 +125,7 @@
     padding: var(--size-4-2) var(--size-4-3);
     cursor: grab;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .swimlane-card.swimlane-drag-and-drop--dragging,
@@ -168,8 +169,10 @@
     transition: transform var(--anim-duration-fast) var(--anim-motion-baseline);
 }
 
-.swimlane-card:hover {
-    border-color: var(--interactive-accent);
+@media (hover: hover) {
+    .swimlane-card:hover {
+        border-color: var(--interactive-accent);
+    }
 }
 
 .swimlane-card-menu-btn {
