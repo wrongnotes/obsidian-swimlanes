@@ -822,6 +822,20 @@
     flex-shrink: 0;
 }
 
+.swimlane-mobile .swimlane-add-card-btn {
+    flex-shrink: 0;
+    justify-content: center;
+    margin: 0;
+    padding: var(--size-4-2) var(--size-4-3);
+    border: var(--border-width) dashed var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+
+.swimlane-mobile .swimlane-add-card-wrapper {
+    flex-shrink: 0;
+    margin: 0;
+}
+
 .swimlane-mobile .swimlane-column-header {
     cursor: default;
 }
@@ -845,6 +859,8 @@
     align-items: center;
     gap: var(--size-2-2);
     padding: var(--size-4-2);
+    /* Push above Obsidian's mobile bottom toolbar and iOS safe area. */
+    padding-bottom: calc(var(--size-4-2) + env(safe-area-inset-bottom, 0px));
 }
 
 .swimlane-carousel-dot {

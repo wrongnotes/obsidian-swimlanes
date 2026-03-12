@@ -344,6 +344,11 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         return this.dropAnimationMs
     }
 
+    /** Returns the drag clone's bounding rect, or null if not dragging. */
+    get cloneRect(): DOMRect | null {
+        return this.dragClone?.getBoundingClientRect() ?? null
+    }
+
     /**
      * Register a drop area with its context. Call when building the UI for each drop area.
      * The same context is passed to onDrop when a drop occurs in this area.

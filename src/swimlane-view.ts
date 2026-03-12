@@ -481,7 +481,8 @@ export class SwimlaneView extends BasesView {
             }
 
             if (this.showAddCard) {
-                this.renderAddCardButton(col, groupKey)
+                // On mobile, render inside the card list so it scrolls with cards.
+                this.renderAddCardButton(mobile ? cardList : col, groupKey)
             }
         }
 
@@ -900,13 +901,19 @@ export class SwimlaneView extends BasesView {
             return
         }
 
+        // Use the drag clone's leading edge rather than the finger position,
+        // so the card visually crossing the edge triggers the swipe.
+        const cloneRect = this.cardDnd.cloneRect
+        const leftEdge = cloneRect ? cloneRect.left : clientX
+        const rightEdge = cloneRect ? cloneRect.right : clientX
+
         const edgeThreshold = 20
         const boardRect = board.getBoundingClientRect()
 
-        if (clientX < boardRect.left + edgeThreshold) {
+        if (leftEdge < boardRect.left + edgeThreshold) {
             this.scrollToAdjacentColumn(-1)
             this.mobileSwipeCooldown = now + 800
-        } else if (clientX > boardRect.right - edgeThreshold) {
+        } else if (rightEdge > boardRect.right - edgeThreshold) {
             this.scrollToAdjacentColumn(1)
             this.mobileSwipeCooldown = now + 800
         }
