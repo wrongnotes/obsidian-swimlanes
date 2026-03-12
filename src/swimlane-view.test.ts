@@ -168,23 +168,21 @@ describe("add swimlane button", () => {
     })
 })
 
-describe("remove swimlane button", () => {
-    it("renders remove button on each column header when showAddColumn is enabled", () => {
-        const { view, container } = makeView(
-            [makeGroup("Backlog", [makeEntry("A")]), makeGroup("Done", [makeEntry("B")])],
-            { showAddColumn: true },
-        )
+describe("column menu button", () => {
+    it("renders menu button on each column header", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("A")]),
+            makeGroup("Done", [makeEntry("B")]),
+        ])
         view.onDataUpdated()
-        const removeBtns = container.querySelectorAll(".swimlane-column-remove")
-        expect(removeBtns).toHaveLength(2)
+        const menuBtns = container.querySelectorAll(".swimlane-column-menu-btn")
+        expect(menuBtns).toHaveLength(2)
     })
 
-    it("remove button has data-no-drag attribute", () => {
-        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])], {
-            showAddColumn: true,
-        })
+    it("menu button has data-no-drag attribute", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         view.onDataUpdated()
-        const btn = container.querySelector(".swimlane-column-remove")
+        const btn = container.querySelector(".swimlane-column-menu-btn")
         expect(btn?.hasAttribute("data-no-drag")).toBe(true)
     })
 })
@@ -431,24 +429,34 @@ describe("add column input", () => {
     })
 })
 
-describe("remove column", () => {
-    it("removes empty column immediately from swimlaneOrder", () => {
-        const { view, container, configStore } = makeView(
-            [makeGroup("Backlog", [makeEntry("A")])],
-            { swimlaneOrder: ["Backlog", "EmptyCol"] },
+describe("column management", () => {
+    it("removes empty column via removeColumn", () => {
+        const { view, configStore } = makeView([makeGroup("Backlog", [makeEntry("A")])], {
+            swimlaneOrder: ["Backlog", "EmptyCol"],
+        })
+        view.onDataUpdated()
+        ;(view as any).removeColumn(document.createElement("div"), "EmptyCol", 0)
+        expect(configStore.swimlaneOrder).not.toContain("EmptyCol")
+    })
+
+    it("moves column left via moveColumn", () => {
+        const { view, configStore } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")]), makeGroup("Done", [makeEntry("B")])],
+            { swimlaneOrder: ["Backlog", "Done"] },
         )
         view.onDataUpdated()
-        // Find the remove button for EmptyCol
-        const cols = container.querySelectorAll(".swimlane-column")
-        let emptyColRemoveBtn: HTMLElement | null = null
-        cols.forEach(col => {
-            if (col.getAttribute("data-group-key") === "EmptyCol") {
-                emptyColRemoveBtn = col.querySelector(".swimlane-column-remove")
-            }
-        })
-        expect(emptyColRemoveBtn).not.toBeNull()
-        emptyColRemoveBtn!.click()
-        expect(configStore.swimlaneOrder).not.toContain("EmptyCol")
+        ;(view as any).moveColumn("Done", -1)
+        expect(configStore.swimlaneOrder).toEqual(["Done", "Backlog"])
+    })
+
+    it("moves column right via moveColumn", () => {
+        const { view, configStore } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")]), makeGroup("Done", [makeEntry("B")])],
+            { swimlaneOrder: ["Backlog", "Done"] },
+        )
+        view.onDataUpdated()
+        ;(view as any).moveColumn("Backlog", 1)
+        expect(configStore.swimlaneOrder).toEqual(["Done", "Backlog"])
     })
 })
 

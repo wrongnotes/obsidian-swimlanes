@@ -29,12 +29,16 @@ export interface CardRenderOptions {
     properties: CardPropertyAlias[]
     showIcons: boolean
     imagePropId?: BasesPropertyId
+    /** Width of the card image in pixels. Defaults to 64. */
+    imageWidth?: number
     /** The frontmatter property used for swimlane grouping (e.g. "status"). */
     swimlaneProp: string
     /** Returns the current swimlane columns and this card's group key at call time. */
     getSwimlaneContext: () => { columns: string[]; currentSwimlane: string }
     /** Highlight a swimlane column on the board (scroll into view + flash). */
     highlightColumn: (column: string) => void
+    /** When true, renders an inline menu button instead of relying on contextmenu. */
+    mobile?: boolean
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -140,8 +144,11 @@ export function renderCard(
     }
 
     if (imageUrl) {
+        const width = options.imageWidth ?? 64
         card.addClass("swimlane-card--has-image")
-        card.createEl("img", { cls: "swimlane-card-image", attr: { src: imageUrl } })
+        const imageWrapper = card.createDiv({ cls: "swimlane-card-image-wrapper" })
+        imageWrapper.setCssStyles({ width: `${width}px`, minWidth: `${width}px` })
+        imageWrapper.createEl("img", { cls: "swimlane-card-image", attr: { src: imageUrl } })
     }
 
     const content = imageUrl ? card.createDiv({ cls: "swimlane-card-content" }) : card
@@ -177,20 +184,49 @@ export function renderCard(
         }
     }
 
+    if (options.mobile) {
+        const menuBtn = card.createDiv({
+            cls: "swimlane-card-menu-btn",
+            attr: { "data-no-drag": "" },
+        })
+        setIcon(menuBtn, "more-vertical")
+        let openMenu: Menu | null = null
+        let wasOpenOnPointerDown = false
+        menuBtn.addEventListener("pointerdown", () => {
+            wasOpenOnPointerDown = openMenu !== null
+        })
+        menuBtn.addEventListener("click", e => {
+            e.stopPropagation()
+            // The menu's outside-click handler fires between pointerdown
+            // and click, clearing openMenu. Use the state captured at
+            // pointerdown to know if this click should toggle closed.
+            if (wasOpenOnPointerDown) {
+                openMenu?.hide()
+                openMenu = null
+                return
+            }
+            const rect = menuBtn.getBoundingClientRect()
+            openMenu = showCardMenu({ x: rect.right, y: rect.bottom }, entry, app, options)
+            openMenu.register(() => {
+                openMenu = null
+            })
+        })
+    }
+
     card.addEventListener("contextmenu", e => {
         e.preventDefault()
-        showCardMenu(e, entry, app, options)
+        showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options)
     })
 
     return card
 }
 
 function showCardMenu(
-    evt: MouseEvent,
+    position: { x: number; y: number },
     entry: BasesEntry,
     app: App,
     options: CardRenderOptions,
-): void {
+): Menu {
     const menu = new Menu()
 
     menu.addItem(item => {
@@ -234,5 +270,6 @@ function showCardMenu(
             })
     })
 
-    menu.showAtMouseEvent(evt)
+    menu.showAtPosition(position)
+    return menu
 }

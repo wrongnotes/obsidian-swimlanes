@@ -1,4 +1,13 @@
-import { BasesEntry, BasesEntryGroup, BasesView, Notice, QueryController, setIcon } from "obsidian"
+import {
+    BasesEntry,
+    BasesEntryGroup,
+    BasesView,
+    Menu,
+    Notice,
+    Platform,
+    QueryController,
+    setIcon,
+} from "obsidian"
 import type {
     BasesPropertyId,
     MultitextOption,
@@ -43,6 +52,8 @@ const CONFIG_KEYS = {
     showAddCard: "showAddCard",
     showAddColumn: "showAddColumn",
     hiddenSwimlanes: "hiddenSwimlanes",
+    forceMobileLayout: "forceMobileLayout",
+    imageWidth: "imageWidth",
 } as const
 
 /** Sentinel groupKey used when a card is dropped onto the "Add column" button. */
@@ -70,21 +81,35 @@ export class SwimlaneView extends BasesView {
     private cardDnd: DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>
     private swimlaneDnd: DragAndDropContext<SwimlaneDragState, null, GroupKey | null>
     private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
+    private currentBoard: HTMLElement | null = null
+    private carouselObserver: IntersectionObserver | null = null
+    private mobileSwipeCooldown = 0
+    private autoScrollRaf: number | null = null
+    /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
+    private savedScrollState: {
+        column: GroupKey | null
+        cardListScrollTops: Map<string, number>
+        boardScrollTop: number
+    } | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
 
-        // Prevent Obsidian's scroll container from competing with the board's
-        // own horizontal scroll. On iOS, nested scrollable elements cause the
-        // browser to swallow touch gestures entirely.
+        // The outer container handles horizontal scroll (so the scrollbar sits
+        // at the viewport edge), while the inner board handles vertical scroll.
+        // On iOS, nested scrollable elements cause the browser to swallow touch
+        // gestures entirely, so on mobile both axes live on the inner board.
         containerEl.setCssStyles({ overflow: "hidden" })
 
         this.cardDnd = new DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>({
             draggableSelector: ".swimlane-card",
             draggableIdAttribute: "path",
-            positionsEqual: (a, b) => a.beforeRank === b.beforeRank && a.afterRank === b.afterRank,
+            positionsEqual: (a, b) =>
+                a.dropIndex === b.dropIndex &&
+                a.beforeRank === b.beforeRank &&
+                a.afterRank === b.afterRank,
             getDropTarget: (el, x, y, d) => this.getCardDropTarget(el, x, y, d),
             onDrop: (state, context, position) => this.handleCardDrop(state, context, position),
             onDropSettle: () => {
@@ -104,7 +129,20 @@ export class SwimlaneView extends BasesView {
                         x: 0,
                     },
                 },
+                {
+                    selector: ".swimlane-add-column-btn",
+                    margin: {
+                        y: "fill",
+                        x: 0,
+                    },
+                },
             ],
+            onDragMove: (_state, clientX, clientY) => {
+                if (this.isMobileLayout) {
+                    this.handleMobileDragSwipe(clientX)
+                }
+                this.handleDragAutoScroll(clientX, clientY)
+            },
         })
 
         this.swimlaneDnd = new DragAndDropContext<SwimlaneDragState, null, GroupKey | null>({
@@ -138,6 +176,12 @@ export class SwimlaneView extends BasesView {
             } satisfies PropertyOption,
             {
                 type: "text",
+                key: CONFIG_KEYS.imageWidth,
+                displayName: "Image width (px)",
+                default: "64",
+            } satisfies TextOption,
+            {
+                type: "text",
                 key: CONFIG_KEYS.rankProperty,
                 displayName: "Rank property",
                 default: "rank",
@@ -159,6 +203,12 @@ export class SwimlaneView extends BasesView {
                 key: CONFIG_KEYS.showAddColumn,
                 displayName: "Show add swimlane button",
                 default: true,
+            } satisfies ToggleOption,
+            {
+                type: "toggle",
+                key: CONFIG_KEYS.forceMobileLayout,
+                displayName: "Force mobile layout (debug)",
+                default: false,
             } satisfies ToggleOption,
             {
                 type: "multitext",
@@ -206,6 +256,12 @@ export class SwimlaneView extends BasesView {
         return val ?? undefined
     }
 
+    private get imageWidth(): number {
+        const val = this.config.get(CONFIG_KEYS.imageWidth)
+        const num = typeof val === "string" ? parseInt(val, 10) : typeof val === "number" ? val : 64
+        return num > 0 ? num : 64
+    }
+
     private get showAddCard(): boolean {
         const val = this.config.get(CONFIG_KEYS.showAddCard)
         return val !== false
@@ -214,6 +270,10 @@ export class SwimlaneView extends BasesView {
     private get showAddColumn(): boolean {
         const val = this.config.get(CONFIG_KEYS.showAddColumn)
         return val !== false
+    }
+
+    private get isMobileLayout(): boolean {
+        return Platform.isMobile || this.config.get(CONFIG_KEYS.forceMobileLayout) === true
     }
 
     private get hiddenSwimlanes(): Set<GroupKey> {
@@ -237,6 +297,11 @@ export class SwimlaneView extends BasesView {
     }
 
     onUnload(): void {
+        this.carouselObserver?.disconnect()
+        if (this.autoScrollRaf !== null) {
+            cancelAnimationFrame(this.autoScrollRaf)
+            this.autoScrollRaf = null
+        }
         this.cardDnd.destroy()
         this.swimlaneDnd.destroy()
     }
@@ -278,7 +343,27 @@ export class SwimlaneView extends BasesView {
     }
 
     private rebuildBoard(): void {
+        // Remember which column is visible so we can restore scroll after rebuild.
+        // Prefer scroll state saved at drop time (before processFrontMatter
+        // triggers could have rebuilt the DOM), falling back to current DOM.
+        const savedScrollColumn = this.savedScrollState?.column ?? this.getVisibleColumnKey()
+        const savedCardListScrollTops =
+            this.savedScrollState?.cardListScrollTops ?? this.getCardListScrollTops()
+        const savedBoardScrollTop =
+            this.savedScrollState?.boardScrollTop ?? this.currentBoard?.scrollTop ?? 0
+        this.savedScrollState = null
+
         this.boardEl.empty()
+        this.carouselObserver?.disconnect()
+        this.carouselObserver = null
+
+        const mobile = this.isMobileLayout
+        this.boardEl.toggleClass("swimlane-mobile", mobile)
+        // Desktop: outer container scrolls both axes, board sizes to content.
+        // Mobile: outer container is hidden, board handles both via scroll-snap.
+        this.boardEl.setCssStyles({
+            overflow: mobile ? "hidden" : "auto",
+        })
 
         const groups = this.data.groupedData
         const hasGroups = groups.some(g => g.hasKey())
@@ -301,6 +386,7 @@ export class SwimlaneView extends BasesView {
         }
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
+        this.currentBoard = board
 
         // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
         // so touch scrolling on the outer container works normally.
@@ -308,10 +394,12 @@ export class SwimlaneView extends BasesView {
         this.cardDnd.initDropIndicator(board)
         this.cardDnd.clearDropAreas()
 
-        this.swimlaneDnd.registerContainer(board)
-        this.swimlaneDnd.initDropIndicator(board)
-        this.swimlaneDnd.clearDropAreas()
-        this.swimlaneDnd.registerDropArea(board, null)
+        if (!mobile) {
+            this.swimlaneDnd.registerContainer(board)
+            this.swimlaneDnd.initDropIndicator(board)
+            this.swimlaneDnd.clearDropAreas()
+            this.swimlaneDnd.registerDropArea(board, null)
+        }
 
         // Build a map of groupKey → group for quick lookup.
         const groupByKey = new Map<GroupKey, BasesEntryGroup>()
@@ -337,8 +425,10 @@ export class SwimlaneView extends BasesView {
             properties: this.cardPropertyAliases,
             showIcons: this.showPropertyIcons,
             imagePropId: this.imagePropId,
+            imageWidth: this.imageWidth,
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
+            mobile,
         }
 
         for (const groupKey of orderedKeys) {
@@ -354,21 +444,27 @@ export class SwimlaneView extends BasesView {
                 cls: "swimlane-column-count",
                 text: String(group?.entries.length ?? 0),
             })
-            if (this.showAddColumn) {
-                const removeBtn = headerRight.createSpan({
-                    cls: "swimlane-column-remove",
-                    attr: { "data-no-drag": "" },
-                })
-                setIcon(removeBtn, "x")
-                removeBtn.addEventListener("click", e => {
-                    e.stopPropagation()
-                    this.removeColumn(board, groupKey, group?.entries.length ?? 0)
-                })
-            }
+            const menuBtn = headerRight.createSpan({
+                cls: "swimlane-column-menu-btn",
+                attr: { "data-no-drag": "" },
+            })
+            setIcon(menuBtn, "more-vertical")
+            menuBtn.addEventListener("click", e => {
+                e.stopPropagation()
+                this.showColumnMenu(
+                    menuBtn,
+                    board,
+                    groupKey,
+                    group?.entries.length ?? 0,
+                    orderedKeys,
+                )
+            })
 
             const cardList = col.createDiv({ cls: "swimlane-card-list" })
             this.cardDnd.registerDropArea(cardList, { groupKey })
-            this.swimlaneDnd.registerDraggable(col, { groupKey })
+            if (!mobile) {
+                this.swimlaneDnd.registerDraggable(col, { groupKey })
+            }
 
             for (const entry of this.sortEntries(group?.entries ?? [])) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
@@ -391,6 +487,18 @@ export class SwimlaneView extends BasesView {
 
         if (this.showAddColumn) {
             this.renderAddColumnButton(board)
+        }
+
+        if (mobile) {
+            this.renderCarouselIndicator(board, orderedKeys)
+        }
+
+        if (savedScrollColumn) {
+            this.restoreScrollPosition(board, savedScrollColumn)
+        }
+        this.restoreCardListScrollTops(board, savedCardListScrollTops)
+        if (savedBoardScrollTop > 0) {
+            board.scrollTop = savedBoardScrollTop
         }
 
         this.applyPendingHighlight()
@@ -589,6 +697,346 @@ export class SwimlaneView extends BasesView {
         }).open()
     }
 
+    private showColumnMenu(
+        triggerEl: HTMLElement,
+        board: HTMLElement,
+        groupKey: GroupKey,
+        entryCount: number,
+        orderedKeys: GroupKey[],
+    ): void {
+        const order = this.swimlaneOrder
+        const idx = order.indexOf(groupKey)
+
+        const menu = new Menu()
+
+        menu.addItem(item => {
+            item.setTitle("Move left")
+                .setIcon("arrow-left")
+                .setDisabled(idx <= 0)
+                .onClick(() => this.moveColumn(groupKey, -1))
+        })
+
+        menu.addItem(item => {
+            item.setTitle("Move right")
+                .setIcon("arrow-right")
+                .setDisabled(idx === -1 || idx >= order.length - 1)
+                .onClick(() => this.moveColumn(groupKey, 1))
+        })
+
+        menu.addSeparator()
+
+        menu.addItem(item => {
+            item.setTitle("Hide")
+                .setIcon("eye-off")
+                .onClick(() => this.hideColumn(groupKey))
+        })
+
+        if (this.showAddColumn) {
+            menu.addItem(item => {
+                item.setTitle("Remove")
+                    .setIcon("trash-2")
+                    .onClick(() => this.removeColumn(board, groupKey, entryCount))
+            })
+        }
+
+        const rect = triggerEl.getBoundingClientRect()
+        menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    }
+
+    private moveColumn(groupKey: GroupKey, direction: -1 | 1): void {
+        const order = [...this.swimlaneOrder]
+        const idx = order.indexOf(groupKey)
+        if (idx === -1) {
+            return
+        }
+        const newIdx = idx + direction
+        if (newIdx < 0 || newIdx >= order.length) {
+            return
+        }
+        ;[order[idx], order[newIdx]] = [order[newIdx]!, order[idx]!]
+        this.config.set(CONFIG_KEYS.swimlaneOrder, order)
+    }
+
+    private renderCarouselIndicator(board: HTMLElement, orderedKeys: GroupKey[]): void {
+        const indicator = this.boardEl.createDiv({ cls: "swimlane-carousel-indicator" })
+
+        // Collect all swipeable slides: columns + optional add-column button.
+        const slides = Array.from(
+            board.querySelectorAll<HTMLElement>(
+                ".swimlane-column, .swimlane-add-column-btn, .swimlane-add-column-input-wrapper",
+            ),
+        )
+        const totalDots = slides.length
+
+        for (let i = 0; i < totalDots; i++) {
+            const slide = slides[i]!
+            const isAddSlide =
+                slide.classList.contains("swimlane-add-column-btn") ||
+                slide.classList.contains("swimlane-add-column-input-wrapper")
+            const cls = ["swimlane-carousel-dot"]
+            if (i === 0) {
+                cls.push("is-active")
+            }
+            if (isAddSlide) {
+                cls.push("swimlane-carousel-dot--add")
+            }
+            const dot = indicator.createDiv({ cls: cls.join(" ") })
+            dot.addEventListener("click", () => {
+                slide.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" })
+            })
+        }
+
+        this.carouselObserver = new IntersectionObserver(
+            entries => {
+                for (const entry of entries) {
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                        const idx = slides.indexOf(entry.target as HTMLElement)
+                        if (idx !== -1) {
+                            this.updateCarouselIndicator(idx)
+                        }
+                    }
+                }
+            },
+            { root: board, threshold: 0.5 },
+        )
+
+        slides.forEach(slide => {
+            this.carouselObserver!.observe(slide)
+        })
+    }
+
+    private updateCarouselIndicator(activeIdx: number): void {
+        const dots = this.boardEl.querySelectorAll(".swimlane-carousel-dot")
+        dots.forEach((dot, i) => {
+            ;(dot as HTMLElement).toggleClass("is-active", i === activeIdx)
+        })
+    }
+
+    /** Returns the groupKey of the column closest to the board center, or null. */
+    private getVisibleColumnKey(): GroupKey | null {
+        const board = this.currentBoard
+        if (!board) {
+            return null
+        }
+
+        const columns = board.querySelectorAll<HTMLElement>(".swimlane-column")
+        if (columns.length === 0) {
+            return null
+        }
+
+        const boardRect = board.getBoundingClientRect()
+        const boardCenter = boardRect.left + boardRect.width / 2
+
+        let bestKey: string | null = null
+        let minDist = Infinity
+        columns.forEach(col => {
+            const colRect = col.getBoundingClientRect()
+            const dist = Math.abs(colRect.left + colRect.width / 2 - boardCenter)
+            if (dist < minDist) {
+                minDist = dist
+                bestKey = col.dataset.groupKey ?? null
+            }
+        })
+        return bestKey as GroupKey | null
+    }
+
+    /** Scrolls the board so the column with the given groupKey is visible. */
+    private restoreScrollPosition(board: HTMLElement, groupKey: GroupKey): void {
+        const col = board.querySelector<HTMLElement>(
+            `.swimlane-column[data-group-key="${CSS.escape(groupKey)}"]`,
+        )
+        if (col) {
+            // Use instant scroll so the user doesn't see an animation on rebuild.
+            col.scrollIntoView({ behavior: "instant", block: "nearest", inline: "start" })
+        }
+    }
+
+    /** Save the scrollTop of every card list, keyed by column groupKey. */
+    private getCardListScrollTops(): Map<string, number> {
+        const result = new Map<string, number>()
+        const board = this.currentBoard
+        if (!board) {
+            return result
+        }
+        for (const col of board.querySelectorAll<HTMLElement>(".swimlane-column")) {
+            const key = col.dataset.groupKey
+            const list = col.querySelector<HTMLElement>(".swimlane-card-list")
+            if (key && list && list.scrollTop > 0) {
+                result.set(key, list.scrollTop)
+            }
+        }
+        return result
+    }
+
+    /** Restore scrollTop on rebuilt card lists. */
+    private restoreCardListScrollTops(board: HTMLElement, saved: Map<string, number>): void {
+        if (saved.size === 0) {
+            return
+        }
+        for (const col of board.querySelectorAll<HTMLElement>(".swimlane-column")) {
+            const key = col.dataset.groupKey
+            if (!key) {
+                continue
+            }
+            const scrollTop = saved.get(key)
+            if (scrollTop === undefined) {
+                continue
+            }
+            const list = col.querySelector<HTMLElement>(".swimlane-card-list")
+            if (list) {
+                list.scrollTop = scrollTop
+            }
+        }
+    }
+
+    private handleMobileDragSwipe(clientX: number): void {
+        const board = this.currentBoard
+        if (!board) {
+            return
+        }
+
+        const now = Date.now()
+        if (now < this.mobileSwipeCooldown) {
+            return
+        }
+
+        const edgeThreshold = 20
+        const boardRect = board.getBoundingClientRect()
+
+        if (clientX < boardRect.left + edgeThreshold) {
+            this.scrollToAdjacentColumn(-1)
+            this.mobileSwipeCooldown = now + 800
+        } else if (clientX > boardRect.right - edgeThreshold) {
+            this.scrollToAdjacentColumn(1)
+            this.mobileSwipeCooldown = now + 800
+        }
+    }
+
+    /**
+     * Auto-scroll the nearest scrollable card list when the pointer is near
+     * the top or bottom edge of the viewport during a drag. Uses a rAF loop
+     * that continues as long as the pointer stays in the edge zone.
+     */
+    private handleDragAutoScroll(clientX: number, clientY: number): void {
+        const edgeSize = 60 // pixels from container edge to start scrolling
+        const maxSpeed = 5 // pixels per frame at the very edge
+
+        // Use the card list's bounds, not the viewport, so scrolling triggers
+        // at the edges of the scrollable area.
+        const scrollContainer = this.findScrollContainer(clientX, clientY)
+        if (!scrollContainer) {
+            if (this.autoScrollRaf !== null) {
+                cancelAnimationFrame(this.autoScrollRaf)
+                this.autoScrollRaf = null
+            }
+            return
+        }
+
+        const rect = scrollContainer.getBoundingClientRect()
+        let speed = 0
+        if (clientY > rect.bottom - edgeSize) {
+            // Near bottom of card list: scroll down.
+            speed = maxSpeed * ((clientY - (rect.bottom - edgeSize)) / edgeSize)
+        } else if (clientY < rect.top + edgeSize) {
+            // Near top of card list: scroll up.
+            speed = -maxSpeed * ((rect.top + edgeSize - clientY) / edgeSize)
+        }
+
+        speed = Math.max(-maxSpeed, Math.min(maxSpeed, speed))
+
+        if (Math.abs(speed) < 0.5) {
+            if (this.autoScrollRaf !== null) {
+                cancelAnimationFrame(this.autoScrollRaf)
+                this.autoScrollRaf = null
+            }
+            return
+        }
+
+        // Start or continue the scroll loop.
+        if (this.autoScrollRaf !== null) {
+            cancelAnimationFrame(this.autoScrollRaf)
+        }
+
+        const tick = () => {
+            if (!this.cardDnd.isDragging) {
+                this.autoScrollRaf = null
+                return
+            }
+            scrollContainer.scrollTop += speed
+            this.autoScrollRaf = requestAnimationFrame(tick)
+        }
+        this.autoScrollRaf = requestAnimationFrame(tick)
+    }
+
+    /** Find the scrollable container for the column at the given X position. */
+    private findScrollContainer(clientX: number, _clientY: number): HTMLElement | null {
+        const board = this.currentBoard
+        if (!board) {
+            return null
+        }
+        // On mobile, each column's card list scrolls independently.
+        // On desktop, columns grow to content and the board scrolls.
+        for (const col of board.querySelectorAll<HTMLElement>(".swimlane-column")) {
+            const colRect = col.getBoundingClientRect()
+            if (clientX >= colRect.left && clientX <= colRect.right) {
+                const list = col.querySelector<HTMLElement>(".swimlane-card-list")
+                if (list && list.scrollHeight > list.clientHeight) {
+                    return list
+                }
+            }
+        }
+        // Fall back to the outer container (desktop layout where it scrolls).
+        if (this.boardEl.scrollHeight > this.boardEl.clientHeight) {
+            return this.boardEl
+        }
+        return null
+    }
+
+    private scrollToAdjacentColumn(direction: 1 | -1): void {
+        const board = this.currentBoard
+        if (!board) {
+            return
+        }
+
+        // Include the add-column slide so drag-swiping can reach it.
+        const columns = Array.from(
+            board.querySelectorAll<HTMLElement>(
+                ".swimlane-column, .swimlane-add-column-btn, .swimlane-add-column-input-wrapper",
+            ),
+        )
+        if (columns.length === 0) {
+            return
+        }
+
+        const boardRect = board.getBoundingClientRect()
+        const boardCenter = boardRect.left + boardRect.width / 2
+
+        let currentIdx = 0
+        let minDist = Infinity
+        for (let i = 0; i < columns.length; i++) {
+            const colRect = columns[i]!.getBoundingClientRect()
+            const colCenter = colRect.left + colRect.width / 2
+            const dist = Math.abs(colCenter - boardCenter)
+            if (dist < minDist) {
+                minDist = dist
+                currentIdx = i
+            }
+        }
+
+        const targetIdx = Math.max(0, Math.min(columns.length - 1, currentIdx + direction))
+        if (targetIdx === currentIdx) {
+            return
+        }
+
+        columns[targetIdx]!.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "start",
+        })
+
+        this.updateCarouselIndicator(targetIdx)
+    }
+
     /**
      * @param immediate If true, apply the highlight now. If false (default),
      * defer until the next rebuildBoard so the animation plays on fresh DOM.
@@ -661,7 +1109,7 @@ export class SwimlaneView extends BasesView {
 
         if (draggables.length === 0) {
             return {
-                position: { beforeRank: null, afterRank: null },
+                position: { beforeRank: null, afterRank: null, dropIndex: 0 },
                 placement: { refNode: dropAreaEl.firstChild, atStart: true, atEnd: true },
             }
         }
@@ -676,6 +1124,7 @@ export class SwimlaneView extends BasesView {
                     position: {
                         beforeRank: i > 0 ? rankOf(draggables[i - 1]) : null,
                         afterRank: rankOf(card),
+                        dropIndex: i,
                     },
                     placement: { refNode: card, atStart: i === 0, atEnd: false },
                 }
@@ -686,6 +1135,7 @@ export class SwimlaneView extends BasesView {
             position: {
                 beforeRank: rankOf(last),
                 afterRank: null,
+                dropIndex: draggables.length,
             },
             placement: { refNode: null, atStart: false, atEnd: true },
         }
@@ -724,6 +1174,14 @@ export class SwimlaneView extends BasesView {
         context: CardDropContext,
         position: LexorankPosition,
     ): void {
+        // Snapshot scroll state NOW, before any processFrontMatter calls
+        // trigger onDataUpdated → rebuildBoard and blow away the DOM.
+        this.savedScrollState = {
+            column: this.getVisibleColumnKey(),
+            cardListScrollTops: this.getCardListScrollTops(),
+            boardScrollTop: this.currentBoard?.scrollTop ?? 0,
+        }
+
         if (context.groupKey === ADD_COLUMN_DROP_KEY) {
             this.handleCardDropOnNewColumn(dragState)
             return
@@ -733,6 +1191,18 @@ export class SwimlaneView extends BasesView {
         if (!file) {
             return
         }
+
+        // Check if the target column has any unranked cards or if adjacent
+        // ranks are identical. In these cases midRank can't produce a useful
+        // position, so we re-rank the entire column to establish proper ordering.
+        if (
+            position.beforeRank === position.afterRank ||
+            this.columnHasUnrankedCards(context.groupKey)
+        ) {
+            this.reRankColumn(dragState, context, position)
+            return
+        }
+
         const newRank = midRank(position.beforeRank, position.afterRank)
 
         this.app.fileManager.processFrontMatter(file, fm => {
@@ -741,6 +1211,62 @@ export class SwimlaneView extends BasesView {
                 fm[this.swimlaneProp] = context.groupKey
             }
         })
+    }
+
+    /** Returns true if any card in the column is missing a rank value. */
+    private columnHasUnrankedCards(groupKey: GroupKey): boolean {
+        const group = this.data.groupedData.find(
+            g => g.hasKey() && (g.key?.toString() ?? "") === groupKey,
+        )
+        if (!group) {
+            return false
+        }
+        return group.entries.some(e => !getFrontmatter<string>(this.app, e.file, this.rankProp))
+    }
+
+    /**
+     * Re-rank all cards in the target column, inserting the dragged card at
+     * the drop position. Uses the dropIndex from getCardDropTarget to
+     * determine visual order, since rank values may be missing or degenerate.
+     */
+    private reRankColumn(
+        dragState: CardDragState,
+        context: CardDropContext,
+        position: LexorankPosition,
+    ): void {
+        const group = this.data.groupedData.find(
+            g => g.hasKey() && (g.key?.toString() ?? "") === context.groupKey,
+        )
+        const entries = this.sortEntries(group?.entries ?? [])
+
+        // Build ordered list of file paths, excluding the dragged card.
+        const paths = entries.map(e => e.file.path).filter(p => p !== dragState.path)
+
+        // Insert the dragged card at the position determined by getCardDropTarget.
+        const insertIdx = Math.min(position.dropIndex, paths.length)
+        paths.splice(insertIdx, 0, dragState.path)
+
+        // Assign evenly-spaced ranks to all cards.
+        const step = Math.floor(26 / (paths.length + 1))
+        const base = "a".charCodeAt(0)
+
+        for (let i = 0; i < paths.length; i++) {
+            const path = paths[i]!
+            const cardFile = this.app.vault.getFileByPath(path)
+            if (!cardFile) {
+                continue
+            }
+            // Generate a rank like "d", "h", "l", "p", etc.
+            const charCode = base + step * (i + 1)
+            const rank = String.fromCharCode(Math.min(charCode, "z".charCodeAt(0)))
+
+            this.app.fileManager.processFrontMatter(cardFile, fm => {
+                fm[this.rankProp] = rank
+                if (path === dragState.path && context.groupKey !== dragState.groupKey) {
+                    fm[this.swimlaneProp] = context.groupKey
+                }
+            })
+        }
     }
 
     private handleCardDropOnNewColumn(dragState: CardDragState): void {
