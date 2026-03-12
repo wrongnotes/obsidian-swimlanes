@@ -34,6 +34,9 @@ const context = await esbuild.context({
     banner: {
         js: banner,
     },
+    define: {
+        "process.env.NODE_ENV": prod ? '"production"' : '"development"',
+    },
     plugins: [copyAssetsPlugin],
     entryPoints: ["src/main.ts"],
     bundle: true,

@@ -211,6 +211,7 @@ export class SwimlaneView extends BasesView {
                 key: CONFIG_KEYS.forceMobileLayout,
                 displayName: "Force mobile layout (debug)",
                 default: false,
+                shouldHide: () => process.env.NODE_ENV === "production",
             } satisfies ToggleOption,
             {
                 type: "multitext",
