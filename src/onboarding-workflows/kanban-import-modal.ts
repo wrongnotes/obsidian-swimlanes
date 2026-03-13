@@ -86,9 +86,7 @@ export class KanbanImportModal extends WrongNotesModal {
     private buildFolderSetting(): void {
         new Setting(this.contentEl)
             .setName("Source folder")
-            .setDesc(
-                "Imported tasks will be created as notes in this directory.",
-            )
+            .setDesc("Imported tasks will be created as notes in this directory.")
             .addText(text => {
                 text.setValue(this.folderPath)
                 text.onChange(value => {
@@ -378,8 +376,7 @@ export class KanbanImportModal extends WrongNotesModal {
         const timeProp = this.timePropertyName.trim() || "time"
 
         const columnsToImport = this.board!.columns.filter(c => !this.excludedColumns.has(c.name))
-        const archiveCards =
-            this.archiveSection?.enabled ? this.board!.archive : []
+        const archiveCards = this.archiveSection?.enabled ? this.board!.archive : []
         const totalCards =
             columnsToImport.reduce((n, c) => n + c.cards.length, 0) + archiveCards.length
 
@@ -528,9 +525,7 @@ export class KanbanImportModal extends WrongNotesModal {
         setFrontmatter: (fm: Record<string, unknown>) => void,
     ): Promise<void> {
         const sanitized = sanitizeFileName(card.text)
-        const notePath = normalizePath(
-            folder ? `${folder}/${sanitized}.md` : `${sanitized}.md`,
-        )
+        const notePath = normalizePath(folder ? `${folder}/${sanitized}.md` : `${sanitized}.md`)
         const exists = await this.app.vault.adapter.exists(notePath)
         if (!exists) {
             await this.app.vault.create(notePath, "")
@@ -541,7 +536,7 @@ export class KanbanImportModal extends WrongNotesModal {
             const needsAlias = sanitized !== card.text
             await this.app.fileManager.processFrontMatter(file, fm => {
                 if (needsAlias) {
-                    const aliases = Array.isArray(fm.aliases) ? fm.aliases as string[] : []
+                    const aliases = Array.isArray(fm.aliases) ? (fm.aliases as string[]) : []
                     if (!aliases.includes(card.text)) {
                         aliases.push(card.text)
                     }

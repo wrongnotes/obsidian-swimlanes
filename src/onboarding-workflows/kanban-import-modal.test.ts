@@ -911,7 +911,14 @@ describe("KanbanImportModal", () => {
             if (path === "Tasks/New card.md") {
                 throw new Error("Disk full")
             }
-            return { path, basename: path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "" }
+            return {
+                path,
+                basename:
+                    path
+                        .split("/")
+                        .pop()
+                        ?.replace(/\.[^.]+$/, "") ?? "",
+            }
         })
 
         modal.open()
