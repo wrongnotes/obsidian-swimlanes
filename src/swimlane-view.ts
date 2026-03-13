@@ -85,8 +85,11 @@ export class SwimlaneView extends BasesView {
     private carouselObserver: IntersectionObserver | null = null
     /** When true, swipe is blocked until the finger returns to the column center. */
     private mobileSwipeNeedsReturn = false
-    private mobileSwipeDwell: { direction: 1 | -1; timer: ReturnType<typeof setTimeout> } | null =
-        null
+    private mobileSwipeDwell: {
+        direction: 1 | -1
+        timer: ReturnType<typeof setTimeout> | null
+        fallbackTimer: ReturnType<typeof setTimeout>
+    } | null = null
     /** Recent clientX samples for horizontal velocity estimation. */
     private mobileSwipeXSamples: { x: number; t: number }[] = []
     private autoScrollRaf: number | null = null
@@ -776,13 +779,28 @@ export class SwimlaneView extends BasesView {
         )
         const totalDots = slides.length
 
+        // Determine which slide is initially visible based on scroll position.
+        const boardRect = board.getBoundingClientRect()
+        const boardCenter = boardRect.left + boardRect.width / 2
+        let initialActive = 0
+        let minDist = Infinity
+        for (let i = 0; i < totalDots; i++) {
+            const slide = slides[i]!
+            const slideRect = slide.getBoundingClientRect()
+            const dist = Math.abs(slideRect.left + slideRect.width / 2 - boardCenter)
+            if (dist < minDist) {
+                minDist = dist
+                initialActive = i
+            }
+        }
+
         for (let i = 0; i < totalDots; i++) {
             const slide = slides[i]!
             const isAddSlide =
                 slide.classList.contains("swimlane-add-column-btn") ||
                 slide.classList.contains("swimlane-add-column-input-wrapper")
             const cls = ["swimlane-carousel-dot"]
-            if (i === 0) {
+            if (i === initialActive) {
                 cls.push("is-active")
             }
             if (isAddSlide) {
@@ -944,8 +962,8 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        // Require the finger to be moving toward the edge (not just drifting there).
-        // Compute horizontal velocity from recent samples (px/ms).
+        // Check if the finger is moving toward the edge.
+        let hasVelocity = false
         const samples = this.mobileSwipeXSamples
         if (samples.length >= 2) {
             const oldest = samples[0]!
@@ -953,40 +971,50 @@ export class SwimlaneView extends BasesView {
             const dt = newest.t - oldest.t
             if (dt > 0) {
                 const vx = (newest.x - oldest.x) / dt // px/ms, positive = rightward
-                // Velocity must agree with swipe direction (min 0.1 px/ms ≈ 100px/s).
-                if (direction === 1 && vx < 0.1) {
-                    this.cancelMobileSwipeDwell()
-                    return
-                }
-                if (direction === -1 && vx > -0.1) {
-                    this.cancelMobileSwipeDwell()
-                    return
+                if (direction === 1 && vx >= 0.1) {
+                    hasVelocity = true
+                } else if (direction === -1 && vx <= -0.1) {
+                    hasVelocity = true
                 }
             }
         }
 
-        // If already dwelling in this direction, let the timer run.
         if (this.mobileSwipeDwell?.direction === direction) {
+            // Already dwelling — upgrade to fast timer if velocity just appeared.
+            if (hasVelocity && this.mobileSwipeDwell.timer === null) {
+                const dwell = this.mobileSwipeDwell
+                dwell.timer = setTimeout(() => {
+                    this.cancelMobileSwipeDwell()
+                    this.mobileSwipeNeedsReturn = true
+                    this.scrollToAdjacentColumn(direction)
+                }, 500) as any
+            }
             return
         }
 
-        // Start a new dwell: finger must stay in the edge zone for 500ms
-        // while moving toward the edge.
+        // Two paths to trigger a swipe:
+        // 1. Fast path (500ms): requires velocity toward the edge.
+        // 2. Fallback (1200ms): fires unconditionally if finger stays in edge zone.
         this.cancelMobileSwipeDwell()
         const dir = direction
+        const fire = () => {
+            this.cancelMobileSwipeDwell()
+            this.mobileSwipeNeedsReturn = true
+            this.scrollToAdjacentColumn(dir)
+        }
         this.mobileSwipeDwell = {
             direction: dir,
-            timer: setTimeout(() => {
-                this.mobileSwipeDwell = null
-                this.mobileSwipeNeedsReturn = true
-                this.scrollToAdjacentColumn(dir)
-            }, 500),
+            timer: hasVelocity ? setTimeout(fire, 500) : null,
+            fallbackTimer: setTimeout(fire, 1200),
         }
     }
 
     private cancelMobileSwipeDwell(): void {
         if (this.mobileSwipeDwell) {
-            clearTimeout(this.mobileSwipeDwell.timer)
+            if (this.mobileSwipeDwell.timer !== null) {
+                clearTimeout(this.mobileSwipeDwell.timer)
+            }
+            clearTimeout(this.mobileSwipeDwell.fallbackTimer)
             this.mobileSwipeDwell = null
         }
     }
