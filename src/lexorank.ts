@@ -49,6 +49,8 @@ export function midRank(lo: string | null, hi: string | null): string {
 export interface LexorankPosition {
     beforeRank: string | null
     afterRank: string | null
+    /** Index in the drop area, used to disambiguate when ranks are identical or null. */
+    dropIndex: number
 }
 
 const FIRST = "a".charCodeAt(0) // 97

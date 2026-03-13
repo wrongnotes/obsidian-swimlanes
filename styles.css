@@ -5,10 +5,10 @@
  */
 
 .swimlane-board {
-    display: flex;
+    display: inline-flex;
     gap: var(--size-4-4);
-    height: 100%;
-    overflow: auto;
+    min-height: 100%;
+    min-width: 100%;
     padding: var(--size-4-4);
     box-sizing: border-box;
     align-items: flex-start;
@@ -70,7 +70,7 @@
     gap: var(--size-4-1);
 }
 
-.swimlane-column-remove {
+.swimlane-column-menu-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -79,24 +79,18 @@
     background-color: transparent;
     border-radius: var(--radius-s);
     cursor: pointer;
-    opacity: 0;
     transition:
-        opacity var(--anim-duration-fast) ease,
         color var(--anim-duration-fast) ease,
         background-color var(--anim-duration-fast) ease;
 }
 
-.swimlane-column-remove svg {
+.swimlane-column-menu-btn svg {
     width: var(--icon-xs);
     height: var(--icon-xs);
 }
 
-.swimlane-column-header:hover .swimlane-column-remove {
-    opacity: 1;
-}
-
-.swimlane-column-remove:hover {
-    color: var(--text-error);
+.swimlane-column-menu-btn:hover {
+    color: var(--text-muted);
     background-color: var(--background-modifier-hover);
 }
 
@@ -124,12 +118,14 @@
 }
 
 .swimlane-card {
+    position: relative;
     background-color: var(--background-primary);
     border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     padding: var(--size-4-2) var(--size-4-3);
     cursor: grab;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .swimlane-card.swimlane-drag-and-drop--dragging,
@@ -144,10 +140,20 @@
     overflow: hidden;
 }
 
-.swimlane-card-image {
-    width: 64px;
+.swimlane-card-image-wrapper {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--size-4-1);
+    overflow: hidden;
+}
+
+.swimlane-card-image {
+    width: 100%;
+    aspect-ratio: 2 / 3;
     object-fit: cover;
+    border-radius: var(--radius-s);
 }
 
 .swimlane-card-content {
@@ -163,8 +169,39 @@
     transition: transform var(--anim-duration-fast) var(--anim-motion-baseline);
 }
 
-.swimlane-card:hover {
-    border-color: var(--interactive-accent);
+@media (hover: hover) {
+    .swimlane-card:hover {
+        border-color: var(--interactive-accent);
+    }
+}
+
+.swimlane-card-menu-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--size-4-2) var(--size-4-1);
+    color: var(--text-faint);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    z-index: 1;
+}
+
+.swimlane-card-menu-btn svg {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.swimlane-card-menu-btn:hover {
+    color: var(--text-muted);
+    background-color: var(--background-modifier-hover);
+}
+
+/* Reserve space in the title row so the menu button doesn't overlap */
+.swimlane-card:has(.swimlane-card-menu-btn) .swimlane-card-title {
+    padding-right: calc(var(--icon-s) + var(--size-4-1));
 }
 
 .swimlane-card-title {
@@ -743,4 +780,123 @@
 
 .swimlane-import-preview-column-count {
     color: var(--text-faint);
+}
+
+/* ── Mobile carousel ─────────────────────────────────────────────── */
+.swimlane-mobile {
+    display: flex;
+    flex-direction: column;
+}
+
+.swimlane-mobile .swimlane-board {
+    display: flex;
+    flex: 1;
+    height: 0;
+    min-height: 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    padding: var(--size-2-3);
+    gap: var(--size-2-3);
+    scroll-padding-inline: var(--size-2-3);
+    scrollbar-width: none;
+}
+
+.swimlane-mobile .swimlane-board::-webkit-scrollbar {
+    display: none;
+}
+
+.swimlane-mobile .swimlane-column {
+    min-width: 100%;
+    max-width: 100%;
+    /* Constrain to board height so the card list scrolls independently. */
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    scroll-snap-align: start;
+}
+
+.swimlane-mobile .swimlane-card-list {
+    min-height: 0;
+    scrollbar-width: none;
+}
+
+.swimlane-mobile .swimlane-card-list::-webkit-scrollbar {
+    display: none;
+}
+
+.swimlane-mobile .swimlane-card {
+    flex-shrink: 0;
+}
+
+.swimlane-mobile .swimlane-add-card-btn {
+    flex-shrink: 0;
+    justify-content: center;
+    margin: 0;
+    padding: var(--size-4-2) var(--size-4-3);
+    border: var(--border-width) dashed var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+
+.swimlane-mobile .swimlane-add-card-wrapper {
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.swimlane-mobile .swimlane-column-header {
+    cursor: default;
+}
+
+.swimlane-mobile .swimlane-add-column-btn,
+.swimlane-mobile .swimlane-add-column-input-wrapper {
+    min-width: 100%;
+    scroll-snap-align: start;
+}
+
+.swimlane-mobile .swimlane-add-column-btn {
+    min-height: 200px;
+    flex: 1;
+    border-style: dashed;
+    border-width: 2px;
+}
+
+.swimlane-carousel-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--size-2-2);
+    padding: var(--size-4-2);
+    /* Push above Obsidian's mobile bottom toolbar and iOS safe area. */
+    padding-bottom: calc(var(--size-4-2) + env(safe-area-inset-bottom, 0px));
+}
+
+.swimlane-carousel-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--text-faint);
+    opacity: 0.4;
+    cursor: pointer;
+    transition:
+        opacity var(--anim-duration-fast) ease,
+        transform var(--anim-duration-fast) ease;
+}
+
+.swimlane-carousel-dot.is-active {
+    opacity: 1;
+    transform: scale(1.4);
+    background-color: var(--interactive-accent);
+}
+
+.swimlane-carousel-dot--add {
+    background-color: transparent;
+    border: 1.5px solid var(--text-faint);
+    width: 7px;
+    height: 7px;
+}
+
+.swimlane-carousel-dot--add.is-active {
+    border-color: var(--interactive-accent);
+    background-color: transparent;
 }

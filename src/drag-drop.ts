@@ -207,6 +207,8 @@ export interface DragAndDropContextOptions<TState, TContext = DragContext, TPosi
      * indicator, and the configured duration. Defaults to a translate + fade animation.
      */
     onDropAnimate?: (clone: HTMLElement, dx: number, dy: number, durationMs: number) => void
+    /** Called on each pointer move during an active drag. */
+    onDragMove?: (state: TState, clientX: number, clientY: number) => void
 }
 
 /**
@@ -248,6 +250,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         durationMs: number,
     ) => void
     private readonly onDropSettle: (() => void) | null
+    private readonly onDragMoveCallback: ((state: TState, x: number, y: number) => void) | null
     private dragging: TState | null = null
     private dropAnimating = false
     private dropHeld = false
@@ -315,6 +318,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             right: o.right === "fill" ? Number.POSITIVE_INFINITY : o.right,
         }))
         this.onDropSettle = options.onDropSettle ?? null
+        this.onDragMoveCallback = options.onDragMove ?? null
         this.onDropAnimate =
             options.onDropAnimate ??
             ((clone, dx, dy, durationMs) => {
@@ -338,6 +342,11 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
 
     get animationMs(): number {
         return this.dropAnimationMs
+    }
+
+    /** Returns the drag clone's bounding rect, or null if not dragging. */
+    get cloneRect(): DOMRect | null {
+        return this.dragClone?.getBoundingClientRect() ?? null
     }
 
     /**
@@ -543,6 +552,16 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             }
             const { latestX, latestY } = this.pendingTouchDrag
             this.cancelPendingTouchDrag()
+            // Suppress the native context menu that fires after a long-press on
+            // touch so it doesn't compete with the drag gesture.
+            document.addEventListener(
+                "contextmenu",
+                ev => {
+                    ev.preventDefault()
+                    ev.stopImmediatePropagation()
+                },
+                { capture: true, once: true },
+            )
             this.startDrag(draggable, state, options, latestX, latestY)
         }, this.longPressDurationMs)
 
@@ -644,6 +663,10 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             this.dragClone.style.top = `${e.clientY - this.dragOffset.y}px`
         }
 
+        if (this.dragging) {
+            this.onDragMoveCallback?.(this.dragging, e.clientX, e.clientY)
+        }
+
         if (!this.dragging || !this.dropIndicator) {
             return
         }
@@ -743,9 +766,22 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         this.dropIndicator?.remove()
     }
 
-    private onPointerUp(_e: PointerEvent): void {
+    private onPointerUp(e: PointerEvent): void {
         this.cleanupListeners()
-        const target = this.currentTarget
+
+        // On touch devices, a scroll triggered by the onDragMove callback can
+        // shift the layout between the last pointermove and the pointer-up,
+        // leaving currentTarget stale or null. Re-resolve the drop target at
+        // the pointer-up coordinates so the drop still lands correctly.
+        let target = this.currentTarget
+        if (!target && this.dragging && this.dropIndicator && e.pointerType === "touch") {
+            const resolved = this.resolveDropTarget(e.clientX, e.clientY)
+            if (resolved) {
+                target = resolved
+                this.showDropIndicator(resolved)
+            }
+        }
+
         const state = this.dragging
         const draggableEl = this.draggable
         const options = this.dragOptions

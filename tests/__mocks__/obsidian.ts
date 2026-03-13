@@ -1,6 +1,15 @@
 // Minimal mock of the Obsidian API for Jest tests.
 // Add to this file as more Obsidian APIs are used in source code.
 
+export const Platform = {
+    isMobile: false,
+    isDesktop: true,
+    isDesktopApp: true,
+    isMobileApp: false,
+    isPhone: false,
+    isTablet: false,
+}
+
 export class Component {
     load() {}
     unload() {}
@@ -245,6 +254,13 @@ export class Menu {
     showAtMouseEvent(_evt: MouseEvent): this {
         return this
     }
+    showAtPosition(_pos: { x: number; y: number }): this {
+        return this
+    }
+    hide(): this {
+        return this
+    }
+    register(_cb: () => void): void {}
 }
 
 export class MenuItem {
