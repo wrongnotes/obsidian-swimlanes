@@ -800,6 +800,11 @@
     padding: var(--size-2-3);
     gap: var(--size-2-3);
     scroll-padding-inline: var(--size-2-3);
+    scrollbar-width: none;
+}
+
+.swimlane-mobile .swimlane-board::-webkit-scrollbar {
+    display: none;
 }
 
 .swimlane-mobile .swimlane-column {

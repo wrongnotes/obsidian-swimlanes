@@ -779,18 +779,15 @@ export class SwimlaneView extends BasesView {
         )
         const totalDots = slides.length
 
-        // Determine which slide is initially visible based on scroll position.
-        const boardRect = board.getBoundingClientRect()
-        const boardCenter = boardRect.left + boardRect.width / 2
+        // Determine which slide is initially visible. Use the saved/restored
+        // column key rather than getBoundingClientRect (which returns 0s before
+        // the browser has run layout on freshly-inserted DOM).
+        const savedKey = this.savedScrollState?.column ?? this.getVisibleColumnKey()
         let initialActive = 0
-        let minDist = Infinity
-        for (let i = 0; i < totalDots; i++) {
-            const slide = slides[i]!
-            const slideRect = slide.getBoundingClientRect()
-            const dist = Math.abs(slideRect.left + slideRect.width / 2 - boardCenter)
-            if (dist < minDist) {
-                minDist = dist
-                initialActive = i
+        if (savedKey) {
+            const idx = slides.findIndex(s => s.dataset.groupKey === savedKey)
+            if (idx !== -1) {
+                initialActive = idx
             }
         }
 
@@ -1238,13 +1235,18 @@ export class SwimlaneView extends BasesView {
             }
         }
         const last = draggables[draggables.length - 1]
+        // On mobile the add-card button is inside the card list, so insert
+        // the indicator before it rather than appending to the end.
+        const addCardBtn = dropAreaEl.querySelector(
+            ".swimlane-add-card-wrapper, .swimlane-add-card-btn",
+        )
         return {
             position: {
                 beforeRank: rankOf(last),
                 afterRank: null,
                 dropIndex: draggables.length,
             },
-            placement: { refNode: null, atStart: false, atEnd: true },
+            placement: { refNode: addCardBtn ?? null, atStart: false, atEnd: !addCardBtn },
         }
     }
 
