@@ -1,4 +1,4 @@
-import { KanbanImportModal } from "./kanban-import-modal"
+import { KanbanImportModal, ImportProgressModal } from "./kanban-import-modal"
 
 const KANBAN_MD = [
     "---",
@@ -205,12 +205,19 @@ describe("KanbanImportModal", () => {
 
         // Should have called processFrontMatter for linked note + created new note
         expect(app.fileManager.processFrontMatter).toHaveBeenCalled()
+        // New notes go into the default Tasks folder
+        expect(app.vault.create).toHaveBeenCalledWith("Tasks/New card.md", "")
         // Should have created the .base file
         expect(app.vault.create).toHaveBeenCalledWith("My board.base", expect.any(String))
     })
 
     it("resolves linked notes via metadataCache", async () => {
-        const linkedFile = { path: "Existing Note.md", basename: "Existing Note" }
+        const linkedFile = {
+            path: "Tasks/Existing Note.md",
+            basename: "Existing Note",
+            name: "Existing Note.md",
+            parent: { path: "Tasks" },
+        }
         app.metadataCache.getFirstLinkpathDest.mockImplementation((link: string) =>
             link === "Existing Note" ? linkedFile : null,
         )
@@ -504,7 +511,7 @@ describe("KanbanImportModal", () => {
         expect(timedFm?.time).toBeUndefined()
     })
 
-    it("creates new notes for unlinked cards", async () => {
+    it("creates new notes for unlinked cards in default Tasks folder", async () => {
         modal.open()
         await selectSource(modal, app)
         setInputValue(modal.contentEl, 1, "My board")
@@ -513,11 +520,23 @@ describe("KanbanImportModal", () => {
         button.click()
         await flush()
 
-        // "New card" has no link, so a new file should be created
-        expect(app.vault.create).toHaveBeenCalledWith("New card.md", "")
+        // "New card" has no link, so a new file should be created in the default folder
+        expect(app.vault.create).toHaveBeenCalledWith("Tasks/New card.md", "")
     })
 
-    it("creates the folder if it does not exist", async () => {
+    it("creates the default Tasks folder if it does not exist", async () => {
+        modal.open()
+        await selectSource(modal, app)
+        setInputValue(modal.contentEl, 1, "My board")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        expect(app.vault.createFolder).toHaveBeenCalledWith("Tasks")
+    })
+
+    it("creates a custom folder if it does not exist", async () => {
         modal.open()
         await selectSource(modal, app)
         setInputValue(modal.contentEl, 1, "My board")
@@ -543,7 +562,7 @@ describe("KanbanImportModal", () => {
         button.click()
         await flush()
 
-        expect(app.vault.createFolder).not.toHaveBeenCalled()
+        expect(app.vault.createFolder).not.toHaveBeenCalledWith("Cards")
     })
 
     it("uses folder path for new notes", async () => {
@@ -680,7 +699,7 @@ describe("KanbanImportModal", () => {
         modal.open()
         await selectSource(modal, app)
         setInputValue(modal.contentEl, 1, "My board")
-        // No folder set
+        setInputValue(modal.contentEl, 2, "") // Clear the default folder
 
         const button = modal.contentEl.querySelector("button")!
         button.click()
@@ -825,6 +844,120 @@ describe("KanbanImportModal", () => {
         const view = config.views[0]
         expect(view.swimlaneOrder).toEqual(["To Do"])
         expect(view.swimlaneOrder).not.toContain("Done")
+    })
+
+    it("sanitizes invalid filename characters and adds alias", async () => {
+        const frontmatters: Array<{ path: string; fm: Record<string, unknown> }> = []
+        app.fileManager.processFrontMatter.mockImplementation(
+            async (file: any, cb: (fm: Record<string, unknown>) => void) => {
+                const fm: Record<string, unknown> = {}
+                cb(fm)
+                frontmatters.push({ path: file.path, fm })
+            },
+        )
+
+        const kanbanWithSlash = [
+            "---",
+            "kanban-plugin: basic",
+            "---",
+            "",
+            "## To Do",
+            "- [ ] Feature A/B test",
+        ].join("\n")
+        app.vault.read.mockResolvedValue(kanbanWithSlash)
+
+        modal.open()
+        await selectSource(modal, app)
+        setInputValue(modal.contentEl, 1, "My board")
+        setInputValue(modal.contentEl, 2, "Cards")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        // File path should use sanitized name
+        expect(app.vault.create).toHaveBeenCalledWith("Cards/Feature A-B test.md", "")
+        // Should have set an alias with the original name
+        const cardFm = frontmatters.find(f => f.path === "Cards/Feature A-B test.md")
+        expect(cardFm?.fm.aliases).toEqual(["Feature A/B test"])
+    })
+
+    it("does not add alias when filename needs no sanitization", async () => {
+        const frontmatters: Array<{ path: string; fm: Record<string, unknown> }> = []
+        app.fileManager.processFrontMatter.mockImplementation(
+            async (file: any, cb: (fm: Record<string, unknown>) => void) => {
+                const fm: Record<string, unknown> = {}
+                cb(fm)
+                frontmatters.push({ path: file.path, fm })
+            },
+        )
+
+        modal.open()
+        await selectSource(modal, app)
+        setInputValue(modal.contentEl, 1, "My board")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        const cardFm = frontmatters.find(f => f.path === "Tasks/New card.md")
+        expect(cardFm?.fm.aliases).toBeUndefined()
+    })
+
+    it("continues importing when a card fails and reports errors", async () => {
+        let callCount = 0
+        app.vault.create.mockImplementation(async (path: string) => {
+            callCount++
+            if (path === "Tasks/New card.md") {
+                throw new Error("Disk full")
+            }
+            return {
+                path,
+                basename:
+                    path
+                        .split("/")
+                        .pop()
+                        ?.replace(/\.[^.]+$/, "") ?? "",
+            }
+        })
+
+        modal.open()
+        await selectSource(modal, app)
+        setInputValue(modal.contentEl, 1, "My board")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        // Should still have created the .base file despite one card failing
+        expect(app.vault.create).toHaveBeenCalledWith("My board.base", expect.any(String))
+    })
+
+    it("shows progress modal during import", async () => {
+        modal.open()
+        await selectSource(modal, app)
+        setInputValue(modal.contentEl, 1, "My board")
+
+        const button = modal.contentEl.querySelector("button")!
+        button.click()
+        await flush()
+
+        // The base file should have been created (import completed)
+        expect(app.vault.create).toHaveBeenCalledWith("My board.base", expect.any(String))
+    })
+
+    it("defaults source folder to Tasks", () => {
+        modal.open()
+        const inputs = modal.contentEl.querySelectorAll("input")
+        // source=0, name=1, folder=2
+        expect(inputs[2]?.value).toBe("Tasks")
+    })
+
+    it("shows descriptive text for source folder", () => {
+        modal.open()
+        const descs = modal.contentEl.querySelectorAll(".setting-item-description")
+        const descTexts = Array.from(descs).map(d => d.textContent)
+        expect(descTexts).toContain("Imported tasks will be created as notes in this directory.")
     })
 
     describe("buildBaseConfig", () => {
