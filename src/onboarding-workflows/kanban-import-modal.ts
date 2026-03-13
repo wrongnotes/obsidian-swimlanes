@@ -1,4 +1,4 @@
-import { Setting, normalizePath } from "obsidian"
+import { Modal, Setting, normalizePath } from "obsidian"
 import type { App, BasesConfigFile, BasesConfigFileView, TFile } from "obsidian"
 import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import { FolderSuggest } from "../inputs/folder-suggest"
@@ -6,7 +6,14 @@ import { FileSuggest } from "../inputs/file-suggest"
 import { ToggleableInputSection } from "../inputs/toggleable-input-section"
 import { midRank } from "../lexorank"
 import { parseKanbanMarkdown } from "./kanban-parser"
-import type { KanbanBoard } from "./kanban-parser"
+import type { KanbanBoard, KanbanCard } from "./kanban-parser"
+
+/** Characters that are invalid in file names across Windows/macOS/Linux + Obsidian */
+const INVALID_FILENAME_CHARS = /[\\/:*?"<>|]/g
+
+function sanitizeFileName(name: string): string {
+    return name.replace(INVALID_FILENAME_CHARS, "-").replace(/-{2,}/g, "-")
+}
 
 export class KanbanImportModal extends WrongNotesModal {
     private sourceFile: TFile | null = null
@@ -14,7 +21,7 @@ export class KanbanImportModal extends WrongNotesModal {
     private baseName = ""
     private propertyName = "status"
     private rankPropertyName = "rank"
-    private folderPath = ""
+    private folderPath = "Tasks"
     private dateSection: ToggleableInputSection | null = null
     private datePropertyName = "date"
     private timePropertyName = "time"
@@ -79,9 +86,11 @@ export class KanbanImportModal extends WrongNotesModal {
     private buildFolderSetting(): void {
         new Setting(this.contentEl)
             .setName("Source folder")
-            .setDesc("Where to create new notes for cards that aren't linked to existing notes.")
+            .setDesc(
+                "Imported tasks will be created as notes in this directory.",
+            )
             .addText(text => {
-                text.setPlaceholder("Cards")
+                text.setValue(this.folderPath)
                 text.onChange(value => {
                     this.folderPath = value
                 })
@@ -368,6 +377,19 @@ export class KanbanImportModal extends WrongNotesModal {
         const dateProp = this.datePropertyName.trim() || "date"
         const timeProp = this.timePropertyName.trim() || "time"
 
+        const columnsToImport = this.board!.columns.filter(c => !this.excludedColumns.has(c.name))
+        const archiveCards =
+            this.archiveSection?.enabled ? this.board!.archive : []
+        const totalCards =
+            columnsToImport.reduce((n, c) => n + c.cards.length, 0) + archiveCards.length
+
+        const progress = new ImportProgressModal(this.app, totalCards)
+        this.close()
+        progress.open()
+
+        const errors: ImportError[] = []
+        let imported = 0
+
         if (folder) {
             const folderExists = await this.app.vault.adapter.exists(folder)
             if (!folderExists) {
@@ -384,102 +406,99 @@ export class KanbanImportModal extends WrongNotesModal {
             }
         }
 
-        const columnsToImport = this.board!.columns.filter(c => !this.excludedColumns.has(c.name))
-
         for (const column of columnsToImport) {
             let lastRank: string | null = null
             for (const card of column.cards) {
                 const rank = midRank(lastRank, null)
                 lastRank = rank
 
-                const setCardFrontmatter = (fm: Record<string, unknown>) => {
-                    fm[prop] = column.name
-                    fm[rankProp] = rank
-                    if (card.completed) {
-                        fm.completed = true
+                try {
+                    const setCardFrontmatter = (fm: Record<string, unknown>) => {
+                        fm[prop] = column.name
+                        fm[rankProp] = rank
+                        if (card.completed) {
+                            fm.completed = true
+                        }
+                        if (card.tags.length > 0) {
+                            fm.tags = card.tags
+                        }
+                        if (this.dateSection?.enabled && card.date) {
+                            fm[dateProp] = card.date
+                        }
+                        if (this.dateSection?.enabled && card.time) {
+                            fm[timeProp] = card.time
+                        }
                     }
-                    if (card.tags.length > 0) {
-                        fm.tags = card.tags
-                    }
-                    if (this.dateSection?.enabled && card.date) {
-                        fm[dateProp] = card.date
-                    }
-                    if (this.dateSection?.enabled && card.time) {
-                        fm[timeProp] = card.time
-                    }
-                }
 
-                if (card.link) {
-                    const linked = this.app.metadataCache.getFirstLinkpathDest(
-                        card.link,
-                        this.sourceFile!.path,
-                    )
-                    if (linked) {
-                        await this.app.fileManager.processFrontMatter(linked, setCardFrontmatter)
-                        continue
+                    if (card.link) {
+                        const linked = this.app.metadataCache.getFirstLinkpathDest(
+                            card.link,
+                            this.sourceFile!.path,
+                        )
+                        if (linked) {
+                            await this.app.fileManager.processFrontMatter(
+                                linked,
+                                setCardFrontmatter,
+                            )
+                            imported++
+                            progress.update(imported)
+                            continue
+                        }
                     }
-                }
 
-                const noteName = card.text
-                const notePath = normalizePath(
-                    folder ? `${folder}/${noteName}.md` : `${noteName}.md`,
-                )
-                const exists = await this.app.vault.adapter.exists(notePath)
-                if (!exists) {
-                    await this.app.vault.create(notePath, "")
-                }
-
-                const file = this.app.vault.getAbstractFileByPath(notePath) as TFile | null
-                if (file) {
-                    await this.app.fileManager.processFrontMatter(file, setCardFrontmatter)
+                    await this.createCardNote(card, folder, setCardFrontmatter)
+                    imported++
+                    progress.update(imported)
+                } catch (err) {
+                    errors.push({ card: card.text, error: String(err) })
+                    imported++
+                    progress.update(imported)
                 }
             }
         }
 
         // Import archived cards if opted in
         const archiveStatus = this.archiveStatus.trim()
-        if (this.archiveSection?.enabled && this.board!.archive.length > 0) {
-            for (const card of this.board!.archive) {
-                const setArchivedFrontmatter = (fm: Record<string, unknown>) => {
-                    fm[prop] = archiveStatus || "Archived"
-                    fm.archived = true
-                    if (card.completed) {
-                        fm.completed = true
+        if (archiveCards.length > 0) {
+            for (const card of archiveCards) {
+                try {
+                    const setArchivedFrontmatter = (fm: Record<string, unknown>) => {
+                        fm[prop] = archiveStatus || "Archived"
+                        fm.archived = true
+                        if (card.completed) {
+                            fm.completed = true
+                        }
+                        if (card.tags.length > 0) {
+                            fm.tags = card.tags
+                        }
+                        if (this.dateSection?.enabled && card.date) {
+                            fm.archivedAt = card.date
+                        }
                     }
-                    if (card.tags.length > 0) {
-                        fm.tags = card.tags
-                    }
-                    if (this.dateSection?.enabled && card.date) {
-                        fm.archivedAt = card.date
-                    }
-                }
 
-                if (card.link) {
-                    const linked = this.app.metadataCache.getFirstLinkpathDest(
-                        card.link,
-                        this.sourceFile!.path,
-                    )
-                    if (linked) {
-                        await this.app.fileManager.processFrontMatter(
-                            linked,
-                            setArchivedFrontmatter,
+                    if (card.link) {
+                        const linked = this.app.metadataCache.getFirstLinkpathDest(
+                            card.link,
+                            this.sourceFile!.path,
                         )
-                        continue
+                        if (linked) {
+                            await this.app.fileManager.processFrontMatter(
+                                linked,
+                                setArchivedFrontmatter,
+                            )
+                            imported++
+                            progress.update(imported)
+                            continue
+                        }
                     }
-                }
 
-                const noteName = card.text
-                const notePath = normalizePath(
-                    folder ? `${folder}/${noteName}.md` : `${noteName}.md`,
-                )
-                const exists = await this.app.vault.adapter.exists(notePath)
-                if (!exists) {
-                    await this.app.vault.create(notePath, "")
-                }
-
-                const file = this.app.vault.getAbstractFileByPath(notePath) as TFile | null
-                if (file) {
-                    await this.app.fileManager.processFrontMatter(file, setArchivedFrontmatter)
+                    await this.createCardNote(card, folder, setArchivedFrontmatter)
+                    imported++
+                    progress.update(imported)
+                } catch (err) {
+                    errors.push({ card: card.text, error: String(err) })
+                    imported++
+                    progress.update(imported)
                 }
             }
         }
@@ -489,19 +508,48 @@ export class KanbanImportModal extends WrongNotesModal {
 
         const baseExists = await this.app.vault.adapter.exists(basePath)
         if (baseExists) {
-            this.showValidationError(`A file already exists at ${basePath}.`)
+            progress.showResult(imported - errors.length, errors, null)
             return
         }
 
-        const hasArchive = !!this.archiveSection?.enabled && this.board!.archive.length > 0
+        const hasArchive = archiveCards.length > 0
         const baseConfig = this.buildBaseConfig(folder, prop, columnNames, hasArchive)
         const baseFile = await this.app.vault.create(
             basePath,
             JSON.stringify(baseConfig, null, "\t"),
         )
-        await this.app.workspace.getLeaf().openFile(baseFile)
 
-        this.close()
+        progress.showResult(imported - errors.length, errors, baseFile)
+    }
+
+    private async createCardNote(
+        card: KanbanCard,
+        folder: string,
+        setFrontmatter: (fm: Record<string, unknown>) => void,
+    ): Promise<void> {
+        const sanitized = sanitizeFileName(card.text)
+        const notePath = normalizePath(
+            folder ? `${folder}/${sanitized}.md` : `${sanitized}.md`,
+        )
+        const exists = await this.app.vault.adapter.exists(notePath)
+        if (!exists) {
+            await this.app.vault.create(notePath, "")
+        }
+
+        const file = this.app.vault.getAbstractFileByPath(notePath) as TFile | null
+        if (file) {
+            const needsAlias = sanitized !== card.text
+            await this.app.fileManager.processFrontMatter(file, fm => {
+                if (needsAlias) {
+                    const aliases = Array.isArray(fm.aliases) ? fm.aliases as string[] : []
+                    if (!aliases.includes(card.text)) {
+                        aliases.push(card.text)
+                    }
+                    fm.aliases = aliases
+                }
+                setFrontmatter(fm)
+            })
+        }
     }
 
     buildBaseConfig(
@@ -530,6 +578,75 @@ export class KanbanImportModal extends WrongNotesModal {
                     swimlaneOrder: columnNames,
                 } as BasesConfigFileView & Record<string, unknown>,
             ],
+        }
+    }
+}
+
+interface ImportError {
+    card: string
+    error: string
+}
+
+export class ImportProgressModal extends Modal {
+    private total: number
+    private progressEl: HTMLElement
+    private statusEl: HTMLElement
+    private bodyEl: HTMLElement
+
+    constructor(app: App, total: number) {
+        super(app)
+        this.total = total
+        this.modalEl.classList.add("swimlane-modal")
+        this.setTitle("Importing cards…")
+
+        this.statusEl = this.contentEl.createEl("p", {
+            cls: "swimlane-import-progress-status",
+            text: `0 / ${total}`,
+        })
+
+        this.progressEl = this.contentEl.createEl("progress", {
+            cls: "swimlane-import-progress-bar",
+        })
+        this.progressEl.setAttribute("max", String(total))
+        this.progressEl.setAttribute("value", "0")
+
+        this.bodyEl = this.contentEl.createDiv()
+    }
+
+    update(done: number): void {
+        this.statusEl.textContent = `${done} / ${this.total}`
+        this.progressEl.setAttribute("value", String(done))
+    }
+
+    showResult(succeeded: number, errors: ImportError[], baseFile: TFile | null): void {
+        this.setTitle("Import complete")
+        this.statusEl.remove()
+        this.progressEl.remove()
+        this.bodyEl.empty()
+
+        if (errors.length === 0) {
+            this.bodyEl.createEl("p", {
+                text: `Successfully imported ${succeeded} card${succeeded === 1 ? "" : "s"}.`,
+            })
+        } else {
+            this.bodyEl.createEl("p", {
+                text: `Imported ${succeeded} card${succeeded === 1 ? "" : "s"}. ${errors.length} failed:`,
+            })
+            const list = this.bodyEl.createEl("ul", { cls: "swimlane-import-error-list" })
+            for (const err of errors) {
+                list.createEl("li", { text: `${err.card}: ${err.error}` })
+            }
+        }
+
+        if (baseFile && !errors.some(e => e.card === "__base__")) {
+            new Setting(this.bodyEl).addButton(btn => {
+                btn.setButtonText("Open swimlane")
+                btn.setCta()
+                btn.onClick(async () => {
+                    await this.app.workspace.getLeaf().openFile(baseFile)
+                    this.close()
+                })
+            })
         }
     }
 }

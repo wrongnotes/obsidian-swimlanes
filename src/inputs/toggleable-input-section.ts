@@ -20,7 +20,7 @@ export class ToggleableInputSection {
                 toggle.setValue(false)
                 toggle.onChange(value => {
                     this._enabled = value
-                    this.bodyEl.toggleClass("is-hidden", !value)
+                    this.bodyEl.setCssStyles({ display: value ? "" : "none" })
                     onChange?.(value)
                 })
             })
@@ -28,7 +28,7 @@ export class ToggleableInputSection {
         this.bodyEl = this.containerEl.createDiv({
             cls: "swimlane-toggleable-section-body",
         })
-        this.bodyEl.addClass("is-hidden")
+        this.bodyEl.setCssStyles({ display: "none" })
     }
 
     get enabled(): boolean {
