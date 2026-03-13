@@ -83,10 +83,12 @@ export class SwimlaneView extends BasesView {
     private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
     private currentBoard: HTMLElement | null = null
     private carouselObserver: IntersectionObserver | null = null
-    /** When true, swipe is blocked until the finger returns inside the column. */
+    /** When true, swipe is blocked until the finger returns to the column center. */
     private mobileSwipeNeedsReturn = false
     private mobileSwipeDwell: { direction: 1 | -1; timer: ReturnType<typeof setTimeout> } | null =
         null
+    /** Recent clientX samples for horizontal velocity estimation. */
+    private mobileSwipeXSamples: { x: number; t: number }[] = []
     private autoScrollRaf: number | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
@@ -901,6 +903,14 @@ export class SwimlaneView extends BasesView {
             return
         }
 
+        // Track recent X positions for velocity estimation.
+        const now = Date.now()
+        this.mobileSwipeXSamples.push({ x: clientX, t: now })
+        // Keep only the last 200ms of samples.
+        while (this.mobileSwipeXSamples.length > 0 && now - this.mobileSwipeXSamples[0]!.t > 200) {
+            this.mobileSwipeXSamples.shift()
+        }
+
         // Find the currently snapped column and use its edges as the trigger zone.
         const visibleKey = this.getVisibleColumnKey()
         const visibleCol = visibleKey
@@ -913,8 +923,6 @@ export class SwimlaneView extends BasesView {
         }
 
         const colRect = visibleCol.getBoundingClientRect()
-        // Use 15% of column width as the edge zone. Finger must enter the
-        // outer 15% to trigger, and return to the inner 70% to re-arm.
         const edgeZone = colRect.width * 0.15
 
         let direction: 1 | -1 | null = null
@@ -936,12 +944,34 @@ export class SwimlaneView extends BasesView {
             return
         }
 
+        // Require the finger to be moving toward the edge (not just drifting there).
+        // Compute horizontal velocity from recent samples (px/ms).
+        const samples = this.mobileSwipeXSamples
+        if (samples.length >= 2) {
+            const oldest = samples[0]!
+            const newest = samples[samples.length - 1]!
+            const dt = newest.t - oldest.t
+            if (dt > 0) {
+                const vx = (newest.x - oldest.x) / dt // px/ms, positive = rightward
+                // Velocity must agree with swipe direction (min 0.1 px/ms ≈ 100px/s).
+                if (direction === 1 && vx < 0.1) {
+                    this.cancelMobileSwipeDwell()
+                    return
+                }
+                if (direction === -1 && vx > -0.1) {
+                    this.cancelMobileSwipeDwell()
+                    return
+                }
+            }
+        }
+
         // If already dwelling in this direction, let the timer run.
         if (this.mobileSwipeDwell?.direction === direction) {
             return
         }
 
-        // Start a new dwell: finger must stay in the edge zone for 500ms.
+        // Start a new dwell: finger must stay in the edge zone for 500ms
+        // while moving toward the edge.
         this.cancelMobileSwipeDwell()
         const dir = direction
         this.mobileSwipeDwell = {
