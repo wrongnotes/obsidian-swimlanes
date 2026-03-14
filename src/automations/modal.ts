@@ -181,18 +181,18 @@ export class AutomationsModal extends WrongNotesModal {
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
-                attr: { type: "text", placeholder: "property", value: action.property },
+                attr: { type: "text", placeholder: "Property", value: action.property },
             })
 
             const valueInput = row.createEl("input", {
                 cls: "swimlane-automation-value-input",
                 attr: {
                     type: "text",
-                    placeholder: "value",
+                    placeholder: "Value",
                     value: action.type === "set" ? action.value : "",
                 },
             })
-            valueInput.style.display = action.type === "set" ? "" : "none"
+            valueInput.toggleClass("swimlane-automation-hidden", action.type !== "set")
 
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as "set" | "clear"
@@ -202,10 +202,10 @@ export class AutomationsModal extends WrongNotesModal {
                         property: propInput.value,
                         value: valueInput.value,
                     }
-                    valueInput.style.display = ""
+                    valueInput.removeClass("swimlane-automation-hidden")
                 } else {
                     draftActions[i] = { type: "clear", property: propInput.value }
-                    valueInput.style.display = "none"
+                    valueInput.addClass("swimlane-automation-hidden")
                 }
             })
 

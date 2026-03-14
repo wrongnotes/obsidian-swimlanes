@@ -141,7 +141,7 @@ describe("AutomationsModal — edit/add mode", () => {
         editBtn.click()
         const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(".swimlane-automation-value-input")
         // Second action in first rule is "clear assigned_to" — value input should be hidden
-        expect(valueInputs[1]?.style.display).toBe("none")
+        expect(valueInputs[1]?.classList.contains("swimlane-automation-hidden")).toBe(true)
     })
 
     it("switching action type to Clear hides value field", () => {
@@ -153,7 +153,7 @@ describe("AutomationsModal — edit/add mode", () => {
         // Change first action from "set" to "clear"
         typeSelects[0]!.value = "clear"
         typeSelects[0]!.dispatchEvent(new Event("change"))
-        expect(valueInputs[0]?.style.display).toBe("none")
+        expect(valueInputs[0]?.classList.contains("swimlane-automation-hidden")).toBe(true)
     })
 
     it("switching action type to Set shows value field", () => {

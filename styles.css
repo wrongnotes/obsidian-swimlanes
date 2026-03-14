@@ -1074,3 +1074,7 @@
     gap: var(--size-4-2);
     margin-top: var(--size-4-3);
 }
+
+.swimlane-automation-hidden {
+    display: none;
+}
