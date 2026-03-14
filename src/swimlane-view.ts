@@ -25,7 +25,7 @@ import { LexorankPosition, midRank } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
-import { matchRules, applyMutations, readAutomations } from "./automations"
+import { matchRules, applyMutations, readAutomations, AutomationsModal, writeAutomations } from "./automations"
 import type { AutomationRule, FrontmatterMutation } from "./automations"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
@@ -321,6 +321,24 @@ export class SwimlaneView extends BasesView {
         })
     }
 
+    private openAutomationsModal(): void {
+        if (!this.baseFile) {
+            return
+        }
+        const baseFile = this.baseFile
+        const modal = new AutomationsModal({
+            app: this.app,
+            rules: [...this.automationRules],
+            swimlanes: this.swimlaneOrder as string[],
+            swimlaneProp: this.swimlaneProp,
+            onSave: rules => {
+                this.automationRules = rules
+                this.app.vault.process(baseFile, content => writeAutomations(content, rules))
+            },
+        })
+        modal.open()
+    }
+
     private get swimlanePropId(): BasesPropertyId {
         return (
             this.config.getAsPropertyId(CONFIG_KEYS.swimlaneProperty) ??
@@ -545,6 +563,15 @@ export class SwimlaneView extends BasesView {
             // Move hint before the board so it sits above the columns.
             this.boardEl.insertBefore(hint, board)
         }
+
+        const automationsBtn = this.boardEl.createEl("button", { cls: "swimlane-automations-btn" })
+        setIcon(automationsBtn.createSpan({ cls: "swimlane-automations-btn-icon" }), "zap")
+        const count = this.automationRules.length
+        automationsBtn.createSpan({
+            text: count > 0 ? `Automations (${count})` : "Automations",
+        })
+        automationsBtn.addEventListener("click", () => this.openAutomationsModal())
+        this.boardEl.insertBefore(automationsBtn, board)
 
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
