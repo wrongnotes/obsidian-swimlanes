@@ -255,9 +255,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         durationMs: number,
     ) => void
     private readonly onDropSettle: (() => void) | null
-    private readonly onDragStartCallback:
-        | ((state: TState, draggable: HTMLElement) => void)
-        | null
+    private readonly onDragStartCallback: ((state: TState, draggable: HTMLElement) => void) | null
     private readonly onDragMoveCallback: ((state: TState, x: number, y: number) => void) | null
     private dragging: TState | null = null
     private dropAnimating = false

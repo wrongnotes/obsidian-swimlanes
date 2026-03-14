@@ -587,9 +587,13 @@ export class SwimlaneView extends BasesView {
                 })
                 if (this.expandingCardPath === entry.file.path) {
                     card.addClass("swimlane-card--expanding")
-                    card.addEventListener("animationend", () => {
-                        card.removeClass("swimlane-card--expanding")
-                    }, { once: true })
+                    card.addEventListener(
+                        "animationend",
+                        () => {
+                            card.removeClass("swimlane-card--expanding")
+                        },
+                        { once: true },
+                    )
                 }
                 this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
             }
@@ -1220,7 +1224,11 @@ export class SwimlaneView extends BasesView {
      * the DnD system's resolved target), but when resolveDropTarget returns
      * null, getCardDropTarget isn't called, so we clear here.
      */
-    private clearColumnHighlightIfOutside(_state: CardDragState, clientX: number, clientY: number): void {
+    private clearColumnHighlightIfOutside(
+        _state: CardDragState,
+        clientX: number,
+        clientY: number,
+    ): void {
         if (!this.columnDropTarget) {
             return
         }
@@ -1229,8 +1237,12 @@ export class SwimlaneView extends BasesView {
             return
         }
         const boardRect = board.getBoundingClientRect()
-        if (clientX < boardRect.left || clientX > boardRect.right ||
-            clientY < boardRect.top || clientY > boardRect.bottom) {
+        if (
+            clientX < boardRect.left ||
+            clientX > boardRect.right ||
+            clientY < boardRect.top ||
+            clientY > boardRect.bottom
+        ) {
             this.columnDropTarget.removeClass("swimlane-column--drop-target")
             this.columnDropTarget = null
         }
