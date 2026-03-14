@@ -15,6 +15,7 @@ import type {
     MultitextOption,
     PropertyOption,
     TextOption,
+    TFile,
     ToggleOption,
     ViewOption,
 } from "obsidian"
@@ -24,6 +25,8 @@ import { LexorankPosition, midRank } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
+import { matchRules, applyMutations, readAutomations } from "./automations"
+import type { AutomationRule, FrontmatterMutation } from "./automations"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -103,6 +106,8 @@ export class SwimlaneView extends BasesView {
     private columnDropPlaceholder: HTMLElement | null = null
     /** File path of a card that was just dropped cross-column; triggers expand animation on rebuild. */
     private expandingCardPath: string | null = null
+    private automationRules: AutomationRule[] = []
+    private baseFile: TFile | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
         column: GroupKey | null
@@ -396,6 +401,13 @@ export class SwimlaneView extends BasesView {
     }
 
     onDataUpdated(): void {
+        if (!this.baseFile) {
+            const f = this.app.workspace.getActiveFile()
+            if (f?.extension === "base") {
+                this.baseFile = f
+            }
+        }
+
         if (this.cardDnd.isDragging || this.swimlaneDnd.isDragging) {
             return
         }
@@ -451,6 +463,12 @@ export class SwimlaneView extends BasesView {
         this.columnDropPlaceholder = null
         this.carouselObserver?.disconnect()
         this.carouselObserver = null
+
+        if (this.baseFile) {
+            this.app.vault.read(this.baseFile).then(content => {
+                this.automationRules = readAutomations(content)
+            })
+        }
 
         const mobile = this.isMobileLayout
         const sortedByRank = this.isSortedByRank
@@ -715,6 +733,8 @@ export class SwimlaneView extends BasesView {
         await this.app.fileManager.processFrontMatter(file, fm => {
             fm[swimlaneProp] = groupKey
             fm[rankProp] = newRank
+            const mutations = this.getAutomationMutations(null, groupKey as string, "created_in")
+            applyMutations(fm, mutations)
         })
     }
 
@@ -1457,6 +1477,18 @@ export class SwimlaneView extends BasesView {
         }
     }
 
+    private getAutomationMutations(
+        sourceSwimlane: string | null,
+        targetSwimlane: string | null,
+        type: "enters" | "leaves" | "created_in",
+    ): FrontmatterMutation[] {
+        return matchRules(
+            this.automationRules,
+            { type, sourceSwimlane, targetSwimlane },
+            this.swimlaneProp,
+        )
+    }
+
     private handleCardDrop(
         dragState: CardDragState,
         context: CardDropContext,
@@ -1522,6 +1554,11 @@ export class SwimlaneView extends BasesView {
             fm[this.rankProp] = newRank
             if (isCrossColumn) {
                 fm[this.swimlaneProp] = context.groupKey
+                const mutations = [
+                    ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
+                    ...this.getAutomationMutations(dragState.groupKey as string, context.groupKey as string, "enters"),
+                ]
+                applyMutations(fm, mutations)
             }
         })
     }
@@ -1577,6 +1614,11 @@ export class SwimlaneView extends BasesView {
                 fm[this.rankProp] = rank
                 if (path === dragState.path && context.groupKey !== dragState.groupKey) {
                     fm[this.swimlaneProp] = context.groupKey
+                    const mutations = [
+                        ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
+                        ...this.getAutomationMutations(dragState.groupKey as string, context.groupKey as string, "enters"),
+                    ]
+                    applyMutations(fm, mutations)
                 }
             })
         }
@@ -1607,6 +1649,11 @@ export class SwimlaneView extends BasesView {
                 this.app.fileManager.processFrontMatter(file, fm => {
                     fm[this.swimlaneProp] = columnName
                     fm[this.rankProp] = midRank(null, null)
+                    const mutations = [
+                        ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
+                        ...this.getAutomationMutations(dragState.groupKey as string, columnName, "enters"),
+                    ]
+                    applyMutations(fm, mutations)
                 })
             },
         })

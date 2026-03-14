@@ -29,7 +29,7 @@ function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Reco
                 basename: path.replace(/\.md$/, ""),
             })),
         },
-        workspace: { openLinkText: jest.fn() },
+        workspace: { openLinkText: jest.fn(), getActiveFile: () => null },
         fileManager: {
             processFrontMatter: jest.fn(async () => {}),
             getNewFileParent: () => ({ path: "/", isRoot: () => true }),
