@@ -425,7 +425,13 @@ export function normalizePath(path: string): string {
 }
 
 export function parseYaml(s: string) {
-    try { return JSON.parse(s) } catch { return null }
+    try {
+        return JSON.parse(s)
+    } catch {
+        return null
+    }
 }
 
-export function stringifyYaml(o: any) { return JSON.stringify(o) }
+export function stringifyYaml(o: any) {
+    return JSON.stringify(o)
+}

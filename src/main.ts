@@ -48,7 +48,10 @@ export default class SwimlanePlugin extends Plugin {
                     const swimlanes = Array.isArray(swimView?.swimlaneOrder)
                         ? swimView.swimlaneOrder.filter((s: unknown) => typeof s === "string")
                         : []
-                    const properties = Object.keys(config.properties ?? {})
+                    const properties = Object.keys(config.properties ?? {}).map(name => ({
+                        name,
+                        isArray: false, // Cannot detect from config alone
+                    }))
                     const modal = new AutomationsModal({
                         app: this.app,
                         rules,

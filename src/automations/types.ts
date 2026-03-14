@@ -16,10 +16,12 @@ export interface AutomationRule {
 
 export type AutomationAction =
     | { type: "set"; property: string; value: string }
+    | { type: "add"; property: string; value: string }
+    | { type: "remove"; property: string; value: string }
     | { type: "clear"; property: string }
 
 export interface FrontmatterMutation {
-    type: "set" | "clear"
+    type: "set" | "add" | "remove" | "clear"
     property: string
     value?: unknown
 }

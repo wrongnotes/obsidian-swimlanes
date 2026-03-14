@@ -80,16 +80,13 @@ export function matchRules(
             if (action.property === swimlaneProp) {
                 continue
             }
-            if (action.type === "set") {
-                mutations.push({
-                    type: "set",
-                    property: action.property,
-                    value: resolveValue(action.value, context, now),
-                })
+            if (action.type === "clear") {
+                mutations.push({ type: "clear", property: action.property })
             } else {
                 mutations.push({
-                    type: "clear",
+                    type: action.type,
                     property: action.property,
+                    value: resolveValue(action.value, context, now),
                 })
             }
         }
@@ -100,14 +97,41 @@ export function matchRules(
 
 /**
  * Applies an array of frontmatter mutations to a frontmatter object in-place.
- * "set" assigns the value; "clear" deletes the property.
+ * - "set": assigns the value
+ * - "add": appends to an array (creates if absent, no-ops if already present)
+ * - "remove": removes from an array (no-ops if absent)
+ * - "clear": deletes the property
  */
-export function applyMutations(fm: Record<string, unknown>, mutations: FrontmatterMutation[]): void {
+export function applyMutations(
+    fm: Record<string, unknown>,
+    mutations: FrontmatterMutation[],
+): void {
     for (const mutation of mutations) {
-        if (mutation.type === "set") {
-            fm[mutation.property] = mutation.value
-        } else {
-            delete fm[mutation.property]
+        switch (mutation.type) {
+            case "set":
+                fm[mutation.property] = mutation.value
+                break
+            case "add": {
+                const arr = Array.isArray(fm[mutation.property])
+                    ? (fm[mutation.property] as unknown[])
+                    : []
+                if (!arr.includes(mutation.value)) {
+                    arr.push(mutation.value)
+                }
+                fm[mutation.property] = arr
+                break
+            }
+            case "remove": {
+                if (Array.isArray(fm[mutation.property])) {
+                    fm[mutation.property] = (fm[mutation.property] as unknown[]).filter(
+                        v => v !== mutation.value,
+                    )
+                }
+                break
+            }
+            case "clear":
+                delete fm[mutation.property]
+                break
         }
     }
 }

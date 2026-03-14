@@ -172,12 +172,13 @@ describe("AutomationsModal — edit/add mode", () => {
         const typeSelects = modal.contentEl.querySelectorAll<HTMLSelectElement>(
             ".swimlane-automation-action-type-select",
         )
-        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
-            ".swimlane-automation-value-input",
-        )
         // Change first action from "set" to "clear"
         typeSelects[0]!.value = "clear"
         typeSelects[0]!.dispatchEvent(new Event("change"))
+        // Re-query after re-render
+        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
         expect(valueInputs[0]?.classList.contains("swimlane-automation-hidden")).toBe(true)
     })
 

@@ -32,7 +32,7 @@ import {
     AutomationsModal,
     writeAutomations,
 } from "./automations"
-import type { AutomationRule, FrontmatterMutation } from "./automations"
+import type { AutomationRule, FrontmatterMutation, PropertyInfo } from "./automations"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -337,15 +337,35 @@ export class SwimlaneView extends BasesView {
             rules: [...this.automationRules],
             swimlanes: this.swimlaneOrder as string[],
             swimlaneProp: this.swimlaneProp,
-            properties: this.allProperties
-                .filter(p => p.startsWith("note."))
-                .map(p => p.slice(5)),
+            properties: this.getPropertyInfos(),
             onSave: rules => {
                 this.automationRules = rules
                 this.app.vault.process(baseFile, content => writeAutomations(content, rules))
             },
         })
         modal.open()
+    }
+
+    /** Build property info list with array detection from current entries. */
+    private getPropertyInfos(): PropertyInfo[] {
+        const arrayProps = new Set<string>()
+        for (const entry of this.data.data) {
+            const cache = this.app.metadataCache.getFileCache(entry.file)
+            if (!cache?.frontmatter) {
+                continue
+            }
+            for (const [key, val] of Object.entries(cache.frontmatter)) {
+                if (Array.isArray(val)) {
+                    arrayProps.add(key)
+                }
+            }
+        }
+        return this.allProperties
+            .filter(p => p.startsWith("note."))
+            .map(p => {
+                const name = p.slice(5)
+                return { name, isArray: arrayProps.has(name) }
+            })
     }
 
     private get swimlanePropId(): BasesPropertyId {

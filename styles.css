@@ -1120,6 +1120,13 @@
     flex-shrink: 0;
 }
 
+.swimlane-automation-label {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 .swimlane-automation-hidden {
     display: none;
 }

@@ -8,4 +8,4 @@ export type {
 export { matchRules, resolveValue, formatNow, applyMutations } from "./engine"
 export { readAutomations, writeAutomations } from "./io"
 export { AutomationsModal } from "./modal"
-export type { AutomationsModalContext } from "./modal"
+export type { AutomationsModalContext, PropertyInfo } from "./modal"

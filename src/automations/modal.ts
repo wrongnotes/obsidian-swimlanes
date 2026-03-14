@@ -4,32 +4,43 @@ import type { AutomationRule, AutomationAction, TriggerType } from "./types"
 import { AutomationPropertySuggest } from "./property-suggest"
 import { AutomationValueSuggest } from "./value-suggest"
 
+export interface PropertyInfo {
+    name: string
+    isArray: boolean
+}
+
 export interface AutomationsModalContext {
     app: App
     rules: AutomationRule[]
     swimlanes: string[]
     swimlaneProp: string
-    properties: string[]
+    properties: PropertyInfo[]
     onSave: (rules: AutomationRule[]) => void
 }
 
 const TRIGGER_LABELS: Record<TriggerType, string> = {
-    enters: "Card enters",
-    leaves: "Card leaves",
-    created_in: "Card is created in",
+    enters: "enters",
+    leaves: "leaves",
+    created_in: "is created in",
 }
 
 function triggerText(trigger: { type: TriggerType; swimlane: string }): string {
     const label = TRIGGER_LABELS[trigger.type]
     const swimlane = trigger.swimlane === "*" ? "any swimlane" : `"${trigger.swimlane}"`
-    return `When card ${label.toLowerCase().replace("card ", "")} ${swimlane}`
+    return `When a card ${label} ${swimlane}`
 }
 
 function actionText(action: AutomationAction): string {
-    if (action.type === "set") {
-        return `→ Set ${action.property} to ${action.value}`
+    switch (action.type) {
+        case "set":
+            return `→ Set ${action.property} to ${action.value}`
+        case "add":
+            return `→ Add ${action.value} to ${action.property}`
+        case "remove":
+            return `→ Remove ${action.value} from ${action.property}`
+        case "clear":
+            return `→ Clear ${action.property}`
     }
-    return `→ Clear ${action.property}`
 }
 
 export class AutomationsModal extends WrongNotesModal {
@@ -130,6 +141,7 @@ export class AutomationsModal extends WrongNotesModal {
 
         // --- Trigger row ---
         const triggerRow = editor.createDiv({ cls: "swimlane-automation-trigger-row" })
+        triggerRow.createSpan({ cls: "swimlane-automation-label", text: "When a card" })
 
         const triggerSelect = triggerRow.createEl("select", {
             cls: "swimlane-automation-trigger-select",
@@ -171,6 +183,26 @@ export class AutomationsModal extends WrongNotesModal {
             }
         }
 
+        const ACTION_TYPE_LABELS: Record<string, string> = {
+            set: "Set",
+            add: "Add to",
+            remove: "Remove from",
+            clear: "Clear",
+        }
+        const PROP_LABELS: Record<string, string> = {
+            set: "property",
+            add: "property",
+            remove: "property",
+            clear: "property",
+        }
+        const VALUE_LABELS: Record<string, string> = {
+            set: "to",
+            add: "value",
+            remove: "value",
+        }
+        const hasValue = (type: string) => type !== "clear"
+        const isArrayAction = (type: string) => type === "add" || type === "remove"
+
         const renderActionRow = (i: number) => {
             const action = draftActions[i]!
             const row = actionsContainer.createDiv({ cls: "swimlane-automation-action" })
@@ -178,88 +210,78 @@ export class AutomationsModal extends WrongNotesModal {
             const typeSelect = row.createEl("select", {
                 cls: "swimlane-automation-action-type-select",
             })
-            typeSelect.createEl("option", { text: "Set", attr: { value: "set" } })
-            typeSelect.createEl("option", { text: "Clear", attr: { value: "clear" } })
+            for (const [value, label] of Object.entries(ACTION_TYPE_LABELS)) {
+                typeSelect.createEl("option", { text: label, attr: { value } })
+            }
             typeSelect.value = action.type
+
+            const propLabel = row.createSpan({
+                cls: "swimlane-automation-label",
+                text: PROP_LABELS[action.type] ?? "property",
+            })
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
-                attr: { type: "text", placeholder: "Property", value: action.property },
+                attr: { type: "text", placeholder: "Property name", value: action.property },
             })
 
             const propSuggest = new AutomationPropertySuggest(
                 this.ctx.app,
                 propInput,
-                () => this.ctx.properties,
+                () => this.getFilteredProperties(action.type),
                 this.ctx.swimlaneProp,
                 value => {
                     propInput.value = value
-                    const cur = draftActions[i]!
-                    if (cur.type === "set") {
-                        draftActions[i] = { type: "set", property: value, value: cur.value }
-                    } else {
-                        draftActions[i] = { type: "clear", property: value }
-                    }
+                    this.updateDraftAction(draftActions, i, { property: value })
                 },
             )
             propSuggest.close()
+
+            const valueLabel = row.createSpan({
+                cls: "swimlane-automation-label",
+                text: VALUE_LABELS[action.type] ?? "to",
+            })
+            valueLabel.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
 
             const valueInput = row.createEl("input", {
                 cls: "swimlane-automation-value-input",
                 attr: {
                     type: "text",
-                    placeholder: "Value",
-                    value: action.type === "set" ? action.value : "",
+                    placeholder: "value or {{template}}",
+                    value: action.type !== "clear" ? action.value : "",
                 },
             })
-            valueInput.toggleClass("swimlane-automation-hidden", action.type !== "set")
+            valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
 
             const valueSuggest = new AutomationValueSuggest(
                 this.ctx.app,
                 valueInput,
                 value => {
                     valueInput.value = value
-                    const cur = draftActions[i]!
-                    if (cur.type === "set") {
-                        draftActions[i] = { type: "set", property: cur.property, value }
-                    }
+                    this.updateDraftAction(draftActions, i, { value })
                 },
             )
             valueSuggest.close()
 
             typeSelect.addEventListener("change", () => {
-                const newType = typeSelect.value as "set" | "clear"
-                if (newType === "set") {
-                    draftActions[i] = {
-                        type: "set",
-                        property: propInput.value,
-                        value: valueInput.value,
-                    }
-                    valueInput.removeClass("swimlane-automation-hidden")
+                const newType = typeSelect.value as AutomationAction["type"]
+                const prop = propInput.value
+                const val = valueInput.value
+                if (newType === "clear") {
+                    draftActions[i] = { type: "clear", property: prop }
                 } else {
-                    draftActions[i] = { type: "clear", property: propInput.value }
-                    valueInput.addClass("swimlane-automation-hidden")
+                    draftActions[i] = { type: newType, property: prop, value: val }
                 }
+                // Re-render this row to update labels and visibility
+                renderActions()
             })
 
             propInput.addEventListener("input", () => {
-                const cur = draftActions[i]!
-                if (cur.type === "set") {
-                    draftActions[i] = { type: "set", property: propInput.value, value: cur.value }
-                } else {
-                    draftActions[i] = { type: "clear", property: propInput.value }
-                }
+                this.updateDraftAction(draftActions, i, { property: propInput.value })
             })
 
             valueInput.addEventListener("input", () => {
-                const cur = draftActions[i]!
-                if (cur.type === "set") {
-                    draftActions[i] = {
-                        type: "set",
-                        property: cur.property,
-                        value: valueInput.value,
-                    }
-                }
+                this.updateDraftAction(draftActions, i, { value: valueInput.value })
             })
 
             if (draftActions.length > 1) {
@@ -320,8 +342,8 @@ export class AutomationsModal extends WrongNotesModal {
                     this.showValidationError("Every action must have a property name.")
                     return
                 }
-                if (action.type === "set" && !action.value.trim()) {
-                    this.showValidationError("Set actions must have a non-empty value.")
+                if (action.type !== "clear" && !action.value.trim()) {
+                    this.showValidationError("Actions must have a non-empty value.")
                     return
                 }
                 if (action.property.trim() === this.ctx.swimlaneProp) {
@@ -346,5 +368,29 @@ export class AutomationsModal extends WrongNotesModal {
         }
 
         return editor
+    }
+
+    /** Returns property names filtered for the action type (array vs scalar). */
+    private getFilteredProperties(actionType: string): string[] {
+        const wantArray = actionType === "add" || actionType === "remove"
+        return this.ctx.properties
+            .filter(p => (wantArray ? p.isArray : !p.isArray) || actionType === "clear")
+            .map(p => p.name)
+    }
+
+    /** Updates a draft action in-place, preserving its type. */
+    private updateDraftAction(
+        draftActions: AutomationAction[],
+        i: number,
+        patch: { property?: string; value?: string },
+    ): void {
+        const cur = draftActions[i]!
+        const prop = patch.property ?? cur.property
+        const val = patch.value ?? (cur.type !== "clear" ? cur.value : "")
+        if (cur.type === "clear") {
+            draftActions[i] = { type: "clear", property: prop }
+        } else {
+            draftActions[i] = { type: cur.type, property: prop, value: val }
+        }
     }
 }

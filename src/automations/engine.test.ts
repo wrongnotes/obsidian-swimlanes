@@ -103,7 +103,11 @@ describe("resolveValue", () => {
     })
 
     it("handles mixed tokens and static text", () => {
-        const result = resolveValue("Moved from {{source.swimlane}} on {{now:YYYY-MM-DD}}", ctx, FIXED_DATE)
+        const result = resolveValue(
+            "Moved from {{source.swimlane}} on {{now:YYYY-MM-DD}}",
+            ctx,
+            FIXED_DATE,
+        )
         expect(result).toBe("Moved from Todo on 2026-03-14")
     })
 
@@ -287,6 +291,22 @@ describe("matchRules", () => {
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.property).toBe("startedAt")
     })
+
+    it("handles add and remove action types", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "In Progress" },
+                actions: [
+                    { type: "add", property: "tags", value: "wip" },
+                    { type: "remove", property: "tags", value: "backlog" },
+                ],
+            },
+        ]
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        expect(mutations).toHaveLength(2)
+        expect(mutations[0]).toEqual({ type: "add", property: "tags", value: "wip" })
+        expect(mutations[1]).toEqual({ type: "remove", property: "tags", value: "backlog" })
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -330,5 +350,53 @@ describe("applyMutations", () => {
         const fm: Record<string, unknown> = { existing: "value" }
         applyMutations(fm, [])
         expect(fm).toEqual({ existing: "value" })
+    })
+
+    it("add appends to existing array", () => {
+        const fm: Record<string, unknown> = { tags: ["a", "b"] }
+        applyMutations(fm, [{ type: "add", property: "tags", value: "c" }])
+        expect(fm.tags).toEqual(["a", "b", "c"])
+    })
+
+    it("add creates array if property absent", () => {
+        const fm: Record<string, unknown> = {}
+        applyMutations(fm, [{ type: "add", property: "tags", value: "first" }])
+        expect(fm.tags).toEqual(["first"])
+    })
+
+    it("add no-ops if value already present", () => {
+        const fm: Record<string, unknown> = { tags: ["a", "b"] }
+        applyMutations(fm, [{ type: "add", property: "tags", value: "a" }])
+        expect(fm.tags).toEqual(["a", "b"])
+    })
+
+    it("add creates array if property is non-array", () => {
+        const fm: Record<string, unknown> = { tags: "not an array" }
+        applyMutations(fm, [{ type: "add", property: "tags", value: "x" }])
+        expect(fm.tags).toEqual(["x"])
+    })
+
+    it("remove filters value from array", () => {
+        const fm: Record<string, unknown> = { tags: ["a", "b", "c"] }
+        applyMutations(fm, [{ type: "remove", property: "tags", value: "b" }])
+        expect(fm.tags).toEqual(["a", "c"])
+    })
+
+    it("remove no-ops if value not in array", () => {
+        const fm: Record<string, unknown> = { tags: ["a", "b"] }
+        applyMutations(fm, [{ type: "remove", property: "tags", value: "z" }])
+        expect(fm.tags).toEqual(["a", "b"])
+    })
+
+    it("remove no-ops if property is not an array", () => {
+        const fm: Record<string, unknown> = { tags: "string" }
+        applyMutations(fm, [{ type: "remove", property: "tags", value: "string" }])
+        expect(fm.tags).toBe("string")
+    })
+
+    it("remove no-ops if property absent", () => {
+        const fm: Record<string, unknown> = {}
+        applyMutations(fm, [{ type: "remove", property: "tags", value: "x" }])
+        expect(fm).toEqual({})
     })
 })
