@@ -28,6 +28,8 @@ function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Reco
                 path,
                 basename: path.replace(/\.md$/, ""),
             })),
+            read: jest.fn(async () => "{}"),
+            process: jest.fn(async () => "{}"),
         },
         workspace: { openLinkText: jest.fn(), getActiveFile: () => null },
         fileManager: {
@@ -498,5 +500,15 @@ describe("data-group-key attribute", () => {
         const keys = Array.from(cols).map(c => c.getAttribute("data-group-key"))
         expect(keys).toContain("Backlog")
         expect(keys).toContain("Done")
+    })
+})
+
+describe("automations button", () => {
+    it("renders automations button", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const btn = container.querySelector(".swimlane-automations-btn")
+        expect(btn).not.toBeNull()
+        expect(btn?.textContent).toContain("Automations")
     })
 })
