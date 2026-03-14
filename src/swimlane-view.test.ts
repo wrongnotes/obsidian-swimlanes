@@ -43,6 +43,7 @@ function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Reco
             configStore[key] = value
         },
         getAsPropertyId: () => null,
+        getSort: () => [],
     } as any
     return { view, container, configStore }
 }

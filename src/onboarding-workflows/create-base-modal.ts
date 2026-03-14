@@ -145,11 +145,15 @@ export class CreateBaseModal extends WrongNotesModal {
     buildBaseConfig(folder: string): BasesConfigFile {
         const prop = this.groupKey.trim()
         const propId = `note.${prop}`
+        const rankPropId = "note.rank"
         return {
             filters: folder ? { and: [`file.folder == "${folder}"`] } : undefined,
             properties: {
                 [prop]: {
                     displayName: prop,
+                },
+                rank: {
+                    displayName: "rank",
                 },
             },
             views: [
@@ -157,6 +161,7 @@ export class CreateBaseModal extends WrongNotesModal {
                     type: "swimlane",
                     name: "Swimlane",
                     groupBy: { property: prop, direction: "ASC" },
+                    sort: [{ property: rankPropId, direction: "ASC" }],
                     order: [propId],
                     swimlaneProperty: propId,
                     swimlaneOrder: this.groupValues,
