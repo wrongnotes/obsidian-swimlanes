@@ -1,12 +1,15 @@
 import type { App } from "obsidian"
 import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import type { AutomationRule, AutomationAction, TriggerType } from "./types"
+import { AutomationPropertySuggest } from "./property-suggest"
+import { AutomationValueSuggest } from "./value-suggest"
 
 export interface AutomationsModalContext {
     app: App
     rules: AutomationRule[]
     swimlanes: string[]
     swimlaneProp: string
+    properties: string[]
     onSave: (rules: AutomationRule[]) => void
 }
 
@@ -184,6 +187,23 @@ export class AutomationsModal extends WrongNotesModal {
                 attr: { type: "text", placeholder: "Property", value: action.property },
             })
 
+            const propSuggest = new AutomationPropertySuggest(
+                this.ctx.app,
+                propInput,
+                () => this.ctx.properties,
+                this.ctx.swimlaneProp,
+                value => {
+                    propInput.value = value
+                    const cur = draftActions[i]!
+                    if (cur.type === "set") {
+                        draftActions[i] = { type: "set", property: value, value: cur.value }
+                    } else {
+                        draftActions[i] = { type: "clear", property: value }
+                    }
+                },
+            )
+            propSuggest.close()
+
             const valueInput = row.createEl("input", {
                 cls: "swimlane-automation-value-input",
                 attr: {
@@ -193,6 +213,19 @@ export class AutomationsModal extends WrongNotesModal {
                 },
             })
             valueInput.toggleClass("swimlane-automation-hidden", action.type !== "set")
+
+            const valueSuggest = new AutomationValueSuggest(
+                this.ctx.app,
+                valueInput,
+                value => {
+                    valueInput.value = value
+                    const cur = draftActions[i]!
+                    if (cur.type === "set") {
+                        draftActions[i] = { type: "set", property: cur.property, value }
+                    }
+                },
+            )
+            valueSuggest.close()
 
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as "set" | "clear"
@@ -288,7 +321,7 @@ export class AutomationsModal extends WrongNotesModal {
                     return
                 }
                 if (action.type === "set" && !action.value.trim()) {
-                    this.showValidationError('Set actions must have a non-empty value.')
+                    this.showValidationError("Set actions must have a non-empty value.")
                     return
                 }
                 if (action.property.trim() === this.ctx.swimlaneProp) {

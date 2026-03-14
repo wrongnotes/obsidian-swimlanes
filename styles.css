@@ -1019,36 +1019,54 @@
     border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     padding: var(--size-4-3);
+    margin-bottom: var(--size-4-3);
+}
+
+.swimlane-automation-trigger {
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
     margin-bottom: var(--size-4-2);
 }
 
-.swimlane-automation-rule-trigger {
-    font-weight: var(--font-semibold);
-    font-size: var(--font-ui-small);
-    margin-bottom: var(--size-4-1);
-}
-
-.swimlane-automation-rule-action {
+.swimlane-automation-action-summary {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     padding-left: var(--size-4-3);
+    line-height: var(--line-height-tight);
 }
 
-.swimlane-automation-rule-action::before {
-    content: "→ ";
-}
-
-.swimlane-automation-rule-buttons {
+.swimlane-automation-card-buttons {
     display: flex;
     justify-content: flex-end;
     gap: var(--size-4-2);
-    margin-top: var(--size-4-2);
+    margin-top: var(--size-4-3);
+}
+
+.swimlane-automation-card-buttons button {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
 }
 
 .swimlane-automation-editor {
     border: var(--border-width) solid var(--interactive-accent);
     border-radius: var(--radius-s);
-    padding: var(--size-4-3);
+    padding: var(--size-4-4);
+    margin-bottom: var(--size-4-3);
+}
+
+.swimlane-automation-trigger-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-4);
+}
+
+.swimlane-automation-trigger-row select {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+}
+
+.swimlane-automation-actions {
     margin-bottom: var(--size-4-2);
 }
 
@@ -1059,13 +1077,29 @@
     margin-bottom: var(--size-4-2);
 }
 
-.swimlane-automation-action select,
+.swimlane-automation-action select {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex-shrink: 0;
+}
+
 .swimlane-automation-action input {
     font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex: 1;
+    min-width: 0;
+}
+
+.swimlane-automation-add-action-btn {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    margin-bottom: var(--size-4-2);
 }
 
 .swimlane-automation-add-btn {
-    margin-top: var(--size-4-2);
+    margin-top: var(--size-4-3);
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
 }
 
 .swimlane-automation-editor-buttons {
@@ -1075,6 +1109,28 @@
     margin-top: var(--size-4-3);
 }
 
+.swimlane-automation-editor-buttons button {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-3);
+}
+
+.swimlane-automation-remove-action-btn {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex-shrink: 0;
+}
+
 .swimlane-automation-hidden {
     display: none;
+}
+
+/* Automation suggestion dropdowns */
+.swimlane-suggest-token {
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+}
+
+.swimlane-suggest-description {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
 }

@@ -25,7 +25,13 @@ import { LexorankPosition, midRank } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
-import { matchRules, applyMutations, readAutomations, AutomationsModal, writeAutomations } from "./automations"
+import {
+    matchRules,
+    applyMutations,
+    readAutomations,
+    AutomationsModal,
+    writeAutomations,
+} from "./automations"
 import type { AutomationRule, FrontmatterMutation } from "./automations"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
@@ -331,6 +337,9 @@ export class SwimlaneView extends BasesView {
             rules: [...this.automationRules],
             swimlanes: this.swimlaneOrder as string[],
             swimlaneProp: this.swimlaneProp,
+            properties: this.allProperties
+                .filter(p => p.startsWith("note."))
+                .map(p => p.slice(5)),
             onSave: rules => {
                 this.automationRules = rules
                 this.app.vault.process(baseFile, content => writeAutomations(content, rules))
@@ -485,6 +494,12 @@ export class SwimlaneView extends BasesView {
         if (this.baseFile) {
             this.app.vault.read(this.baseFile).then(content => {
                 this.automationRules = readAutomations(content)
+                // Update the automations button count if the board is still mounted.
+                const btn = this.boardEl.querySelector(".swimlane-automations-btn span:last-child")
+                if (btn) {
+                    const count = this.automationRules.length
+                    btn.textContent = count > 0 ? `Automations (${count})` : "Automations"
+                }
             })
         }
 
@@ -864,7 +879,11 @@ export class SwimlaneView extends BasesView {
                     if (op.kind === "move") {
                         mutations = [
                             ...this.getAutomationMutations(groupKey as string, null, "leaves"),
-                            ...this.getAutomationMutations(groupKey as string, op.targetValue, "enters"),
+                            ...this.getAutomationMutations(
+                                groupKey as string,
+                                op.targetValue,
+                                "enters",
+                            ),
                         ]
                     } else if (op.kind === "clear") {
                         mutations = this.getAutomationMutations(groupKey as string, null, "leaves")
@@ -1594,7 +1613,11 @@ export class SwimlaneView extends BasesView {
                 fm[this.swimlaneProp] = context.groupKey
                 const mutations = [
                     ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
-                    ...this.getAutomationMutations(dragState.groupKey as string, context.groupKey as string, "enters"),
+                    ...this.getAutomationMutations(
+                        dragState.groupKey as string,
+                        context.groupKey as string,
+                        "enters",
+                    ),
                 ]
                 applyMutations(fm, mutations)
             }
@@ -1653,8 +1676,16 @@ export class SwimlaneView extends BasesView {
                 if (path === dragState.path && context.groupKey !== dragState.groupKey) {
                     fm[this.swimlaneProp] = context.groupKey
                     const mutations = [
-                        ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
-                        ...this.getAutomationMutations(dragState.groupKey as string, context.groupKey as string, "enters"),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            null,
+                            "leaves",
+                        ),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            context.groupKey as string,
+                            "enters",
+                        ),
                     ]
                     applyMutations(fm, mutations)
                 }
@@ -1688,8 +1719,16 @@ export class SwimlaneView extends BasesView {
                     fm[this.swimlaneProp] = columnName
                     fm[this.rankProp] = midRank(null, null)
                     const mutations = [
-                        ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
-                        ...this.getAutomationMutations(dragState.groupKey as string, columnName, "enters"),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            null,
+                            "leaves",
+                        ),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            columnName,
+                            "enters",
+                        ),
                     ]
                     applyMutations(fm, mutations)
                 })

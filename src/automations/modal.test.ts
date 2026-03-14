@@ -25,6 +25,7 @@ function openModal(
         rules: existingRules,
         swimlanes,
         swimlaneProp: "status",
+        properties: [],
         onSave,
     })
     modal.onOpen()
@@ -92,7 +93,9 @@ describe("AutomationsModal — read mode", () => {
 describe("AutomationsModal — edit/add mode", () => {
     it("Add button creates a new rule in edit mode", () => {
         const { modal } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
         const editor = modal.contentEl.querySelector(".swimlane-automation-editor")
         expect(editor).not.toBeNull()
@@ -100,7 +103,9 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Edit button expands rule into edit mode", () => {
         const { modal } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
         const editor = modal.contentEl.querySelector(".swimlane-automation-editor")
         expect(editor).not.toBeNull()
@@ -108,9 +113,13 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Cancel discards changes and does not call onSave", () => {
         const { modal, onSave } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const cancelBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-cancel-btn")!
+        const cancelBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-cancel-btn",
+        )!
         cancelBtn.click()
         expect(onSave).not.toHaveBeenCalled()
         // Should be back to read mode
@@ -119,7 +128,9 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Delete removes rule and calls onSave", () => {
         const { modal, onSave } = openModal(rules)
-        const deleteBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-delete-btn")!
+        const deleteBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-delete-btn",
+        )!
         deleteBtn.click()
         expect(onSave).toHaveBeenCalledTimes(1)
         const savedRules = onSave.mock.calls[0][0] as AutomationRule[]
@@ -128,28 +139,42 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Set action shows value field", () => {
         const { modal } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(".swimlane-automation-value-input")
+        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
         // First action in first rule is "set completed_at" — value input should be visible
         expect(valueInputs[0]?.style.display).not.toBe("none")
     })
 
     it("Clear action hides value field", () => {
         const { modal } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(".swimlane-automation-value-input")
+        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
         // Second action in first rule is "clear assigned_to" — value input should be hidden
         expect(valueInputs[1]?.classList.contains("swimlane-automation-hidden")).toBe(true)
     })
 
     it("switching action type to Clear hides value field", () => {
         const { modal } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const typeSelects = modal.contentEl.querySelectorAll<HTMLSelectElement>(".swimlane-automation-action-type-select")
-        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(".swimlane-automation-value-input")
+        const typeSelects = modal.contentEl.querySelectorAll<HTMLSelectElement>(
+            ".swimlane-automation-action-type-select",
+        )
+        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
         // Change first action from "set" to "clear"
         typeSelects[0]!.value = "clear"
         typeSelects[0]!.dispatchEvent(new Event("change"))
@@ -158,10 +183,16 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("switching action type to Set shows value field", () => {
         const { modal } = openModal(rules)
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const typeSelects = modal.contentEl.querySelectorAll<HTMLSelectElement>(".swimlane-automation-action-type-select")
-        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(".swimlane-automation-value-input")
+        const typeSelects = modal.contentEl.querySelectorAll<HTMLSelectElement>(
+            ".swimlane-automation-action-type-select",
+        )
+        const valueInputs = modal.contentEl.querySelectorAll<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
         // Second action is "clear" — switch to "set"
         typeSelects[1]!.value = "set"
         typeSelects[1]!.dispatchEvent(new Event("change"))
@@ -175,9 +206,13 @@ describe("AutomationsModal — edit/add mode", () => {
                 actions: [{ type: "set", property: "foo", value: "bar" }],
             },
         ])
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
-        const addActionBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-action-btn")!
+        const addActionBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-action-btn",
+        )!
         addActionBtn.click()
         const actionRows = modal.contentEl.querySelectorAll(".swimlane-automation-action")
         expect(actionRows).toHaveLength(2)
@@ -185,9 +220,13 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("swimlane dropdown includes 'Any swimlane' option with value '*'", () => {
         const { modal } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
-        const swimlaneSelect = modal.contentEl.querySelector<HTMLSelectElement>(".swimlane-automation-swimlane-select")!
+        const swimlaneSelect = modal.contentEl.querySelector<HTMLSelectElement>(
+            ".swimlane-automation-swimlane-select",
+        )!
         const options = Array.from(swimlaneSelect.options)
         const anyOption = options.find(o => o.value === "*")
         expect(anyOption).not.toBeUndefined()
@@ -196,9 +235,13 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("swimlane dropdown includes all swimlanes", () => {
         const { modal } = openModal([], ["Backlog", "In Progress", "Done"])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
-        const swimlaneSelect = modal.contentEl.querySelector<HTMLSelectElement>(".swimlane-automation-swimlane-select")!
+        const swimlaneSelect = modal.contentEl.querySelector<HTMLSelectElement>(
+            ".swimlane-automation-swimlane-select",
+        )!
         const values = Array.from(swimlaneSelect.options).map(o => o.value)
         expect(values).toContain("Backlog")
         expect(values).toContain("In Progress")
@@ -207,9 +250,13 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("trigger type dropdown has all three options", () => {
         const { modal } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
-        const triggerSelect = modal.contentEl.querySelector<HTMLSelectElement>(".swimlane-automation-trigger-select")!
+        const triggerSelect = modal.contentEl.querySelector<HTMLSelectElement>(
+            ".swimlane-automation-trigger-select",
+        )!
         const values = Array.from(triggerSelect.options).map(o => o.value)
         expect(values).toContain("enters")
         expect(values).toContain("leaves")
@@ -218,33 +265,49 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Save with valid data calls onSave", () => {
         const { modal, onSave } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
 
-        const propInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-prop-input")!
+        const propInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-prop-input",
+        )!
         propInput.value = "completed_at"
         propInput.dispatchEvent(new Event("input"))
 
-        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-value-input")!
+        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )!
         valueInput.value = "today"
         valueInput.dispatchEvent(new Event("input"))
 
-        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-save-btn")!
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
         saveBtn.click()
 
         expect(onSave).toHaveBeenCalledTimes(1)
         const saved = onSave.mock.calls[0][0] as AutomationRule[]
         expect(saved).toHaveLength(1)
-        expect(saved[0]!.actions[0]).toMatchObject({ type: "set", property: "completed_at", value: "today" })
+        expect(saved[0]!.actions[0]).toMatchObject({
+            type: "set",
+            property: "completed_at",
+            value: "today",
+        })
     })
 
     it("Validation: empty property shows error, onSave not called", () => {
         const { modal, onSave } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
 
         // Leave prop empty
-        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-save-btn")!
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
         saveBtn.click()
 
         expect(onSave).not.toHaveBeenCalled()
@@ -254,15 +317,21 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Validation: empty value for Set action shows error", () => {
         const { modal, onSave } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
 
-        const propInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-prop-input")!
+        const propInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-prop-input",
+        )!
         propInput.value = "my_prop"
         propInput.dispatchEvent(new Event("input"))
         // Leave value empty
 
-        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-save-btn")!
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
         saveBtn.click()
 
         expect(onSave).not.toHaveBeenCalled()
@@ -272,18 +341,26 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Validation: property equal to swimlaneProp shows error", () => {
         const { modal, onSave } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
 
-        const propInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-prop-input")!
+        const propInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-prop-input",
+        )!
         propInput.value = "status" // same as swimlaneProp
         propInput.dispatchEvent(new Event("input"))
 
-        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-value-input")!
+        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )!
         valueInput.value = "done"
         valueInput.dispatchEvent(new Event("input"))
 
-        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-save-btn")!
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
         saveBtn.click()
 
         expect(onSave).not.toHaveBeenCalled()
@@ -293,18 +370,26 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("After save, returns to read mode", () => {
         const { modal } = openModal([])
-        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-add-btn")!
+        const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-add-btn",
+        )!
         addBtn.click()
 
-        const propInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-prop-input")!
+        const propInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-prop-input",
+        )!
         propInput.value = "done_at"
         propInput.dispatchEvent(new Event("input"))
 
-        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(".swimlane-automation-value-input")!
+        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )!
         valueInput.value = "today"
         valueInput.dispatchEvent(new Event("input"))
 
-        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-save-btn")!
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
         saveBtn.click()
 
         expect(modal.contentEl.querySelector(".swimlane-automation-editor")).toBeNull()
@@ -313,10 +398,14 @@ describe("AutomationsModal — edit/add mode", () => {
 
     it("Remove action button removes a row when multiple actions", () => {
         const { modal } = openModal(rules) // first rule has 2 actions
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
 
-        const removeBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-remove-action-btn")!
+        const removeBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-remove-action-btn",
+        )!
         removeBtn.click()
 
         const actionRows = modal.contentEl.querySelectorAll(".swimlane-automation-action")
@@ -330,7 +419,9 @@ describe("AutomationsModal — edit/add mode", () => {
                 actions: [{ type: "set", property: "foo", value: "bar" }],
             },
         ])
-        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(".swimlane-automation-edit-btn")!
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
         editBtn.click()
         const removeBtn = modal.contentEl.querySelector(".swimlane-automation-remove-action-btn")
         expect(removeBtn).toBeNull()
