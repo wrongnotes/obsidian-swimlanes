@@ -24,12 +24,14 @@ export async function executeRmSwimlane(
     files: TFile[],
     swimlaneProp: string,
     op: RmSwimlaneOp,
+    onMutate?: (file: TFile, fm: Record<string, unknown>) => void,
 ): Promise<void> {
     switch (op.kind) {
         case "move":
             for (const file of files) {
                 await app.fileManager.processFrontMatter(file, fm => {
                     fm[swimlaneProp] = op.targetValue
+                    onMutate?.(file, fm)
                 })
             }
             break
@@ -37,6 +39,7 @@ export async function executeRmSwimlane(
             for (const file of files) {
                 await app.fileManager.processFrontMatter(file, fm => {
                     delete fm[swimlaneProp]
+                    onMutate?.(file, fm)
                 })
             }
             break

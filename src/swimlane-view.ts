@@ -832,7 +832,18 @@ export class SwimlaneView extends BasesView {
                     this.hideColumn(groupKey)
                     return
                 }
-                await executeRmSwimlane(this.app, files, this.swimlaneProp, op)
+                await executeRmSwimlane(this.app, files, this.swimlaneProp, op, (_file, fm) => {
+                    let mutations: FrontmatterMutation[] = []
+                    if (op.kind === "move") {
+                        mutations = [
+                            ...this.getAutomationMutations(groupKey as string, null, "leaves"),
+                            ...this.getAutomationMutations(groupKey as string, op.targetValue, "enters"),
+                        ]
+                    } else if (op.kind === "clear") {
+                        mutations = this.getAutomationMutations(groupKey as string, null, "leaves")
+                    }
+                    applyMutations(fm, mutations)
+                })
                 const order = this.swimlaneOrder.filter(k => k !== groupKey)
                 this.config.set(CONFIG_KEYS.swimlaneOrder, order)
             },
