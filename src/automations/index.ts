@@ -7,3 +7,5 @@ export type {
 } from "./types"
 export { matchRules, resolveValue, formatNow, applyMutations } from "./engine"
 export { readAutomations, writeAutomations } from "./io"
+export { AutomationsModal } from "./modal"
+export type { AutomationsModalContext } from "./modal"
