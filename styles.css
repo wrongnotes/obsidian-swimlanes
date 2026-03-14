@@ -983,3 +983,94 @@
     border-color: var(--interactive-accent);
     background-color: transparent;
 }
+
+/* Automations button */
+.swimlane-automations-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) var(--size-4-3);
+    margin: var(--size-4-2) var(--size-4-4) 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    background: none;
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.swimlane-automations-btn:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.swimlane-automations-btn-icon {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.swimlane-automations-btn-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Automations modal */
+.swimlane-automation-rule {
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-rule-trigger {
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
+    margin-bottom: var(--size-4-1);
+}
+
+.swimlane-automation-rule-action {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    padding-left: var(--size-4-3);
+}
+
+.swimlane-automation-rule-action::before {
+    content: "→ ";
+}
+
+.swimlane-automation-rule-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-2);
+}
+
+.swimlane-automation-editor {
+    border: var(--border-width) solid var(--interactive-accent);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-action {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-action select,
+.swimlane-automation-action input {
+    font-size: var(--font-ui-smaller);
+}
+
+.swimlane-automation-add-btn {
+    margin-top: var(--size-4-2);
+}
+
+.swimlane-automation-editor-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+}
