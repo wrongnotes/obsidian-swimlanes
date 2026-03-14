@@ -207,6 +207,11 @@ export interface DragAndDropContextOptions<TState, TContext = DragContext, TPosi
      * indicator, and the configured duration. Defaults to a translate + fade animation.
      */
     onDropAnimate?: (clone: HTMLElement, dx: number, dy: number, durationMs: number) => void
+    /**
+     * Called at drag start, before the draggable is hidden. The element's
+     * bounding rect is still valid at this point.
+     */
+    onDragStart?: (state: TState, draggable: HTMLElement) => void
     /** Called on each pointer move during an active drag. */
     onDragMove?: (state: TState, clientX: number, clientY: number) => void
 }
@@ -250,6 +255,9 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
         durationMs: number,
     ) => void
     private readonly onDropSettle: (() => void) | null
+    private readonly onDragStartCallback:
+        | ((state: TState, draggable: HTMLElement) => void)
+        | null
     private readonly onDragMoveCallback: ((state: TState, x: number, y: number) => void) | null
     private dragging: TState | null = null
     private dropAnimating = false
@@ -318,6 +326,7 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
             right: o.right === "fill" ? Number.POSITIVE_INFINITY : o.right,
         }))
         this.onDropSettle = options.onDropSettle ?? null
+        this.onDragStartCallback = options.onDragStart ?? null
         this.onDragMoveCallback = options.onDragMove ?? null
         this.onDropAnimate =
             options.onDropAnimate ??
@@ -622,6 +631,8 @@ export class DragAndDropContext<TState, TContext = DragContext, TPosition = numb
                 width: `${rect.width}px`,
             })
         }
+        // Fire before hiding so the callback can read the element's rect.
+        this.onDragStartCallback?.(state, draggable)
         const clone = draggable.cloneNode(true) as HTMLElement
         draggable.addClass(this.hiddenClass)
         draggable.addClass(this.draggingClass)

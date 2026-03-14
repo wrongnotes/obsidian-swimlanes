@@ -554,12 +554,17 @@ export class KanbanImportModal extends WrongNotesModal {
         hasArchive: boolean,
     ): BasesConfigFile {
         const propId = `note.${prop}`
+        const rankProp = this.rankPropertyName.trim() || "rank"
+        const rankPropId = `note.${rankProp}`
         const viewFilters = hasArchive ? { and: ["archived != true"] } : undefined
         return {
             filters: folder ? { and: [`file.folder == "${folder}"`] } : undefined,
             properties: {
                 [prop]: {
                     displayName: prop,
+                },
+                [rankProp]: {
+                    displayName: rankProp,
                 },
             },
             views: [
@@ -568,9 +573,11 @@ export class KanbanImportModal extends WrongNotesModal {
                     name: "Swimlane",
                     filters: viewFilters,
                     groupBy: { property: prop, direction: "ASC" },
+                    sort: [{ property: rankPropId, direction: "ASC" }],
                     order: [propId],
                     swimlaneProperty: propId,
                     swimlaneOrder: columnNames,
+                    rankProperty: rankProp,
                 } as BasesConfigFileView & Record<string, unknown>,
             ],
         }

@@ -4,9 +4,11 @@ import {
     BasesView,
     Menu,
     Notice,
+    parseYaml,
     Platform,
     QueryController,
     setIcon,
+    stringifyYaml,
 } from "obsidian"
 import type {
     BasesPropertyId,
@@ -93,11 +95,20 @@ export class SwimlaneView extends BasesView {
     /** Recent clientX samples for horizontal velocity estimation. */
     private mobileSwipeXSamples: { x: number; t: number }[] = []
     private autoScrollRaf: number | null = null
+    /** Column element highlighted as a drop target when in column-drop mode (sort ≠ rank). */
+    private columnDropTarget: HTMLElement | null = null
+    /** Source column element marked during drag in column-drop mode. */
+    private columnDragSource: HTMLElement | null = null
+    /** Placeholder holding the card's original slot in column-drop mode. */
+    private columnDropPlaceholder: HTMLElement | null = null
+    /** File path of a card that was just dropped cross-column; triggers expand animation on rebuild. */
+    private expandingCardPath: string | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
         column: GroupKey | null
         cardListScrollTops: Map<string, number>
         boardScrollTop: number
+        boardScrollLeft: number
     } | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
@@ -145,11 +156,38 @@ export class SwimlaneView extends BasesView {
                     },
                 },
             ],
-            onDragMove: (_state, clientX, clientY) => {
+            onDragStart: (state, draggable) => {
+                if (!this.isSortedByRank) {
+                    this.initColumnDropMode(state, draggable)
+                }
+            },
+            onDropAnimate: (clone, dx, dy, durationMs) => {
+                // In column-drop mode the indicator is display:none so dx/dy
+                // point to 0,0. Animate towards the target column (cross-column)
+                // or the placeholder (same-column / cancel).
+                if (this.columnDropTarget) {
+                    const from = clone.getBoundingClientRect()
+                    const to = this.columnDropTarget.getBoundingClientRect()
+                    dx = to.left + to.width / 2 - from.left - from.width / 2
+                    dy = to.top + to.height / 3 - from.top
+                } else if (this.columnDropPlaceholder) {
+                    const from = clone.getBoundingClientRect()
+                    const to = this.columnDropPlaceholder.getBoundingClientRect()
+                    dx = to.left - from.left
+                    dy = to.top - from.top
+                }
+                clone.style.transition = `transform ${durationMs}ms cubic-bezier(0.2, 0, 0, 1), opacity ${durationMs}ms ease`
+                clone.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg)`
+                clone.addClass("swimlane-drag-clone--dropping")
+            },
+            onDragMove: (state, clientX, clientY) => {
                 if (this.isMobileLayout) {
                     this.handleMobileDragSwipe(clientX)
                 }
                 this.handleDragAutoScroll(clientX, clientY)
+                if (!this.isSortedByRank) {
+                    this.clearColumnHighlightIfOutside(state, clientX, clientY)
+                }
             },
         })
 
@@ -235,6 +273,47 @@ export class SwimlaneView extends BasesView {
 
     private get rankPropId(): BasesPropertyId {
         return `note.${this.rankProp}` as BasesPropertyId
+    }
+
+    /**
+     * Returns true when the view sort is compatible with rank-based DnD.
+     * Empty sort returns true — on drop we auto-set it to rank.
+     * A non-rank sort returns false — in-column card DnD is disabled.
+     */
+    private get isSortedByRank(): boolean {
+        const sort = this.config.getSort()
+        if (sort.length === 0) {
+            return true
+        }
+        return sort[0]!.property === this.rankPropId
+    }
+
+    /**
+     * Write a rank sort directly into the `.base` file.
+     * `config.set` cannot modify the built-in `sort` field (it's managed
+     * by Obsidian's sort toolbar), so we modify the file content instead.
+     */
+    private setSortByRank(): void {
+        const file = this.app.workspace.getActiveFile()
+        if (!file || file.extension !== "base") {
+            return
+        }
+        const viewName = this.config.name
+        const rankPropId = this.rankPropId
+        this.app.vault.process(file, content => {
+            const config = parseYaml(content)
+            if (!config?.views || !Array.isArray(config.views)) {
+                return content
+            }
+            const view = config.views.find(
+                (v: Record<string, unknown>) => v.name === viewName && v.type === "swimlane",
+            )
+            if (!view) {
+                return content
+            }
+            view.sort = [{ property: rankPropId, direction: "ASC" }]
+            return stringifyYaml(config)
+        })
     }
 
     private get swimlanePropId(): BasesPropertyId {
@@ -361,13 +440,20 @@ export class SwimlaneView extends BasesView {
             this.savedScrollState?.cardListScrollTops ?? this.getCardListScrollTops()
         const savedBoardScrollTop =
             this.savedScrollState?.boardScrollTop ?? this.currentBoard?.scrollTop ?? 0
+        const savedBoardScrollLeft =
+            this.savedScrollState?.boardScrollLeft ?? this.boardEl.scrollLeft
         this.savedScrollState = null
 
         this.boardEl.empty()
+        // Clear stale column-drop references — the DOM elements were removed by empty().
+        this.columnDropTarget = null
+        this.columnDragSource = null
+        this.columnDropPlaceholder = null
         this.carouselObserver?.disconnect()
         this.carouselObserver = null
 
         const mobile = this.isMobileLayout
+        const sortedByRank = this.isSortedByRank
         this.boardEl.toggleClass("swimlane-mobile", mobile)
         // Desktop: outer container scrolls both axes, board sizes to content.
         // Mobile: outer container is hidden, board handles both via scroll-snap.
@@ -396,7 +482,9 @@ export class SwimlaneView extends BasesView {
         }
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
+        board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
         this.currentBoard = board
+        this.columnDropTarget = null
 
         // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
         // so touch scrolling on the outer container works normally.
@@ -430,6 +518,16 @@ export class SwimlaneView extends BasesView {
         ).filter(k => !hidden.has(k))
 
         const rankProp = this.rankProp
+
+        if (!sortedByRank) {
+            const hint = this.boardEl.createEl("button", { cls: "swimlane-sort-hint" })
+            setIcon(hint.createSpan({ cls: "swimlane-sort-hint-icon" }), "arrow-up-down")
+            hint.createSpan({ text: "Sort by rank to enable re-ordering" })
+            hint.addEventListener("click", () => this.setSortByRank())
+            // Move hint before the board so it sits above the columns.
+            this.boardEl.insertBefore(hint, board)
+        }
+
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
             properties: this.cardPropertyAliases,
@@ -476,7 +574,7 @@ export class SwimlaneView extends BasesView {
                 this.swimlaneDnd.registerDraggable(col, { groupKey })
             }
 
-            for (const entry of this.sortEntries(group?.entries ?? [])) {
+            for (const entry of group?.entries ?? []) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
                 const currentGroupKey = groupKey
                 const card = renderCard(cardList, entry, this.app, {
@@ -487,6 +585,12 @@ export class SwimlaneView extends BasesView {
                         currentSwimlane: currentGroupKey,
                     }),
                 })
+                if (this.expandingCardPath === entry.file.path) {
+                    card.addClass("swimlane-card--expanding")
+                    card.addEventListener("animationend", () => {
+                        card.removeClass("swimlane-card--expanding")
+                    }, { once: true })
+                }
                 this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
             }
 
@@ -504,8 +608,10 @@ export class SwimlaneView extends BasesView {
             this.renderCarouselIndicator(board, orderedKeys)
         }
 
-        if (savedScrollColumn) {
+        if (mobile && savedScrollColumn) {
             this.restoreScrollPosition(board, savedScrollColumn)
+        } else if (savedBoardScrollLeft > 0) {
+            this.boardEl.scrollLeft = savedBoardScrollLeft
         }
         this.restoreCardListScrollTops(board, savedCardListScrollTops)
         if (savedBoardScrollTop > 0) {
@@ -513,6 +619,7 @@ export class SwimlaneView extends BasesView {
         }
 
         this.applyPendingHighlight()
+        this.expandingCardPath = null
     }
 
     private renderAddCardButton(columnEl: HTMLElement, groupKey: GroupKey): void {
@@ -1072,6 +1179,72 @@ export class SwimlaneView extends BasesView {
         this.autoScrollRaf = requestAnimationFrame(tick)
     }
 
+    /**
+     * In column-drop mode (sort ≠ rank), highlight the column under the pointer
+     * instead of showing an insertion-line indicator. Skip the source column
+     * since same-column drops are blocked.
+     */
+    /**
+     * Called at drag start (before the card is hidden) to set up column-drop
+     * mode: mark the source column and insert a fixed placeholder at the
+     * card's position.
+     */
+    private initColumnDropMode(state: CardDragState, draggable: HTMLElement): void {
+        const board = this.currentBoard
+        if (!board) {
+            return
+        }
+        const src = board.querySelector<HTMLElement>(
+            `.swimlane-column[data-group-key="${CSS.escape(state.groupKey)}"]`,
+        )
+        if (src) {
+            src.addClass("swimlane-column--drag-source")
+            this.columnDragSource = src
+        }
+
+        // Measure the card while it's still visible, then insert a placeholder.
+        const rect = draggable.getBoundingClientRect()
+        const placeholder = document.createElement("div")
+        placeholder.className = "swimlane-column-drop-placeholder"
+        placeholder.setCssStyles({
+            height: `${rect.height}px`,
+            width: `${rect.width}px`,
+        })
+        draggable.parentElement?.insertBefore(placeholder, draggable)
+        this.columnDropPlaceholder = placeholder
+    }
+
+    /**
+     * Fallback: clear the column highlight when the pointer leaves all drop
+     * areas. The primary highlight is set in getCardDropTarget (synced to
+     * the DnD system's resolved target), but when resolveDropTarget returns
+     * null, getCardDropTarget isn't called, so we clear here.
+     */
+    private clearColumnHighlightIfOutside(_state: CardDragState, clientX: number, clientY: number): void {
+        if (!this.columnDropTarget) {
+            return
+        }
+        const board = this.currentBoard
+        if (!board) {
+            return
+        }
+        const boardRect = board.getBoundingClientRect()
+        if (clientX < boardRect.left || clientX > boardRect.right ||
+            clientY < boardRect.top || clientY > boardRect.bottom) {
+            this.columnDropTarget.removeClass("swimlane-column--drop-target")
+            this.columnDropTarget = null
+        }
+    }
+
+    private clearColumnDropHighlight(): void {
+        this.columnDropTarget?.removeClass("swimlane-column--drop-target")
+        this.columnDropTarget = null
+        this.columnDragSource?.removeClass("swimlane-column--drag-source")
+        this.columnDragSource = null
+        this.columnDropPlaceholder?.remove()
+        this.columnDropPlaceholder = null
+    }
+
     /** Find the scrollable container for the column at the given X position. */
     private findScrollContainer(clientX: number, _clientY: number): HTMLElement | null {
         const board = this.currentBoard
@@ -1181,24 +1354,6 @@ export class SwimlaneView extends BasesView {
         col.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
     }
 
-    private sortEntries(entries: BasesEntry[]): BasesEntry[] {
-        return [...entries].sort((a, b) => {
-            const ra = getFrontmatter<string>(this.app, a.file, this.rankProp) || null
-            const rb = getFrontmatter<string>(this.app, b.file, this.rankProp) || null
-            // Ranked cards before unranked; unranked cards stable-sorted by filename.
-            if (ra && !rb) {
-                return -1
-            }
-            if (!ra && rb) {
-                return 1
-            }
-            if (ra && rb) {
-                return ra < rb ? -1 : ra > rb ? 1 : 0
-            }
-            return a.file.basename.localeCompare(b.file.basename)
-        })
-    }
-
     private getCardDropTarget(
         dropAreaEl: HTMLElement,
         _clientX: number,
@@ -1208,6 +1363,18 @@ export class SwimlaneView extends BasesView {
         position: LexorankPosition
         placement: { refNode: Node | null; atStart: boolean; atEnd: boolean }
     } | null {
+        // In column-drop mode, sync the column highlight to the DnD system's
+        // resolved drop area so the visual always matches the actual target.
+        if (this.columnDragSource) {
+            const col = dropAreaEl.closest<HTMLElement>(".swimlane-column")
+            const target = col && col !== this.columnDragSource ? col : null
+            if (target !== this.columnDropTarget) {
+                this.columnDropTarget?.removeClass("swimlane-column--drop-target")
+                this.columnDropTarget = target
+                target?.addClass("swimlane-column--drop-target")
+            }
+        }
+
         const rankProp = this.rankProp
         const rankOf = (el: HTMLElement | undefined): string | null => el?.dataset[rankProp] || null
 
@@ -1283,17 +1450,42 @@ export class SwimlaneView extends BasesView {
         context: CardDropContext,
         position: LexorankPosition,
     ): void {
+        // Don't clear column-drop highlights here — the placeholder must
+        // survive until onDropAnimate (next rAF) reads its rect. The
+        // subsequent rebuildBoard() via boardEl.empty() handles cleanup.
+
         // Snapshot scroll state NOW, before any processFrontMatter calls
         // trigger onDataUpdated → rebuildBoard and blow away the DOM.
         this.savedScrollState = {
             column: this.getVisibleColumnKey(),
             cardListScrollTops: this.getCardListScrollTops(),
             boardScrollTop: this.currentBoard?.scrollTop ?? 0,
+            boardScrollLeft: this.boardEl.scrollLeft,
         }
 
         if (context.groupKey === ADD_COLUMN_DROP_KEY) {
             this.handleCardDropOnNewColumn(dragState)
             return
+        }
+
+        const isCrossColumn = context.groupKey !== dragState.groupKey
+
+        // Trigger expand animation on rebuild for cross-column drops in column-drop mode.
+        if (isCrossColumn && this.columnDragSource) {
+            this.expandingCardPath = dragState.path
+        }
+
+        // When sorted by a non-rank property, block same-column reorders
+        // (the visual order is driven by that sort field, not rank).
+        // Cross-column moves always work.
+        if (!isCrossColumn && !this.isSortedByRank) {
+            new Notice("Sort by rank to re-order cards within a swimlane.")
+            return
+        }
+
+        // If no sort is configured, set it to rank so Bases handles ordering.
+        if (this.config.getSort().length === 0) {
+            this.setSortByRank()
         }
 
         const file = this.app.vault.getFileByPath(dragState.path)
@@ -1316,7 +1508,7 @@ export class SwimlaneView extends BasesView {
 
         this.app.fileManager.processFrontMatter(file, fm => {
             fm[this.rankProp] = newRank
-            if (context.groupKey !== dragState.groupKey) {
+            if (isCrossColumn) {
                 fm[this.swimlaneProp] = context.groupKey
             }
         })
@@ -1346,7 +1538,7 @@ export class SwimlaneView extends BasesView {
         const group = this.data.groupedData.find(
             g => g.hasKey() && (g.key?.toString() ?? "") === context.groupKey,
         )
-        const entries = this.sortEntries(group?.entries ?? [])
+        const entries = group?.entries ?? []
 
         // Build ordered list of file paths, excluding the dragged card.
         const paths = entries.map(e => e.file.path).filter(p => p !== dragState.path)
@@ -1382,6 +1574,10 @@ export class SwimlaneView extends BasesView {
         const file = this.app.vault.getFileByPath(dragState.path)
         if (!file) {
             return
+        }
+
+        if (this.config.getSort().length === 0) {
+            this.setSortByRank()
         }
 
         const releaseDrop = this.cardDnd.holdDrop()

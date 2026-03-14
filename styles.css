@@ -49,6 +49,60 @@
     opacity: 0.25;
 }
 
+/* Column-drop mode: sort ≠ rank, so in-column reorder is disabled.
+   The DnD system's indicator is fully hidden; a separate fixed placeholder
+   holds the card's original slot in the source column. */
+.swimlane-column-drop-mode .swimlane-card-list > .swimlane-drop-indicator {
+    display: none;
+}
+
+/* In column-drop mode the hidden indicator is the only child of empty
+   card lists, breaking :empty and adding unwanted padding. Collapse it. */
+.swimlane-column-drop-mode .swimlane-card-list:has(> .swimlane-drop-indicator:only-child) {
+    padding-bottom: 0;
+}
+
+.swimlane-column-drop-placeholder {
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.swimlane-column--drop-target {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+    background-color: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+}
+
+.swimlane-column--drag-source {
+    outline: 2px dashed var(--text-faint);
+    outline-offset: -2px;
+    opacity: 0.6;
+}
+
+/* Card expand-in animation after a cross-column drop in column-drop mode. */
+@keyframes swimlane-card-expand {
+    from {
+        max-height: 0;
+        opacity: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+        overflow: hidden;
+    }
+    to {
+        max-height: 200px;
+        opacity: 1;
+    }
+}
+
+.swimlane-card--expanding {
+    animation: swimlane-card-expand 250ms ease-out forwards;
+}
+
 .swimlane-drag-clone {
     opacity: 0.9;
     box-shadow: var(--shadow-l);
@@ -270,6 +324,35 @@
     padding: var(--size-4-4);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
+}
+
+.swimlane-sort-hint {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) var(--size-4-3);
+    margin: var(--size-4-2) var(--size-4-4) 0;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    background: none;
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.swimlane-sort-hint:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.swimlane-sort-hint-icon {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.swimlane-sort-hint-icon svg {
+    width: 14px;
+    height: 14px;
 }
 
 .swimlane-add-card-btn {
