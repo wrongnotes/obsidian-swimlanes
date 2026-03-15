@@ -34,7 +34,7 @@ import {
 } from "./automations"
 import type { AutomationRule, FrontmatterMutation, PropertyInfo } from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
-import type { UndoRedoContext } from "./undo"
+import type { UndoOperation, UndoRedoContext } from "./undo"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -1753,22 +1753,46 @@ export class SwimlaneView extends BasesView {
         }
 
         const newRank = midRank(position.beforeRank, position.afterRank)
+        const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
+        const label = isCrossColumn ? "Move card" : "Reorder card"
+        this.undoManager.beginTransaction(label)
 
         this.app.fileManager.processFrontMatter(file, fm => {
             fm[this.rankProp] = newRank
             if (isCrossColumn) {
-                fm[this.swimlaneProp] = context.groupKey
+                const fromSwimlane = dragState.groupKey as string
+                const toSwimlane = context.groupKey as string
                 const mutations = [
-                    ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
-                    ...this.getAutomationMutations(
-                        dragState.groupKey as string,
-                        context.groupKey as string,
-                        "enters",
-                    ),
+                    ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                    ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
                 ]
+                const prevValues: Record<string, unknown> = {}
+                for (const m of mutations) {
+                    prevValues[m.property] = fm[m.property]
+                }
+                fm[this.swimlaneProp] = toSwimlane
                 applyMutations(fm, mutations)
+                this.undoManager.pushOperation({
+                    type: "MoveCard",
+                    file,
+                    fromSwimlane,
+                    toSwimlane,
+                    fromRank,
+                    toRank: newRank,
+                    resolvedAutomationMutations: mutations,
+                    automationPreviousValues: prevValues,
+                })
+            } else {
+                this.undoManager.pushOperation({
+                    type: "ReorderCard",
+                    file,
+                    fromRank,
+                    toRank: newRank,
+                })
             }
         })
+
+        this.undoManager.endTransaction()
     }
 
     /** Returns true if any card in the column is missing a rank value. */
@@ -1796,17 +1820,15 @@ export class SwimlaneView extends BasesView {
             g => g.hasKey() && (g.key?.toString() ?? "") === context.groupKey,
         )
         const entries = group?.entries ?? []
-
-        // Build ordered list of file paths, excluding the dragged card.
         const paths = entries.map(e => e.file.path).filter(p => p !== dragState.path)
-
-        // Insert the dragged card at the position determined by getCardDropTarget.
         const insertIdx = Math.min(position.dropIndex, paths.length)
         paths.splice(insertIdx, 0, dragState.path)
 
-        // Assign evenly-spaced ranks to all cards.
         const step = Math.floor(26 / (paths.length + 1))
         const base = "a".charCodeAt(0)
+        const isCrossColumn = context.groupKey !== dragState.groupKey
+
+        this.undoManager.beginTransaction(isCrossColumn ? "Move card" : "Reorder cards")
 
         for (let i = 0; i < paths.length; i++) {
             const path = paths[i]!
@@ -1814,30 +1836,47 @@ export class SwimlaneView extends BasesView {
             if (!cardFile) {
                 continue
             }
-            // Generate a rank like "d", "h", "l", "p", etc.
             const charCode = base + step * (i + 1)
             const rank = String.fromCharCode(Math.min(charCode, "z".charCodeAt(0)))
+            const fromRank = getFrontmatter<string>(this.app, cardFile, this.rankProp) ?? ""
 
             this.app.fileManager.processFrontMatter(cardFile, fm => {
                 fm[this.rankProp] = rank
-                if (path === dragState.path && context.groupKey !== dragState.groupKey) {
-                    fm[this.swimlaneProp] = context.groupKey
+                if (path === dragState.path && isCrossColumn) {
+                    const fromSwimlane = dragState.groupKey as string
+                    const toSwimlane = context.groupKey as string
                     const mutations = [
-                        ...this.getAutomationMutations(
-                            dragState.groupKey as string,
-                            null,
-                            "leaves",
-                        ),
-                        ...this.getAutomationMutations(
-                            dragState.groupKey as string,
-                            context.groupKey as string,
-                            "enters",
-                        ),
+                        ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                        ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
                     ]
+                    const prevValues: Record<string, unknown> = {}
+                    for (const m of mutations) {
+                        prevValues[m.property] = fm[m.property]
+                    }
+                    fm[this.swimlaneProp] = toSwimlane
                     applyMutations(fm, mutations)
+                    this.undoManager.pushOperation({
+                        type: "MoveCard",
+                        file: cardFile,
+                        fromSwimlane,
+                        toSwimlane,
+                        fromRank,
+                        toRank: rank,
+                        resolvedAutomationMutations: mutations,
+                        automationPreviousValues: prevValues,
+                    })
+                } else {
+                    this.undoManager.pushOperation({
+                        type: "ReorderCard",
+                        file: cardFile,
+                        fromRank,
+                        toRank: rank,
+                    })
                 }
             })
         }
+
+        this.undoManager.endTransaction()
     }
 
     private handleCardDropOnNewColumn(dragState: CardDragState): void {
