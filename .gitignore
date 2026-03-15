@@ -27,3 +27,6 @@ memory/
 
 # Test coverage reports
 coverage/
+
+# Superpowers specs and plans (session artifacts)
+docs/superpowers/

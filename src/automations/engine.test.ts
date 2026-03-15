@@ -1,61 +1,5 @@
-import { formatNow, resolveValue, matchRules, applyMutations } from "./engine"
+import { resolveValue, matchRules, applyMutations } from "./engine"
 import type { AutomationContext, AutomationRule, FrontmatterMutation } from "./types"
-
-// Fixed date: March 14, 2026 09:05:07
-const FIXED_DATE = new Date(2026, 2, 14, 9, 5, 7)
-
-// ---------------------------------------------------------------------------
-// formatNow
-// ---------------------------------------------------------------------------
-
-describe("formatNow", () => {
-    it("formats YYYY", () => {
-        expect(formatNow("YYYY", FIXED_DATE)).toBe("2026")
-    })
-
-    it("formats YY", () => {
-        expect(formatNow("YY", FIXED_DATE)).toBe("26")
-    })
-
-    it("formats MM with zero-padding", () => {
-        expect(formatNow("MM", FIXED_DATE)).toBe("03")
-    })
-
-    it("formats DD with zero-padding", () => {
-        expect(formatNow("DD", FIXED_DATE)).toBe("14")
-    })
-
-    it("formats HH with zero-padding", () => {
-        expect(formatNow("HH", FIXED_DATE)).toBe("09")
-    })
-
-    it("formats mm with zero-padding", () => {
-        expect(formatNow("mm", FIXED_DATE)).toBe("05")
-    })
-
-    it("formats ss with zero-padding", () => {
-        expect(formatNow("ss", FIXED_DATE)).toBe("07")
-    })
-
-    it("formats full date string YYYY-MM-DD", () => {
-        expect(formatNow("YYYY-MM-DD", FIXED_DATE)).toBe("2026-03-14")
-    })
-
-    it("formats datetime YYYY-MM-DDTHH:mm", () => {
-        expect(formatNow("YYYY-MM-DDTHH:mm", FIXED_DATE)).toBe("2026-03-14T09:05")
-    })
-
-    it("preserves static text between tokens", () => {
-        expect(formatNow("Date: DD/MM/YYYY", FIXED_DATE)).toBe("Date: 14/03/2026")
-    })
-
-    it("defaults to current date when now is omitted", () => {
-        // Just verify it returns a string without throwing
-        const result = formatNow("YYYY")
-        expect(typeof result).toBe("string")
-        expect(result).toMatch(/^\d{4}$/)
-    })
-})
 
 // ---------------------------------------------------------------------------
 // resolveValue
@@ -68,51 +12,49 @@ describe("resolveValue", () => {
         targetSwimlane: "In Progress",
     }
 
-    it("resolves {{now:YYYY-MM-DD}}", () => {
-        expect(resolveValue("{{now:YYYY-MM-DD}}", ctx, FIXED_DATE)).toBe("2026-03-14")
+    it("resolves {{now:YYYY-MM-DD}} to a date string", () => {
+        expect(resolveValue("{{now:YYYY-MM-DD}}", ctx)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
 
-    it("resolves {{now:YYYY-MM-DDTHH:mm}}", () => {
-        expect(resolveValue("{{now:YYYY-MM-DDTHH:mm}}", ctx, FIXED_DATE)).toBe("2026-03-14T09:05")
+    it("resolves {{now:YYYY-MM-DDTHH:mm}} to a datetime string", () => {
+        expect(resolveValue("{{now:YYYY-MM-DDTHH:mm}}", ctx)).toMatch(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
+        )
     })
 
-    it("resolves {{now:HH:mm}}", () => {
-        expect(resolveValue("{{now:HH:mm}}", ctx, FIXED_DATE)).toBe("09:05")
+    it("resolves {{now:HH:mm}} to a time string", () => {
+        expect(resolveValue("{{now:HH:mm}}", ctx)).toMatch(/^\d{2}:\d{2}$/)
     })
 
     it("resolves {{source.swimlane}}", () => {
-        expect(resolveValue("{{source.swimlane}}", ctx, FIXED_DATE)).toBe("Todo")
+        expect(resolveValue("{{source.swimlane}}", ctx)).toBe("Todo")
     })
 
     it("resolves {{target.swimlane}}", () => {
-        expect(resolveValue("{{target.swimlane}}", ctx, FIXED_DATE)).toBe("In Progress")
+        expect(resolveValue("{{target.swimlane}}", ctx)).toBe("In Progress")
     })
 
     it("resolves null sourceSwimlane to empty string", () => {
         const nullCtx: AutomationContext = { ...ctx, sourceSwimlane: null }
-        expect(resolveValue("{{source.swimlane}}", nullCtx, FIXED_DATE)).toBe("")
+        expect(resolveValue("{{source.swimlane}}", nullCtx)).toBe("")
     })
 
     it("resolves null targetSwimlane to empty string", () => {
         const nullCtx: AutomationContext = { ...ctx, targetSwimlane: null }
-        expect(resolveValue("{{target.swimlane}}", nullCtx, FIXED_DATE)).toBe("")
+        expect(resolveValue("{{target.swimlane}}", nullCtx)).toBe("")
     })
 
     it("returns static string unchanged", () => {
-        expect(resolveValue("no tokens here", ctx, FIXED_DATE)).toBe("no tokens here")
+        expect(resolveValue("no tokens here", ctx)).toBe("no tokens here")
     })
 
     it("handles mixed tokens and static text", () => {
-        const result = resolveValue(
-            "Moved from {{source.swimlane}} on {{now:YYYY-MM-DD}}",
-            ctx,
-            FIXED_DATE,
-        )
-        expect(result).toBe("Moved from Todo on 2026-03-14")
+        const result = resolveValue("Moved from {{source.swimlane}} to {{target.swimlane}}", ctx)
+        expect(result).toBe("Moved from Todo to In Progress")
     })
 
     it("leaves unknown token as-is", () => {
-        expect(resolveValue("{{unknown.token}}", ctx, FIXED_DATE)).toBe("{{unknown.token}}")
+        expect(resolveValue("{{unknown.token}}", ctx)).toBe("{{unknown.token}}")
     })
 })
 
@@ -145,24 +87,24 @@ describe("matchRules", () => {
         const rules: AutomationRule[] = [
             {
                 trigger: { type: "enters", swimlane: "In Progress" },
-                actions: [{ type: "set", property: "startedAt", value: "{{now:YYYY-MM-DD}}" }],
+                actions: [{ type: "set", property: "startedAt", value: "yes" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(1)
-        expect(mutations[0]).toEqual({ type: "set", property: "startedAt", value: "2026-03-14" })
+        expect(mutations[0]).toEqual({ type: "set", property: "startedAt", value: "yes" })
     })
 
     it("leaves trigger matches sourceSwimlane", () => {
         const rules: AutomationRule[] = [
             {
                 trigger: { type: "leaves", swimlane: "Todo" },
-                actions: [{ type: "set", property: "leftTodoAt", value: "{{now:YYYY-MM-DD}}" }],
+                actions: [{ type: "set", property: "leftTodoAt", value: "yes" }],
             },
         ]
-        const mutations = matchRules(rules, leavesTodo, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, leavesTodo, swimlaneProp)
         expect(mutations).toHaveLength(1)
-        expect(mutations[0]).toEqual({ type: "set", property: "leftTodoAt", value: "2026-03-14" })
+        expect(mutations[0]).toEqual({ type: "set", property: "leftTodoAt", value: "yes" })
     })
 
     it("created_in trigger matches targetSwimlane", () => {
@@ -172,7 +114,7 @@ describe("matchRules", () => {
                 actions: [{ type: "set", property: "createdDone", value: "yes" }],
             },
         ]
-        const mutations = matchRules(rules, createdInDone, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, createdInDone, swimlaneProp)
         expect(mutations).toHaveLength(1)
         expect(mutations[0]).toEqual({ type: "set", property: "createdDone", value: "yes" })
     })
@@ -181,10 +123,10 @@ describe("matchRules", () => {
         const rules: AutomationRule[] = [
             {
                 trigger: { type: "enters", swimlane: "*" },
-                actions: [{ type: "set", property: "movedAt", value: "{{now:YYYY-MM-DD}}" }],
+                actions: [{ type: "set", property: "movedAt", value: "yes" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(1)
     })
 
@@ -195,7 +137,7 @@ describe("matchRules", () => {
                 actions: [{ type: "clear", property: "assignee" }],
             },
         ]
-        const mutations = matchRules(rules, leavesTodo, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, leavesTodo, swimlaneProp)
         expect(mutations).toHaveLength(1)
     })
 
@@ -206,7 +148,7 @@ describe("matchRules", () => {
                 actions: [{ type: "set", property: "movedAt", value: "today" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(0)
     })
 
@@ -217,7 +159,7 @@ describe("matchRules", () => {
                 actions: [{ type: "set", property: "completedAt", value: "today" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(0)
     })
 
@@ -225,14 +167,14 @@ describe("matchRules", () => {
         const rules: AutomationRule[] = [
             {
                 trigger: { type: "enters", swimlane: "In Progress" },
-                actions: [{ type: "set", property: "startedAt", value: "2026-03-14" }],
+                actions: [{ type: "set", property: "startedAt", value: "a" }],
             },
             {
                 trigger: { type: "enters", swimlane: "*" },
-                actions: [{ type: "set", property: "movedAt", value: "2026-03-14" }],
+                actions: [{ type: "set", property: "movedAt", value: "b" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(2)
         expect(mutations[0]!.property).toBe("startedAt")
         expect(mutations[1]!.property).toBe("movedAt")
@@ -249,8 +191,7 @@ describe("matchRules", () => {
                 actions: [{ type: "set", property: "note", value: "second" }],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
-        // Both mutations present; applyMutations will apply last-write-wins
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(2)
         const fm: Record<string, unknown> = {}
         applyMutations(fm, mutations)
@@ -258,7 +199,7 @@ describe("matchRules", () => {
     })
 
     it("empty rules returns empty array", () => {
-        expect(matchRules([], entersInProgress, swimlaneProp, FIXED_DATE)).toEqual([])
+        expect(matchRules([], entersInProgress, swimlaneProp)).toEqual([])
     })
 
     it("multiple actions in a rule produce multiple mutations", () => {
@@ -266,14 +207,14 @@ describe("matchRules", () => {
             {
                 trigger: { type: "enters", swimlane: "In Progress" },
                 actions: [
-                    { type: "set", property: "startedAt", value: "2026-03-14" },
+                    { type: "set", property: "startedAt", value: "yes" },
                     { type: "clear", property: "blockedBy" },
                 ],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(2)
-        expect(mutations[0]).toEqual({ type: "set", property: "startedAt", value: "2026-03-14" })
+        expect(mutations[0]).toEqual({ type: "set", property: "startedAt", value: "yes" })
         expect(mutations[1]).toEqual({ type: "clear", property: "blockedBy" })
     })
 
@@ -283,11 +224,11 @@ describe("matchRules", () => {
                 trigger: { type: "enters", swimlane: "In Progress" },
                 actions: [
                     { type: "set", property: "status", value: "active" },
-                    { type: "set", property: "startedAt", value: "2026-03-14" },
+                    { type: "set", property: "startedAt", value: "yes" },
                 ],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.property).toBe("startedAt")
     })
@@ -302,10 +243,22 @@ describe("matchRules", () => {
                 ],
             },
         ]
-        const mutations = matchRules(rules, entersInProgress, swimlaneProp, FIXED_DATE)
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
         expect(mutations).toHaveLength(2)
         expect(mutations[0]).toEqual({ type: "add", property: "tags", value: "wip" })
         expect(mutations[1]).toEqual({ type: "remove", property: "tags", value: "backlog" })
+    })
+
+    it("resolves {{now:...}} tokens in set values", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "In Progress" },
+                actions: [{ type: "set", property: "startedAt", value: "{{now:YYYY-MM-DD}}" }],
+            },
+        ]
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
 })
 

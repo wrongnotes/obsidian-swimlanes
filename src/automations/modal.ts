@@ -1,8 +1,8 @@
 import type { App } from "obsidian"
 import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import type { AutomationRule, AutomationAction, TriggerType } from "./types"
-import { AutomationPropertySuggest } from "./property-suggest"
-import { AutomationValueSuggest, TEMPLATE_SUGGESTIONS } from "./value-suggest"
+import { AutomationPropertySuggest } from "../inputs/automation-property-suggest"
+import { AutomationValueSuggest, TEMPLATE_SUGGESTIONS } from "../inputs/automation-value-suggest"
 
 export interface PropertyInfo {
     name: string

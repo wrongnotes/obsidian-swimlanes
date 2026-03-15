@@ -1,42 +1,18 @@
+import { moment } from "obsidian"
 import type { AutomationContext, AutomationRule, FrontmatterMutation } from "./types"
 
 /**
- * Lightweight date formatter using moment-style tokens.
- * Supported tokens: YYYY, YY, MM, DD, HH, mm, ss
- */
-export function formatNow(format: string, now?: Date): string {
-    const d = now ?? new Date()
-    const year = d.getFullYear()
-    const month = d.getMonth() + 1
-    const day = d.getDate()
-    const hours = d.getHours()
-    const minutes = d.getMinutes()
-    const seconds = d.getSeconds()
-
-    const pad = (n: number): string => String(n).padStart(2, "0")
-
-    return format
-        .replace("YYYY", String(year))
-        .replace("YY", String(year).slice(-2))
-        .replace("MM", pad(month))
-        .replace("DD", pad(day))
-        .replace("HH", pad(hours))
-        .replace("mm", pad(minutes))
-        .replace("ss", pad(seconds))
-}
-
-/**
  * Replaces template tokens in a string:
- *   {{now:FORMAT}}         — formats the current date/time
+ *   {{now:FORMAT}}         — formats the current date/time using moment.js
  *   {{source.swimlane}}    — the swimlane the card moved from (empty string if null)
  *   {{target.swimlane}}    — the swimlane the card moved to (empty string if null)
  * Unknown tokens are left as-is.
  */
-export function resolveValue(template: string, context: AutomationContext, now?: Date): string {
+export function resolveValue(template: string, context: AutomationContext): string {
     return template.replace(/\{\{([^}]+)\}\}/g, (match, token: string) => {
         if (token.startsWith("now:")) {
             const fmt = token.slice(4)
-            return formatNow(fmt, now)
+            return moment().format(fmt)
         }
         if (token === "source.swimlane") {
             return context.sourceSwimlane ?? ""
@@ -59,7 +35,6 @@ export function matchRules(
     rules: AutomationRule[],
     context: AutomationContext,
     swimlaneProp: string,
-    now?: Date,
 ): FrontmatterMutation[] {
     const mutations: FrontmatterMutation[] = []
 
@@ -86,7 +61,7 @@ export function matchRules(
                 mutations.push({
                     type: action.type,
                     property: action.property,
-                    value: resolveValue(action.value, context, now),
+                    value: resolveValue(action.value, context),
                 })
             }
         }
