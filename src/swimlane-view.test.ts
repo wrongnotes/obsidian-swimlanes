@@ -540,3 +540,52 @@ describe("automations button", () => {
         expect(newBtn?.style.display).toBe("none")
     })
 })
+
+describe("undo/redo", () => {
+    it("injects undo and redo buttons into the Bases toolbar", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
+        expect(basesToolbar?.querySelector(".swimlane-undo-btn")).not.toBeNull()
+        expect(basesToolbar?.querySelector(".swimlane-redo-btn")).not.toBeNull()
+    })
+
+    it("undo button is disabled when stack is empty", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const undoBtn = container.parentElement?.querySelector(".swimlane-undo-btn")
+        expect(undoBtn?.classList.contains("swimlane-toolbar-disabled")).toBe(true)
+    })
+
+    it("redo button is disabled when stack is empty", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const redoBtn = container.parentElement?.querySelector(".swimlane-redo-btn")
+        expect(redoBtn?.classList.contains("swimlane-toolbar-disabled")).toBe(true)
+    })
+
+    it("Ctrl+Z on board does not crash when stack is empty", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const event = new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true })
+        expect(() => container.dispatchEvent(event)).not.toThrow()
+    })
+
+    it("Ctrl+Z is not intercepted when input is focused", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        // Attach to document body so focus() updates document.activeElement
+        document.body.appendChild(container.parentElement!)
+        view.onDataUpdated()
+        const input = document.createElement("input")
+        container.appendChild(input)
+        input.focus()
+        const event = new KeyboardEvent("keydown", {
+            key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+        })
+        input.dispatchEvent(event)
+        // Event should NOT have been prevented (native text undo should work)
+        expect(event.defaultPrevented).toBe(false)
+        // Clean up
+        container.parentElement?.remove()
+    })
+})
