@@ -53,7 +53,7 @@ jobs:
                     const fs = require('fs');
                     const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
                     m.version = '${ALPHA_VERSION}';
-                    fs.writeFileSync('manifest.json', JSON.stringify(m, null, '\t') + '\n');
+                    fs.writeFileSync('manifest.json', JSON.stringify(m, null, 4) + '\n');
                   "
                   echo "version=${ALPHA_VERSION}" >> $GITHUB_OUTPUT
 

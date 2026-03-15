@@ -326,33 +326,34 @@
     font-size: var(--font-ui-small);
 }
 
-.swimlane-sort-hint {
+.swimlane-toolbar {
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-1) var(--size-4-3);
-    margin: var(--size-4-2) var(--size-4-4) 0;
+    padding: var(--size-4-2) var(--size-4-4);
+}
+
+.swimlane-toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    padding: var(--size-4-1) var(--size-4-2);
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
-    background: none;
-    border: var(--border-width) solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    border: none;
     border-radius: var(--radius-s);
     cursor: pointer;
 }
 
-.swimlane-sort-hint:hover {
+.swimlane-toolbar-btn:hover {
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
 }
 
-.swimlane-sort-hint-icon {
-    display: flex;
-    flex-shrink: 0;
-}
-
-.swimlane-sort-hint-icon svg {
-    width: 14px;
-    height: 14px;
+.swimlane-toolbar-btn svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
 }
 
 .swimlane-add-card-btn {
@@ -982,4 +983,155 @@
 .swimlane-carousel-dot--add.is-active {
     border-color: var(--interactive-accent);
     background-color: transparent;
+}
+
+/* Automations button */
+/* Automations modal */
+.swimlane-automation-list {
+    grid-column: 1 / -1;
+}
+
+.swimlane-automation-rule {
+    border: var(--border-width) solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3);
+    margin-bottom: var(--size-4-3);
+}
+
+.swimlane-automation-trigger {
+    font-weight: var(--font-semibold);
+    font-size: var(--font-ui-small);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-action-summary {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    padding-left: var(--size-4-3);
+    line-height: var(--line-height-normal);
+}
+
+.swimlane-automation-code {
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+    background-color: var(--background-modifier-hover);
+    padding: 1px var(--size-2-2);
+    border-radius: var(--radius-s);
+}
+
+.swimlane-automation-value-desc {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-style: italic;
+}
+
+.swimlane-automation-card-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+}
+
+.swimlane-automation-card-buttons button {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+}
+
+.swimlane-automation-editor {
+    border: var(--border-width) solid var(--interactive-accent);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-4);
+    margin-bottom: var(--size-4-3);
+}
+
+.swimlane-automation-trigger-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-4);
+    flex-wrap: wrap;
+}
+
+.swimlane-automation-trigger-row select {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+}
+
+.swimlane-automation-actions {
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-action {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-2);
+    flex-wrap: wrap;
+}
+
+.swimlane-automation-action select {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex-shrink: 0;
+}
+
+.swimlane-automation-action input {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex: 1 1 10ch;
+    min-width: 10ch;
+}
+
+.swimlane-automation-add-action-btn {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-automation-add-btn {
+    display: block;
+    width: 100%;
+    margin-top: var(--size-4-3);
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-2) var(--size-4-3);
+}
+
+.swimlane-automation-editor-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+}
+
+.swimlane-automation-editor-buttons button {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-3);
+}
+
+.swimlane-automation-remove-action-btn {
+    font-size: var(--font-ui-smaller);
+    padding: var(--size-4-1) var(--size-4-2);
+    flex-shrink: 0;
+}
+
+.swimlane-automation-label {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.swimlane-automation-hidden {
+    display: none;
+}
+
+/* Automation suggestion dropdowns */
+.swimlane-suggest-token {
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+}
+
+.swimlane-suggest-description {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
 }

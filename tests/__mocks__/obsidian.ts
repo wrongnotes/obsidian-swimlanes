@@ -423,3 +423,34 @@ export class TFolder {
 export function normalizePath(path: string): string {
     return path.replace(/\/+/g, "/").replace(/^\/|\/$/g, "")
 }
+
+export function parseYaml(s: string) {
+    try {
+        return JSON.parse(s)
+    } catch {
+        return null
+    }
+}
+
+export function stringifyYaml(o: any) {
+    return JSON.stringify(o)
+}
+
+// Lightweight moment mock for date formatting in tests.
+// Supports the tokens used by the automations engine.
+function createMoment(d: Date = new Date()) {
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return {
+        format(fmt: string) {
+            return fmt
+                .replace("YYYY", String(d.getFullYear()))
+                .replace("YY", String(d.getFullYear()).slice(-2))
+                .replace("MM", pad(d.getMonth() + 1))
+                .replace("DD", pad(d.getDate()))
+                .replace("HH", pad(d.getHours()))
+                .replace("mm", pad(d.getMinutes()))
+                .replace("ss", pad(d.getSeconds()))
+        },
+    }
+}
+export const moment = Object.assign(createMoment, {}) as unknown as typeof import("moment").default

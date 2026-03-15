@@ -14,10 +14,10 @@ if (!targetVersion) {
 const manifest: Manifest = JSON.parse(readFileSync("manifest.json", "utf8"))
 const { minAppVersion } = manifest
 manifest.version = targetVersion
-writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"))
+writeFileSync("manifest.json", JSON.stringify(manifest, null, 4))
 
 const versions: Record<string, string> = JSON.parse(readFileSync("versions.json", "utf8"))
 if (!Object.values(versions).includes(minAppVersion)) {
     versions[targetVersion] = minAppVersion
-    writeFileSync("versions.json", JSON.stringify(versions, null, "\t"))
+    writeFileSync("versions.json", JSON.stringify(versions, null, 4))
 }

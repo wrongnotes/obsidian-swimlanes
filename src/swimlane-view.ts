@@ -15,6 +15,7 @@ import type {
     MultitextOption,
     PropertyOption,
     TextOption,
+    TFile,
     ToggleOption,
     ViewOption,
 } from "obsidian"
@@ -24,6 +25,14 @@ import { LexorankPosition, midRank } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
+import {
+    matchRules,
+    applyMutations,
+    readAutomations,
+    AutomationsModal,
+    writeAutomations,
+} from "./automations"
+import type { AutomationRule, FrontmatterMutation, PropertyInfo } from "./automations"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -103,6 +112,8 @@ export class SwimlaneView extends BasesView {
     private columnDropPlaceholder: HTMLElement | null = null
     /** File path of a card that was just dropped cross-column; triggers expand animation on rebuild. */
     private expandingCardPath: string | null = null
+    private automationRules: AutomationRule[] = []
+    private baseFile: TFile | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
         column: GroupKey | null
@@ -316,6 +327,91 @@ export class SwimlaneView extends BasesView {
         })
     }
 
+    private openAutomationsModal(): void {
+        if (!this.baseFile) {
+            return
+        }
+        const baseFile = this.baseFile
+        const modal = new AutomationsModal({
+            app: this.app,
+            rules: [...this.automationRules],
+            swimlanes: this.swimlaneOrder as string[],
+            swimlaneProp: this.swimlaneProp,
+            properties: this.getPropertyInfos(),
+            onSave: rules => {
+                this.automationRules = rules
+                this.app.vault.process(baseFile, content => writeAutomations(content, rules))
+            },
+        })
+        modal.open()
+    }
+
+    /**
+     * Inject an "Automations" button into the Bases toolbar (the header bar
+     * managed by Obsidian with Sort, Filter, Properties, etc.). We traverse
+     * up from containerEl to find `.bases-toolbar` and insert before the
+     * "New" button. Replaces any previously injected button on rebuild.
+     */
+    private injectBasesToolbarButton(): void {
+        const basesToolbar = this.boardEl.parentElement?.querySelector(".bases-toolbar")
+        if (!basesToolbar) {
+            return
+        }
+
+        // Remove any previously injected button (from a prior rebuild).
+        basesToolbar.querySelector(".swimlane-automations-btn")?.remove()
+
+        // Hide the "New" button — card creation is handled by the swimlane view.
+        const newBtn = basesToolbar.querySelector<HTMLElement>(".bases-toolbar-new-item-menu")
+        if (newBtn) {
+            newBtn.setCssStyles({ display: "none" })
+        }
+
+        // Build the button matching the native toolbar item structure:
+        // div.bases-toolbar-item > div.text-icon-button > span.text-button-icon + span.text-button-label
+        const btn = document.createElement("div")
+        btn.className = "bases-toolbar-item swimlane-automations-btn"
+        const inner = btn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
+        const iconSpan = inner.createSpan({ cls: "text-button-icon" })
+        setIcon(iconSpan, "zap")
+        const count = this.automationRules.length
+        inner.createSpan({
+            cls: "text-button-label",
+            text: count > 0 ? `Automations (${count})` : "Automations",
+        })
+        btn.addEventListener("click", () => this.openAutomationsModal())
+
+        // Insert before Sort.
+        const sortBtn = basesToolbar.querySelector(".bases-toolbar-sort-menu")
+        if (sortBtn) {
+            basesToolbar.insertBefore(btn, sortBtn)
+        } else {
+            basesToolbar.appendChild(btn)
+        }
+    }
+
+    /** Build property info list with array detection from current entries. */
+    private getPropertyInfos(): PropertyInfo[] {
+        const arrayProps = new Set<string>()
+        for (const entry of this.data.data) {
+            const cache = this.app.metadataCache.getFileCache(entry.file)
+            if (!cache?.frontmatter) {
+                continue
+            }
+            for (const [key, val] of Object.entries(cache.frontmatter)) {
+                if (Array.isArray(val)) {
+                    arrayProps.add(key)
+                }
+            }
+        }
+        return this.allProperties
+            .filter(p => p.startsWith("note."))
+            .map(p => {
+                const name = p.slice(5)
+                return { name, isArray: arrayProps.has(name) }
+            })
+    }
+
     private get swimlanePropId(): BasesPropertyId {
         return (
             this.config.getAsPropertyId(CONFIG_KEYS.swimlaneProperty) ??
@@ -396,6 +492,13 @@ export class SwimlaneView extends BasesView {
     }
 
     onDataUpdated(): void {
+        if (!this.baseFile) {
+            const f = this.app.workspace.getActiveFile()
+            if (f?.extension === "base") {
+                this.baseFile = f
+            }
+        }
+
         if (this.cardDnd.isDragging || this.swimlaneDnd.isDragging) {
             return
         }
@@ -451,6 +554,20 @@ export class SwimlaneView extends BasesView {
         this.columnDropPlaceholder = null
         this.carouselObserver?.disconnect()
         this.carouselObserver = null
+
+        if (this.baseFile) {
+            this.app.vault.read(this.baseFile).then(content => {
+                this.automationRules = readAutomations(content)
+                // Update the automations button count if the board is still mounted.
+                const btn = this.boardEl.parentElement?.querySelector(
+                    ".swimlane-automations-btn .text-button-label",
+                )
+                if (btn) {
+                    const count = this.automationRules.length
+                    btn.textContent = count > 0 ? `Automations (${count})` : "Automations"
+                }
+            })
+        }
 
         const mobile = this.isMobileLayout
         const sortedByRank = this.isSortedByRank
@@ -519,13 +636,16 @@ export class SwimlaneView extends BasesView {
 
         const rankProp = this.rankProp
 
+        // Inject the automations button into the Bases toolbar (sibling of containerEl).
+        this.injectBasesToolbarButton()
+
         if (!sortedByRank) {
-            const hint = this.boardEl.createEl("button", { cls: "swimlane-sort-hint" })
-            setIcon(hint.createSpan({ cls: "swimlane-sort-hint-icon" }), "arrow-up-down")
+            const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar" })
+            this.boardEl.insertBefore(toolbar, board)
+            const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+            setIcon(hint.createSpan(), "arrow-up-down")
             hint.createSpan({ text: "Sort by rank to enable re-ordering" })
             hint.addEventListener("click", () => this.setSortByRank())
-            // Move hint before the board so it sits above the columns.
-            this.boardEl.insertBefore(hint, board)
         }
 
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
@@ -715,6 +835,8 @@ export class SwimlaneView extends BasesView {
         await this.app.fileManager.processFrontMatter(file, fm => {
             fm[swimlaneProp] = groupKey
             fm[rankProp] = newRank
+            const mutations = this.getAutomationMutations(null, groupKey as string, "created_in")
+            applyMutations(fm, mutations)
         })
     }
 
@@ -812,7 +934,22 @@ export class SwimlaneView extends BasesView {
                     this.hideColumn(groupKey)
                     return
                 }
-                await executeRmSwimlane(this.app, files, this.swimlaneProp, op)
+                await executeRmSwimlane(this.app, files, this.swimlaneProp, op, (_file, fm) => {
+                    let mutations: FrontmatterMutation[] = []
+                    if (op.kind === "move") {
+                        mutations = [
+                            ...this.getAutomationMutations(groupKey as string, null, "leaves"),
+                            ...this.getAutomationMutations(
+                                groupKey as string,
+                                op.targetValue,
+                                "enters",
+                            ),
+                        ]
+                    } else if (op.kind === "clear") {
+                        mutations = this.getAutomationMutations(groupKey as string, null, "leaves")
+                    }
+                    applyMutations(fm, mutations)
+                })
                 const order = this.swimlaneOrder.filter(k => k !== groupKey)
                 this.config.set(CONFIG_KEYS.swimlaneOrder, order)
             },
@@ -1457,6 +1594,18 @@ export class SwimlaneView extends BasesView {
         }
     }
 
+    private getAutomationMutations(
+        sourceSwimlane: string | null,
+        targetSwimlane: string | null,
+        type: "enters" | "leaves" | "created_in",
+    ): FrontmatterMutation[] {
+        return matchRules(
+            this.automationRules,
+            { type, sourceSwimlane, targetSwimlane },
+            this.swimlaneProp,
+        )
+    }
+
     private handleCardDrop(
         dragState: CardDragState,
         context: CardDropContext,
@@ -1522,6 +1671,15 @@ export class SwimlaneView extends BasesView {
             fm[this.rankProp] = newRank
             if (isCrossColumn) {
                 fm[this.swimlaneProp] = context.groupKey
+                const mutations = [
+                    ...this.getAutomationMutations(dragState.groupKey as string, null, "leaves"),
+                    ...this.getAutomationMutations(
+                        dragState.groupKey as string,
+                        context.groupKey as string,
+                        "enters",
+                    ),
+                ]
+                applyMutations(fm, mutations)
             }
         })
     }
@@ -1577,6 +1735,19 @@ export class SwimlaneView extends BasesView {
                 fm[this.rankProp] = rank
                 if (path === dragState.path && context.groupKey !== dragState.groupKey) {
                     fm[this.swimlaneProp] = context.groupKey
+                    const mutations = [
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            null,
+                            "leaves",
+                        ),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            context.groupKey as string,
+                            "enters",
+                        ),
+                    ]
+                    applyMutations(fm, mutations)
                 }
             })
         }
@@ -1607,6 +1778,19 @@ export class SwimlaneView extends BasesView {
                 this.app.fileManager.processFrontMatter(file, fm => {
                     fm[this.swimlaneProp] = columnName
                     fm[this.rankProp] = midRank(null, null)
+                    const mutations = [
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            null,
+                            "leaves",
+                        ),
+                        ...this.getAutomationMutations(
+                            dragState.groupKey as string,
+                            columnName,
+                            "enters",
+                        ),
+                    ]
+                    applyMutations(fm, mutations)
                 })
             },
         })

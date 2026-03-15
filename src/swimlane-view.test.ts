@@ -16,7 +16,14 @@ function makeGroup(key: string | null, entries: ReturnType<typeof makeEntry>[]) 
 }
 
 function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Record<string, any>) {
-    const container = document.createElement("div")
+    // Simulate the Bases DOM: a parent div.bases-view containing
+    // the bases-toolbar (sibling) and our container.
+    const basesView = document.createElement("div")
+    basesView.className = "bases-view"
+    const basesToolbar = basesView.createDiv("bases-toolbar")
+    basesToolbar.createDiv("bases-toolbar-item bases-toolbar-sort-menu")
+    basesToolbar.createDiv("bases-toolbar-item bases-toolbar-new-item-menu")
+    const container = basesView.createDiv()
     const view = new SwimlaneView({} as any, container, {} as any)
     view.data = { groupedData: groups, data: groups.flatMap(g => g.entries), properties: [] } as any
     view.app = {
@@ -28,8 +35,10 @@ function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Reco
                 path,
                 basename: path.replace(/\.md$/, ""),
             })),
+            read: jest.fn(async () => "{}"),
+            process: jest.fn(async () => "{}"),
         },
-        workspace: { openLinkText: jest.fn() },
+        workspace: { openLinkText: jest.fn(), getActiveFile: () => null },
         fileManager: {
             processFrontMatter: jest.fn(async () => {}),
             getNewFileParent: () => ({ path: "/", isRoot: () => true }),
@@ -498,5 +507,36 @@ describe("data-group-key attribute", () => {
         const keys = Array.from(cols).map(c => c.getAttribute("data-group-key"))
         expect(keys).toContain("Backlog")
         expect(keys).toContain("Done")
+    })
+})
+
+describe("automations button", () => {
+    it("injects automations button into the Bases toolbar", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
+        const btn = basesToolbar?.querySelector(".swimlane-automations-btn")
+        expect(btn).not.toBeNull()
+        expect(btn?.textContent).toContain("Automations")
+    })
+
+    it("inserts automations button before Sort", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
+        const items = Array.from(basesToolbar?.children ?? [])
+        const autoIdx = items.findIndex(el => el.classList.contains("swimlane-automations-btn"))
+        const sortIdx = items.findIndex(el => el.classList.contains("bases-toolbar-sort-menu"))
+        expect(autoIdx).toBeGreaterThan(-1)
+        expect(sortIdx).toBeGreaterThan(autoIdx)
+    })
+
+    it("hides the New button", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const newBtn = container.parentElement?.querySelector<HTMLElement>(
+            ".bases-toolbar-new-item-menu",
+        )
+        expect(newBtn?.style.display).toBe("none")
     })
 })
