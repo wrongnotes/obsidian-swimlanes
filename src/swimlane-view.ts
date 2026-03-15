@@ -124,6 +124,7 @@ export class SwimlaneView extends BasesView {
         boardScrollLeft: number
     } | null = null
     private undoManager = new UndoManager()
+    private keydownHandler: ((e: KeyboardEvent) => void) | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -221,23 +222,28 @@ export class SwimlaneView extends BasesView {
             dropAnimationMs: 80,
         })
 
-        // Make the board focusable so it can receive keyboard events.
-        containerEl.setAttribute("tabindex", "0")
-        containerEl.addEventListener("keydown", (e: KeyboardEvent) => {
-            // Don't intercept when typing in an input
+        // Listen for undo/redo keyboard shortcuts. We use a document-level
+        // listener scoped to when our board is connected, so the user doesn't
+        // need to click the board first. We check that focus isn't in an input.
+        this.keydownHandler = (e: KeyboardEvent) => {
+            if (!this.boardEl.isConnected) {
+                return
+            }
             const tag = (document.activeElement as HTMLElement)?.tagName
             if (tag === "INPUT" || tag === "TEXTAREA") {
                 return
             }
             const mod = Platform.isMacOS ? e.metaKey : e.ctrlKey
-            if (mod && e.key === "z" && !e.shiftKey) {
+            const key = e.key.toLowerCase()
+            if (mod && key === "z" && !e.shiftKey) {
                 e.preventDefault()
                 this.performUndo()
-            } else if (mod && e.key === "z" && e.shiftKey) {
+            } else if (mod && ((key === "z" && e.shiftKey) || key === "y")) {
                 e.preventDefault()
                 this.performRedo()
             }
-        })
+        }
+        document.addEventListener("keydown", this.keydownHandler)
     }
 
     static getViewOptions(): ViewOption[] {
@@ -404,10 +410,13 @@ export class SwimlaneView extends BasesView {
         // div.bases-toolbar-item > div.text-icon-button > span.text-button-icon + span.text-button-label
         const btn = document.createElement("div")
         btn.className = "bases-toolbar-item swimlane-automations-btn"
-        const inner = btn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
+        const count = this.automationRules.length
+        const inner = btn.createDiv({
+            cls: `text-icon-button${count > 0 ? " is-active" : ""}`,
+            attr: { tabindex: "0" },
+        })
         const iconSpan = inner.createSpan({ cls: "text-button-icon" })
         setIcon(iconSpan, "zap")
-        const count = this.automationRules.length
         inner.createSpan({
             cls: "text-button-label",
             text: count > 0 ? `Automations (${count})` : "Automations",
@@ -422,42 +431,9 @@ export class SwimlaneView extends BasesView {
             basesToolbar.appendChild(btn)
         }
 
-        // Remove previously injected undo/redo buttons
+        // Clean up any previously injected undo/redo buttons (from old versions).
         basesToolbar.querySelector(".swimlane-undo-btn")?.remove()
         basesToolbar.querySelector(".swimlane-redo-btn")?.remove()
-
-        // Undo button (icon only, no text label)
-        const undoBtn = document.createElement("div")
-        undoBtn.className = "bases-toolbar-item swimlane-undo-btn"
-        const undoInner = undoBtn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
-        const undoIcon = undoInner.createSpan({ cls: "text-button-icon" })
-        setIcon(undoIcon, "undo")
-        undoBtn.addEventListener("click", () => this.performUndo())
-        undoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canUndo)
-        if (this.undoManager.undoLabel) {
-            undoBtn.setAttribute("aria-label", `Undo: ${this.undoManager.undoLabel}`)
-        }
-
-        // Redo button (icon only, no text label)
-        const redoBtn = document.createElement("div")
-        redoBtn.className = "bases-toolbar-item swimlane-redo-btn"
-        const redoInner = redoBtn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
-        const redoIcon = redoInner.createSpan({ cls: "text-button-icon" })
-        setIcon(redoIcon, "redo")
-        redoBtn.addEventListener("click", () => this.performRedo())
-        redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
-        if (this.undoManager.redoLabel) {
-            redoBtn.setAttribute("aria-label", `Redo: ${this.undoManager.redoLabel}`)
-        }
-
-        // Insert before the hidden New button (after Automations).
-        if (newBtn) {
-            basesToolbar.insertBefore(undoBtn, newBtn)
-            basesToolbar.insertBefore(redoBtn, newBtn)
-        } else {
-            basesToolbar.appendChild(undoBtn)
-            basesToolbar.appendChild(redoBtn)
-        }
     }
 
     /** Build property info list with array detection from current entries. */
@@ -560,6 +536,10 @@ export class SwimlaneView extends BasesView {
         this.cardDnd.destroy()
         this.swimlaneDnd.destroy()
         this.undoManager.clear()
+        if (this.keydownHandler) {
+            document.removeEventListener("keydown", this.keydownHandler)
+            this.keydownHandler = null
+        }
     }
 
     private performUndo(): void {
@@ -746,6 +726,25 @@ export class SwimlaneView extends BasesView {
             hint.createSpan({ text: "Sort by rank to enable re-ordering" })
             hint.addEventListener("click", () => this.setSortByRank())
         }
+
+        // Floating undo/redo controls
+        const undoRedoFloat = this.boardEl.createDiv({ cls: "swimlane-undo-float" })
+
+        const undoBtn = undoRedoFloat.createEl("button", {
+            cls: "swimlane-undo-float-btn swimlane-undo-btn",
+            attr: { "aria-label": this.undoManager.undoLabel ? `Undo: ${this.undoManager.undoLabel}` : "Undo" },
+        })
+        setIcon(undoBtn, "undo")
+        undoBtn.addEventListener("click", () => this.performUndo())
+        undoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canUndo)
+
+        const redoBtn = undoRedoFloat.createEl("button", {
+            cls: "swimlane-undo-float-btn swimlane-redo-btn",
+            attr: { "aria-label": this.undoManager.redoLabel ? `Redo: ${this.undoManager.redoLabel}` : "Redo" },
+        })
+        setIcon(redoBtn, "redo")
+        redoBtn.addEventListener("click", () => this.performRedo())
+        redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
 
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,

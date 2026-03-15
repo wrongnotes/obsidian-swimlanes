@@ -542,25 +542,26 @@ describe("automations button", () => {
 })
 
 describe("undo/redo", () => {
-    it("injects undo and redo buttons into the Bases toolbar", () => {
+    it("renders floating undo and redo buttons", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         view.onDataUpdated()
-        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
-        expect(basesToolbar?.querySelector(".swimlane-undo-btn")).not.toBeNull()
-        expect(basesToolbar?.querySelector(".swimlane-redo-btn")).not.toBeNull()
+        const float = container.querySelector(".swimlane-undo-float")
+        expect(float).not.toBeNull()
+        expect(float?.querySelector(".swimlane-undo-btn")).not.toBeNull()
+        expect(float?.querySelector(".swimlane-redo-btn")).not.toBeNull()
     })
 
     it("undo button is disabled when stack is empty", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         view.onDataUpdated()
-        const undoBtn = container.parentElement?.querySelector(".swimlane-undo-btn")
+        const undoBtn = container.querySelector(".swimlane-undo-btn")
         expect(undoBtn?.classList.contains("swimlane-toolbar-disabled")).toBe(true)
     })
 
     it("redo button is disabled when stack is empty", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         view.onDataUpdated()
-        const redoBtn = container.parentElement?.querySelector(".swimlane-redo-btn")
+        const redoBtn = container.querySelector(".swimlane-redo-btn")
         expect(redoBtn?.classList.contains("swimlane-toolbar-disabled")).toBe(true)
     })
 
