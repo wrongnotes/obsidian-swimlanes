@@ -33,6 +33,8 @@ import {
     writeAutomations,
 } from "./automations"
 import type { AutomationRule, FrontmatterMutation, PropertyInfo } from "./automations"
+import { UndoManager, applyUndo, applyRedo } from "./undo"
+import type { UndoRedoContext } from "./undo"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -121,6 +123,7 @@ export class SwimlaneView extends BasesView {
         boardScrollTop: number
         boardScrollLeft: number
     } | null = null
+    private undoManager = new UndoManager()
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -216,6 +219,24 @@ export class SwimlaneView extends BasesView {
                 }
             },
             dropAnimationMs: 80,
+        })
+
+        // Make the board focusable so it can receive keyboard events.
+        containerEl.setAttribute("tabindex", "0")
+        containerEl.addEventListener("keydown", (e: KeyboardEvent) => {
+            // Don't intercept when typing in an input
+            const tag = (document.activeElement as HTMLElement)?.tagName
+            if (tag === "INPUT" || tag === "TEXTAREA") {
+                return
+            }
+            const mod = Platform.isMacOS ? e.metaKey : e.ctrlKey
+            if (mod && e.key === "z" && !e.shiftKey) {
+                e.preventDefault()
+                this.performUndo()
+            } else if (mod && e.key === "z" && e.shiftKey) {
+                e.preventDefault()
+                this.performRedo()
+            }
         })
     }
 
@@ -388,6 +409,43 @@ export class SwimlaneView extends BasesView {
         } else {
             basesToolbar.appendChild(btn)
         }
+
+        // Remove previously injected undo/redo buttons
+        basesToolbar.querySelector(".swimlane-undo-btn")?.remove()
+        basesToolbar.querySelector(".swimlane-redo-btn")?.remove()
+
+        // Undo button (icon only, no text label)
+        const undoBtn = document.createElement("div")
+        undoBtn.className = "bases-toolbar-item swimlane-undo-btn"
+        const undoInner = undoBtn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
+        const undoIcon = undoInner.createSpan({ cls: "text-button-icon" })
+        setIcon(undoIcon, "undo")
+        undoBtn.addEventListener("click", () => this.performUndo())
+        undoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canUndo)
+        if (this.undoManager.undoLabel) {
+            undoBtn.setAttribute("aria-label", `Undo: ${this.undoManager.undoLabel}`)
+        }
+
+        // Redo button (icon only, no text label)
+        const redoBtn = document.createElement("div")
+        redoBtn.className = "bases-toolbar-item swimlane-redo-btn"
+        const redoInner = redoBtn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
+        const redoIcon = redoInner.createSpan({ cls: "text-button-icon" })
+        setIcon(redoIcon, "redo")
+        redoBtn.addEventListener("click", () => this.performRedo())
+        redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
+        if (this.undoManager.redoLabel) {
+            redoBtn.setAttribute("aria-label", `Redo: ${this.undoManager.redoLabel}`)
+        }
+
+        // Insert before the hidden New button (after Automations).
+        if (newBtn) {
+            basesToolbar.insertBefore(undoBtn, newBtn)
+            basesToolbar.insertBefore(redoBtn, newBtn)
+        } else {
+            basesToolbar.appendChild(undoBtn)
+            basesToolbar.appendChild(redoBtn)
+        }
     }
 
     /** Build property info list with array detection from current entries. */
@@ -489,6 +547,35 @@ export class SwimlaneView extends BasesView {
         this.cancelMobileSwipeDwell()
         this.cardDnd.destroy()
         this.swimlaneDnd.destroy()
+        this.undoManager.clear()
+    }
+
+    private performUndo(): void {
+        const tx = this.undoManager.undo()
+        if (!tx) {
+            return
+        }
+        applyUndo(tx, this.getUndoRedoContext())
+        new Notice(`Undo: ${tx.label}`, 2000)
+    }
+
+    private performRedo(): void {
+        const tx = this.undoManager.redo()
+        if (!tx) {
+            return
+        }
+        applyRedo(tx, this.getUndoRedoContext())
+        new Notice(`Redo: ${tx.label}`, 2000)
+    }
+
+    private getUndoRedoContext(): UndoRedoContext {
+        return {
+            app: this.app,
+            config: this.config,
+            swimlaneProp: this.swimlaneProp,
+            rankProp: this.rankProp,
+            baseFile: this.baseFile,
+        }
     }
 
     onDataUpdated(): void {

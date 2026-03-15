@@ -77,7 +77,7 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
                 new Notice("Cannot undo: file no longer exists.")
                 return
             }
-            await app.vault.trash(file, true)
+            await app.fileManager.trashFile(file)
             break
         }
 
@@ -99,7 +99,7 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             ctx.config.set("swimlaneOrder", op.previousOrder)
             for (const cardState of op.cardStates) {
                 const file = app.vault.getFileByPath(cardState.file.path)
-                if (!file) continue
+                if (!file) { continue }
                 await app.fileManager.processFrontMatter(file, fm => {
                     if (cardState.previousValue === undefined) {
                         delete fm[swimlaneProp]
@@ -212,7 +212,7 @@ async function redoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             const rmOp = op.op
             for (const cardState of op.cardStates) {
                 const file = app.vault.getFileByPath(cardState.file.path)
-                if (!file) continue
+                if (!file) { continue }
                 if (rmOp.kind === "move") {
                     const targetValue = rmOp.targetValue
                     await app.fileManager.processFrontMatter(file, fm => {
@@ -278,7 +278,7 @@ async function writeSort(
     sort: { property: string; direction: string }[],
 ): Promise<void> {
     const { app, baseFile, config } = ctx
-    if (!baseFile) return
+    if (!baseFile) { return }
     await app.vault.process(baseFile, content => {
         const parsed = parseYaml(content) ?? {}
         const views: unknown[] = Array.isArray(parsed.views) ? parsed.views : []

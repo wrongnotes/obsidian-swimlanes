@@ -21,6 +21,7 @@ function makeMockApp() {
                     return fm
                 },
             ),
+            trashFile: jest.fn(),
         },
     } as any
 }
@@ -130,7 +131,7 @@ describe("applyUndo", () => {
 
         await applyUndo(transaction, ctx)
 
-        expect(app.vault.trash).toHaveBeenCalledWith(expect.objectContaining({ path: mockFile.path }), true)
+        expect(app.fileManager.trashFile).toHaveBeenCalledWith(expect.objectContaining({ path: mockFile.path }))
     })
 
     test("ReorderSwimlane: config.set called with previousOrder", async () => {
