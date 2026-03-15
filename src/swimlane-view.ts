@@ -732,7 +732,11 @@ export class SwimlaneView extends BasesView {
 
         const undoBtn = undoRedoFloat.createEl("button", {
             cls: "swimlane-undo-float-btn swimlane-undo-btn",
-            attr: { "aria-label": this.undoManager.undoLabel ? `Undo: ${this.undoManager.undoLabel}` : "Undo" },
+            attr: {
+                "aria-label": this.undoManager.undoLabel
+                    ? `Undo: ${this.undoManager.undoLabel}`
+                    : "Undo",
+            },
         })
         setIcon(undoBtn, "undo")
         undoBtn.addEventListener("click", () => this.performUndo())
@@ -740,7 +744,11 @@ export class SwimlaneView extends BasesView {
 
         const redoBtn = undoRedoFloat.createEl("button", {
             cls: "swimlane-undo-float-btn swimlane-redo-btn",
-            attr: { "aria-label": this.undoManager.redoLabel ? `Redo: ${this.undoManager.redoLabel}` : "Redo" },
+            attr: {
+                "aria-label": this.undoManager.redoLabel
+                    ? `Redo: ${this.undoManager.redoLabel}`
+                    : "Redo",
+            },
         })
         setIcon(redoBtn, "redo")
         redoBtn.addEventListener("click", () => this.performRedo())
