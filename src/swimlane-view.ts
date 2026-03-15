@@ -330,7 +330,9 @@ export class SwimlaneView extends BasesView {
         if (!file || file.extension !== "base") {
             return
         }
-        const previousSort = this.config.getSort().map(s => ({ property: String(s.property), direction: String(s.direction) }))
+        const previousSort = this.config
+            .getSort()
+            .map(s => ({ property: String(s.property), direction: String(s.direction) }))
         const newSort = [{ property: String(this.rankPropId), direction: "ASC" }]
         const ownTransaction = !this.undoManager.hasActiveTransaction
         if (ownTransaction) {
@@ -929,27 +931,27 @@ export class SwimlaneView extends BasesView {
             path = `${prefix}${title} ${++n}.md`
         }
         const file = await this.app.vault.create(path, "")
+        const mutations = this.getAutomationMutations(null, groupKey as string, "created_in")
+        // No previous values to capture for a brand-new file.
+        const prevValues: Record<string, unknown> = {}
+
         this.undoManager.beginTransaction("Create card")
+        this.undoManager.pushOperation({
+            type: "CreateCard",
+            file,
+            path,
+            swimlane: groupKey as string,
+            rank: newRank,
+            resolvedAutomationMutations: mutations,
+            automationPreviousValues: prevValues,
+        })
+        this.undoManager.endTransaction()
+
         await this.app.fileManager.processFrontMatter(file, fm => {
-            const mutations = this.getAutomationMutations(null, groupKey as string, "created_in")
-            const prevValues: Record<string, unknown> = {}
-            for (const m of mutations) {
-                prevValues[m.property] = fm[m.property]
-            }
             fm[swimlaneProp] = groupKey
             fm[rankProp] = newRank
             applyMutations(fm, mutations)
-            this.undoManager.pushOperation({
-                type: "CreateCard",
-                file,
-                path,
-                swimlane: groupKey as string,
-                rank: newRank,
-                resolvedAutomationMutations: mutations,
-                automationPreviousValues: prevValues,
-            })
         })
-        this.undoManager.endTransaction()
     }
 
     private renderAddColumnButton(board: HTMLElement): void {
@@ -1072,12 +1074,18 @@ export class SwimlaneView extends BasesView {
                 // Capture card states before mutation
                 const cardPreviousValues = new Map<string, string | undefined>()
                 for (const f of files) {
-                    cardPreviousValues.set(f.path, getFrontmatter<string>(this.app, f, this.swimlaneProp))
+                    cardPreviousValues.set(
+                        f.path,
+                        getFrontmatter<string>(this.app, f, this.swimlaneProp),
+                    )
                 }
-                const cardAutomationState = new Map<string, {
-                    resolved: FrontmatterMutation[]
-                    prev: Record<string, unknown>
-                }>()
+                const cardAutomationState = new Map<
+                    string,
+                    {
+                        resolved: FrontmatterMutation[]
+                        prev: Record<string, unknown>
+                    }
+                >()
                 await executeRmSwimlane(this.app, files, this.swimlaneProp, op, (file, fm) => {
                     let mutations: FrontmatterMutation[] = []
                     if (op.kind === "move") {
@@ -1109,7 +1117,8 @@ export class SwimlaneView extends BasesView {
                     cardStates: files.map(f => ({
                         file: f,
                         previousValue: cardPreviousValues.get(f.path),
-                        resolvedAutomationMutations: cardAutomationState.get(f.path)?.resolved ?? [],
+                        resolvedAutomationMutations:
+                            cardAutomationState.get(f.path)?.resolved ?? [],
                         automationPreviousValues: cardAutomationState.get(f.path)?.prev ?? {},
                     })),
                 })
@@ -1840,44 +1849,54 @@ export class SwimlaneView extends BasesView {
         const newRank = midRank(position.beforeRank, position.afterRank)
         const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
         const label = isCrossColumn ? "Move card" : "Reorder card"
+
+        // Compute automation mutations and capture previous values BEFORE
+        // processFrontMatter — the callback is async and runs after endTransaction.
+        const fromSwimlane = dragState.groupKey as string
+        const toSwimlane = context.groupKey as string
+        let mutations: FrontmatterMutation[] = []
+        let prevValues: Record<string, unknown> = {}
+        if (isCrossColumn) {
+            mutations = [
+                ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
+            ]
+            const cache = this.app.metadataCache.getFileCache(file)
+            const fm = cache?.frontmatter ?? {}
+            for (const m of mutations) {
+                prevValues[m.property] = fm[m.property]
+            }
+        }
+
         this.undoManager.beginTransaction(label)
+        if (isCrossColumn) {
+            this.undoManager.pushOperation({
+                type: "MoveCard",
+                file,
+                fromSwimlane,
+                toSwimlane,
+                fromRank,
+                toRank: newRank,
+                resolvedAutomationMutations: mutations,
+                automationPreviousValues: prevValues,
+            })
+        } else {
+            this.undoManager.pushOperation({
+                type: "ReorderCard",
+                file,
+                fromRank,
+                toRank: newRank,
+            })
+        }
+        this.undoManager.endTransaction()
 
         this.app.fileManager.processFrontMatter(file, fm => {
             fm[this.rankProp] = newRank
             if (isCrossColumn) {
-                const fromSwimlane = dragState.groupKey as string
-                const toSwimlane = context.groupKey as string
-                const mutations = [
-                    ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
-                    ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
-                ]
-                const prevValues: Record<string, unknown> = {}
-                for (const m of mutations) {
-                    prevValues[m.property] = fm[m.property]
-                }
                 fm[this.swimlaneProp] = toSwimlane
                 applyMutations(fm, mutations)
-                this.undoManager.pushOperation({
-                    type: "MoveCard",
-                    file,
-                    fromSwimlane,
-                    toSwimlane,
-                    fromRank,
-                    toRank: newRank,
-                    resolvedAutomationMutations: mutations,
-                    automationPreviousValues: prevValues,
-                })
-            } else {
-                this.undoManager.pushOperation({
-                    type: "ReorderCard",
-                    file,
-                    fromRank,
-                    toRank: newRank,
-                })
             }
         })
-
-        this.undoManager.endTransaction()
     }
 
     /** Returns true if any card in the column is missing a rank value. */
@@ -1913,7 +1932,30 @@ export class SwimlaneView extends BasesView {
         const base = "a".charCodeAt(0)
         const isCrossColumn = context.groupKey !== dragState.groupKey
 
+        // Build all operations BEFORE processFrontMatter calls — the callbacks
+        // are async and run after endTransaction.
+        const fromSwimlane = dragState.groupKey as string
+        const toSwimlane = context.groupKey as string
+
         this.undoManager.beginTransaction(isCrossColumn ? "Move card" : "Reorder cards")
+
+        // Pre-compute mutations for the dragged card if cross-column.
+        let draggedMutations: FrontmatterMutation[] = []
+        let draggedPrevValues: Record<string, unknown> = {}
+        if (isCrossColumn) {
+            draggedMutations = [
+                ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
+            ]
+            const draggedFile = this.app.vault.getFileByPath(dragState.path)
+            if (draggedFile) {
+                const cache = this.app.metadataCache.getFileCache(draggedFile)
+                const cachedFm = cache?.frontmatter ?? {}
+                for (const m of draggedMutations) {
+                    draggedPrevValues[m.property] = cachedFm[m.property]
+                }
+            }
+        }
 
         for (let i = 0; i < paths.length; i++) {
             const path = paths[i]!
@@ -1925,38 +1967,31 @@ export class SwimlaneView extends BasesView {
             const rank = String.fromCharCode(Math.min(charCode, "z".charCodeAt(0)))
             const fromRank = getFrontmatter<string>(this.app, cardFile, this.rankProp) ?? ""
 
+            if (path === dragState.path && isCrossColumn) {
+                this.undoManager.pushOperation({
+                    type: "MoveCard",
+                    file: cardFile,
+                    fromSwimlane,
+                    toSwimlane,
+                    fromRank,
+                    toRank: rank,
+                    resolvedAutomationMutations: draggedMutations,
+                    automationPreviousValues: draggedPrevValues,
+                })
+            } else {
+                this.undoManager.pushOperation({
+                    type: "ReorderCard",
+                    file: cardFile,
+                    fromRank,
+                    toRank: rank,
+                })
+            }
+
             this.app.fileManager.processFrontMatter(cardFile, fm => {
                 fm[this.rankProp] = rank
                 if (path === dragState.path && isCrossColumn) {
-                    const fromSwimlane = dragState.groupKey as string
-                    const toSwimlane = context.groupKey as string
-                    const mutations = [
-                        ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
-                        ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
-                    ]
-                    const prevValues: Record<string, unknown> = {}
-                    for (const m of mutations) {
-                        prevValues[m.property] = fm[m.property]
-                    }
                     fm[this.swimlaneProp] = toSwimlane
-                    applyMutations(fm, mutations)
-                    this.undoManager.pushOperation({
-                        type: "MoveCard",
-                        file: cardFile,
-                        fromSwimlane,
-                        toSwimlane,
-                        fromRank,
-                        toRank: rank,
-                        resolvedAutomationMutations: mutations,
-                        automationPreviousValues: prevValues,
-                    })
-                } else {
-                    this.undoManager.pushOperation({
-                        type: "ReorderCard",
-                        file: cardFile,
-                        fromRank,
-                        toRank: rank,
-                    })
+                    applyMutations(fm, draggedMutations)
                 }
             })
         }
@@ -1983,38 +2018,42 @@ export class SwimlaneView extends BasesView {
             onConfirm: columnName => {
                 const key = columnName as GroupKey
                 const order = this.swimlaneOrder
+                const fromSwimlane = dragState.groupKey as string
+                const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
+                const toRank = midRank(null, null)
+                const mutations = [
+                    ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                    ...this.getAutomationMutations(fromSwimlane, columnName, "enters"),
+                ]
+                const cache = this.app.metadataCache.getFileCache(file)
+                const cachedFm = cache?.frontmatter ?? {}
+                const prevValues: Record<string, unknown> = {}
+                for (const m of mutations) {
+                    prevValues[m.property] = cachedFm[m.property]
+                }
+
                 this.undoManager.beginTransaction("Move card")
                 if (!order.includes(key)) {
                     this.undoManager.pushOperation({ type: "AddSwimlane", swimlane: key as string })
                     this.config.set(CONFIG_KEYS.swimlaneOrder, [...order, key])
                 }
-                const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
-                const toRank = midRank(null, null)
+                this.undoManager.pushOperation({
+                    type: "MoveCard",
+                    file,
+                    fromSwimlane,
+                    toSwimlane: columnName,
+                    fromRank,
+                    toRank,
+                    resolvedAutomationMutations: mutations,
+                    automationPreviousValues: prevValues,
+                })
+                this.undoManager.endTransaction()
+
                 this.app.fileManager.processFrontMatter(file, fm => {
-                    const fromSwimlane = dragState.groupKey as string
-                    const mutations = [
-                        ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
-                        ...this.getAutomationMutations(fromSwimlane, columnName, "enters"),
-                    ]
-                    const prevValues: Record<string, unknown> = {}
-                    for (const m of mutations) {
-                        prevValues[m.property] = fm[m.property]
-                    }
                     fm[this.swimlaneProp] = columnName
                     fm[this.rankProp] = toRank
                     applyMutations(fm, mutations)
-                    this.undoManager.pushOperation({
-                        type: "MoveCard",
-                        file,
-                        fromSwimlane,
-                        toSwimlane: columnName,
-                        fromRank,
-                        toRank,
-                        resolvedAutomationMutations: mutations,
-                        automationPreviousValues: prevValues,
-                    })
                 })
-                this.undoManager.endTransaction()
             },
         })
 

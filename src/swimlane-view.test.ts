@@ -580,7 +580,10 @@ describe("undo/redo", () => {
         container.appendChild(input)
         input.focus()
         const event = new KeyboardEvent("keydown", {
-            key: "z", ctrlKey: true, bubbles: true, cancelable: true,
+            key: "z",
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
         })
         input.dispatchEvent(event)
         // Event should NOT have been prevented (native text undo should work)

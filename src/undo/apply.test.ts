@@ -131,7 +131,9 @@ describe("applyUndo", () => {
 
         await applyUndo(transaction, ctx)
 
-        expect(app.fileManager.trashFile).toHaveBeenCalledWith(expect.objectContaining({ path: mockFile.path }))
+        expect(app.fileManager.trashFile).toHaveBeenCalledWith(
+            expect.objectContaining({ path: mockFile.path }),
+        )
     })
 
     test("ReorderSwimlane: config.set called with previousOrder", async () => {
@@ -283,7 +285,9 @@ describe("applyUndo", () => {
         const app = makeMockApp()
         // Provide a base file content with a matching view
         app.vault.process = jest.fn(async (_file: any, fn: (s: string) => string) => {
-            const input = JSON.stringify({ views: [{ name: "Swimlane", type: "swimlane", sort: [] }] })
+            const input = JSON.stringify({
+                views: [{ name: "Swimlane", type: "swimlane", sort: [] }],
+            })
             return fn(input)
         })
         const ctx = makeCtx(app)
@@ -315,11 +319,9 @@ describe("applyUndo", () => {
         const order: string[] = []
 
         // Override processFrontMatter to track call order
-        app.fileManager.processFrontMatter = jest.fn(
-            async (file: any, _fn: any) => {
-                order.push(file.path)
-            },
-        )
+        app.fileManager.processFrontMatter = jest.fn(async (file: any, _fn: any) => {
+            order.push(file.path)
+        })
 
         const file1 = { path: "notes/card1.md" } as any
         const file2 = { path: "notes/card2.md" } as any
@@ -391,7 +393,9 @@ describe("applyRedo", () => {
                     toSwimlane: "Done",
                     fromRank: "aaa",
                     toRank: "bbb",
-                    resolvedAutomationMutations: [{ type: "set", property: "completedAt", value: "2024-01-01" }],
+                    resolvedAutomationMutations: [
+                        { type: "set", property: "completedAt", value: "2024-01-01" },
+                    ],
                     automationPreviousValues: {},
                 },
             ],
@@ -502,7 +506,9 @@ describe("applyRedo", () => {
                         {
                             file: cardFile,
                             previousValue: "Archive",
-                            resolvedAutomationMutations: [{ type: "set", property: "movedAt", value: "2024-01-01" }],
+                            resolvedAutomationMutations: [
+                                { type: "set", property: "movedAt", value: "2024-01-01" },
+                            ],
                             automationPreviousValues: {},
                         },
                     ],
@@ -586,9 +592,10 @@ describe("applyRedo", () => {
     test("CreateCard redo with occupied path uses deduplication", async () => {
         const app = makeMockApp()
         // First call: occupied; second call: free
-        app.vault.getAbstractFileByPath = jest.fn()
+        app.vault.getAbstractFileByPath = jest
+            .fn()
             .mockReturnValueOnce({ path: "notes/new-card.md" }) // original path occupied
-            .mockReturnValueOnce(null)                           // "notes/new-card 1.md" is free
+            .mockReturnValueOnce(null) // "notes/new-card 1.md" is free
         const ctx = makeCtx(app)
 
         const transaction: UndoTransaction = {

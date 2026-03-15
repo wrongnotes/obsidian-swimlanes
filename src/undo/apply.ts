@@ -25,10 +25,7 @@ function getSwimlaneOrder(ctx: UndoRedoContext): string[] {
 
 // ─── applyUndo ───────────────────────────────────────────────────────────────
 
-export async function applyUndo(
-    transaction: UndoTransaction,
-    ctx: UndoRedoContext,
-): Promise<void> {
+export async function applyUndo(transaction: UndoTransaction, ctx: UndoRedoContext): Promise<void> {
     const ops = [...transaction.operations].reverse()
     for (const op of ops) {
         await undoOne(op, ctx)
@@ -99,16 +96,16 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             ctx.config.set("swimlaneOrder", op.previousOrder)
             for (const cardState of op.cardStates) {
                 const file = app.vault.getFileByPath(cardState.file.path)
-                if (!file) { continue }
+                if (!file) {
+                    continue
+                }
                 await app.fileManager.processFrontMatter(file, fm => {
                     if (cardState.previousValue === undefined) {
                         delete fm[swimlaneProp]
                     } else {
                         fm[swimlaneProp] = cardState.previousValue
                     }
-                    for (const [key, value] of Object.entries(
-                        cardState.automationPreviousValues,
-                    )) {
+                    for (const [key, value] of Object.entries(cardState.automationPreviousValues)) {
                         if (value === undefined) {
                             delete fm[key]
                         } else {
@@ -144,10 +141,7 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
 
 // ─── applyRedo ───────────────────────────────────────────────────────────────
 
-export async function applyRedo(
-    transaction: UndoTransaction,
-    ctx: UndoRedoContext,
-): Promise<void> {
+export async function applyRedo(transaction: UndoTransaction, ctx: UndoRedoContext): Promise<void> {
     for (const op of transaction.operations) {
         await redoOne(op, ctx)
     }
@@ -212,7 +206,9 @@ async function redoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             const rmOp = op.op
             for (const cardState of op.cardStates) {
                 const file = app.vault.getFileByPath(cardState.file.path)
-                if (!file) { continue }
+                if (!file) {
+                    continue
+                }
                 if (rmOp.kind === "move") {
                     const targetValue = rmOp.targetValue
                     await app.fileManager.processFrontMatter(file, fm => {
@@ -278,14 +274,16 @@ async function writeSort(
     sort: { property: string; direction: string }[],
 ): Promise<void> {
     const { app, baseFile, config } = ctx
-    if (!baseFile) { return }
+    if (!baseFile) {
+        return
+    }
     await app.vault.process(baseFile, content => {
         const parsed = parseYaml(content) ?? {}
         const views: unknown[] = Array.isArray(parsed.views) ? parsed.views : []
         const viewName = (config as { name?: string }).name
-        const view = views.find(
-            (v: any) => v.name === viewName && v.type === "swimlane",
-        ) as Record<string, unknown> | undefined
+        const view = views.find((v: any) => v.name === viewName && v.type === "swimlane") as
+            | Record<string, unknown>
+            | undefined
         if (view) {
             view.sort = sort
         }
