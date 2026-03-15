@@ -2,7 +2,7 @@ import type { App } from "obsidian"
 import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import type { AutomationRule, AutomationAction, TriggerType } from "./types"
 import { AutomationPropertySuggest } from "./property-suggest"
-import { AutomationValueSuggest } from "./value-suggest"
+import { AutomationValueSuggest, TEMPLATE_SUGGESTIONS } from "./value-suggest"
 
 export interface PropertyInfo {
     name: string
@@ -24,22 +24,74 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
     created_in: "is created in",
 }
 
-function triggerText(trigger: { type: TriggerType; swimlane: string }): string {
-    const label = TRIGGER_LABELS[trigger.type]
-    const swimlane = trigger.swimlane === "*" ? "any swimlane" : `"${trigger.swimlane}"`
-    return `When a card ${label} ${swimlane}`
+const ACTION_TYPE_LABELS: Record<string, string> = {
+    set: "Set",
+    add: "Add to",
+    remove: "Remove from",
+    clear: "Clear",
 }
 
-function actionText(action: AutomationAction): string {
+const VALUE_LABELS: Record<string, string> = {
+    set: "to",
+    add: "value",
+    remove: "value",
+}
+
+const hasValue = (type: string) => type !== "clear"
+
+/** Look up a human-readable description for a template token, if known. */
+function templateDescription(value: string): string | null {
+    const match = TEMPLATE_SUGGESTIONS.find(s => s.token === value)
+    return match?.description ?? null
+}
+
+function renderTrigger(
+    container: HTMLElement,
+    trigger: { type: TriggerType; swimlane: string },
+): void {
+    container.createSpan({ text: "When a card " })
+    container.createSpan({ text: TRIGGER_LABELS[trigger.type] })
+    container.createSpan({ text: " " })
+    if (trigger.swimlane === "*") {
+        container.createSpan({ text: "any swimlane" })
+    } else {
+        container.createEl("code", { cls: "swimlane-automation-code", text: trigger.swimlane })
+    }
+}
+
+function renderAction(container: HTMLElement, action: AutomationAction): void {
+    container.createSpan({ text: "→ " })
     switch (action.type) {
         case "set":
-            return `→ Set ${action.property} to ${action.value}`
+            container.createSpan({ text: "Set " })
+            container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            container.createSpan({ text: " to " })
+            renderValue(container, action.value)
+            break
         case "add":
-            return `→ Add ${action.value} to ${action.property}`
+            container.createSpan({ text: "Add " })
+            renderValue(container, action.value)
+            container.createSpan({ text: " to " })
+            container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            break
         case "remove":
-            return `→ Remove ${action.value} from ${action.property}`
+            container.createSpan({ text: "Remove " })
+            renderValue(container, action.value)
+            container.createSpan({ text: " from " })
+            container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            break
         case "clear":
-            return `→ Clear ${action.property}`
+            container.createSpan({ text: "Clear " })
+            container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            break
+    }
+}
+
+function renderValue(container: HTMLElement, value: string): void {
+    const desc = templateDescription(value)
+    container.createEl("code", { cls: "swimlane-automation-code", text: value })
+    if (desc) {
+        container.createSpan({ cls: "swimlane-automation-value-desc", text: ` (${desc})` })
     }
 }
 
@@ -68,12 +120,14 @@ export class AutomationsModal extends WrongNotesModal {
     private renderRules(): void {
         this.contentEl.empty()
 
+        const list = this.contentEl.createDiv({ cls: "swimlane-automation-list" })
+
         for (let i = 0; i < this.rules.length; i++) {
-            this.renderRuleCard(i)
+            this.renderRuleCard(list, i)
         }
 
-        const addBtn = this.contentEl.createEl("button", {
-            cls: "swimlane-automation-add-btn",
+        const addBtn = list.createEl("button", {
+            cls: "swimlane-automation-add-btn mod-cta",
             text: "Add rule",
         })
         addBtn.addEventListener("click", () => {
@@ -83,22 +137,22 @@ export class AutomationsModal extends WrongNotesModal {
         })
     }
 
-    private renderRuleCard(index: number): HTMLElement {
+    private renderRuleCard(container: HTMLElement, index: number): HTMLElement {
         const rule = this.rules[index]!
-        const card = this.contentEl.createDiv({ cls: "swimlane-automation-rule" })
+        const card = container.createDiv({ cls: "swimlane-automation-rule" })
 
         const triggerEl = card.createDiv({ cls: "swimlane-automation-trigger" })
-        triggerEl.textContent = triggerText(rule.trigger)
+        renderTrigger(triggerEl, rule.trigger)
 
         for (const action of rule.actions) {
             const actionEl = card.createDiv({ cls: "swimlane-automation-action-summary" })
-            actionEl.textContent = actionText(action)
+            renderAction(actionEl, action)
         }
 
         const btnsEl = card.createDiv({ cls: "swimlane-automation-card-buttons" })
 
         const editBtn = btnsEl.createEl("button", {
-            cls: "swimlane-automation-edit-btn",
+            cls: "swimlane-automation-edit-btn mod-cta",
             text: "Edit",
         })
         editBtn.addEventListener("click", () => {
@@ -106,7 +160,7 @@ export class AutomationsModal extends WrongNotesModal {
         })
 
         const deleteBtn = btnsEl.createEl("button", {
-            cls: "swimlane-automation-delete-btn",
+            cls: "swimlane-automation-delete-btn mod-warning",
             text: "Delete",
         })
         deleteBtn.addEventListener("click", () => {
@@ -125,8 +179,13 @@ export class AutomationsModal extends WrongNotesModal {
             actions: [{ type: "set", property: "", value: "" }],
         })
         const editor = this.buildRuleEditor(newIndex, null)
-        // Insert before the add button (which was removed, so just append)
-        this.contentEl.appendChild(editor)
+        // Append to the list container
+        const list = this.contentEl.querySelector(".swimlane-automation-list")
+        if (list) {
+            list.appendChild(editor)
+        } else {
+            this.contentEl.appendChild(editor)
+        }
     }
 
     private buildRuleEditor(index: number, replacingEl: HTMLElement | null): HTMLElement {
@@ -183,26 +242,6 @@ export class AutomationsModal extends WrongNotesModal {
             }
         }
 
-        const ACTION_TYPE_LABELS: Record<string, string> = {
-            set: "Set",
-            add: "Add to",
-            remove: "Remove from",
-            clear: "Clear",
-        }
-        const PROP_LABELS: Record<string, string> = {
-            set: "property",
-            add: "property",
-            remove: "property",
-            clear: "property",
-        }
-        const VALUE_LABELS: Record<string, string> = {
-            set: "to",
-            add: "value",
-            remove: "value",
-        }
-        const hasValue = (type: string) => type !== "clear"
-        const isArrayAction = (type: string) => type === "add" || type === "remove"
-
         const renderActionRow = (i: number) => {
             const action = draftActions[i]!
             const row = actionsContainer.createDiv({ cls: "swimlane-automation-action" })
@@ -215,10 +254,7 @@ export class AutomationsModal extends WrongNotesModal {
             }
             typeSelect.value = action.type
 
-            const propLabel = row.createSpan({
-                cls: "swimlane-automation-label",
-                text: PROP_LABELS[action.type] ?? "property",
-            })
+            row.createSpan({ cls: "swimlane-automation-label", text: "property" })
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
@@ -253,14 +289,10 @@ export class AutomationsModal extends WrongNotesModal {
             })
             valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
 
-            const valueSuggest = new AutomationValueSuggest(
-                this.ctx.app,
-                valueInput,
-                value => {
-                    valueInput.value = value
-                    this.updateDraftAction(draftActions, i, { value })
-                },
-            )
+            const valueSuggest = new AutomationValueSuggest(this.ctx.app, valueInput, value => {
+                valueInput.value = value
+                this.updateDraftAction(draftActions, i, { value })
+            })
             valueSuggest.close()
 
             typeSelect.addEventListener("change", () => {
@@ -286,7 +318,7 @@ export class AutomationsModal extends WrongNotesModal {
 
             if (draftActions.length > 1) {
                 const removeBtn = row.createEl("button", {
-                    cls: "swimlane-automation-remove-action-btn",
+                    cls: "swimlane-automation-remove-action-btn mod-warning",
                     text: "Remove",
                 })
                 removeBtn.addEventListener("click", () => {
@@ -328,7 +360,7 @@ export class AutomationsModal extends WrongNotesModal {
         })
 
         const saveBtn = buttonsRow.createEl("button", {
-            cls: "swimlane-automation-save-btn",
+            cls: "swimlane-automation-save-btn mod-cta",
             text: "Save",
         })
         saveBtn.addEventListener("click", () => {

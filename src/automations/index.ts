@@ -5,7 +5,7 @@ export type {
     FrontmatterMutation,
     TriggerType,
 } from "./types"
-export { matchRules, resolveValue, formatNow, applyMutations } from "./engine"
+export { matchRules, applyMutations } from "./engine"
 export { readAutomations, writeAutomations } from "./io"
 export { AutomationsModal } from "./modal"
 export type { AutomationsModalContext, PropertyInfo } from "./modal"

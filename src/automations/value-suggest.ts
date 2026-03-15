@@ -1,12 +1,12 @@
 import { AbstractInputSuggest } from "obsidian"
 import type { App } from "obsidian"
 
-interface TemplateSuggestion {
+export interface TemplateSuggestion {
     token: string
     description: string
 }
 
-const TEMPLATE_SUGGESTIONS: TemplateSuggestion[] = [
+export const TEMPLATE_SUGGESTIONS: TemplateSuggestion[] = [
     { token: "{{now:YYYY-MM-DD}}", description: "Current date" },
     { token: "{{now:YYYY-MM-DDTHH:mm}}", description: "Current date and time" },
     { token: "{{now:HH:mm}}", description: "Current time" },
@@ -17,20 +17,16 @@ const TEMPLATE_SUGGESTIONS: TemplateSuggestion[] = [
 export class AutomationValueSuggest extends AbstractInputSuggest<TemplateSuggestion> {
     private onChange: (value: string) => void
 
-    constructor(
-        app: App,
-        inputEl: HTMLInputElement,
-        onChange: (value: string) => void,
-    ) {
+    constructor(app: App, inputEl: HTMLInputElement, onChange: (value: string) => void) {
         super(app, inputEl)
         this.onChange = onChange
     }
 
     getSuggestions(query: string): TemplateSuggestion[] {
-        const lower = query.toLowerCase()
-        if (!lower && !query) {
+        if (!query) {
             return TEMPLATE_SUGGESTIONS
         }
+        const lower = query.toLowerCase()
         return TEMPLATE_SUGGESTIONS.filter(
             s =>
                 s.token.toLowerCase().includes(lower) ||

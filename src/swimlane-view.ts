@@ -346,6 +346,50 @@ export class SwimlaneView extends BasesView {
         modal.open()
     }
 
+    /**
+     * Inject an "Automations" button into the Bases toolbar (the header bar
+     * managed by Obsidian with Sort, Filter, Properties, etc.). We traverse
+     * up from containerEl to find `.bases-toolbar` and insert before the
+     * "New" button. Replaces any previously injected button on rebuild.
+     */
+    private injectBasesToolbarButton(): void {
+        const basesToolbar = this.boardEl.parentElement?.querySelector(".bases-toolbar")
+        if (!basesToolbar) {
+            return
+        }
+
+        // Remove any previously injected button (from a prior rebuild).
+        basesToolbar.querySelector(".swimlane-automations-btn")?.remove()
+
+        // Hide the "New" button — card creation is handled by the swimlane view.
+        const newBtn = basesToolbar.querySelector<HTMLElement>(".bases-toolbar-new-item-menu")
+        if (newBtn) {
+            newBtn.setCssStyles({ display: "none" })
+        }
+
+        // Build the button matching the native toolbar item structure:
+        // div.bases-toolbar-item > div.text-icon-button > span.text-button-icon + span.text-button-label
+        const btn = document.createElement("div")
+        btn.className = "bases-toolbar-item swimlane-automations-btn"
+        const inner = btn.createDiv({ cls: "text-icon-button", attr: { tabindex: "0" } })
+        const iconSpan = inner.createSpan({ cls: "text-button-icon" })
+        setIcon(iconSpan, "zap")
+        const count = this.automationRules.length
+        inner.createSpan({
+            cls: "text-button-label",
+            text: count > 0 ? `Automations (${count})` : "Automations",
+        })
+        btn.addEventListener("click", () => this.openAutomationsModal())
+
+        // Insert before Sort.
+        const sortBtn = basesToolbar.querySelector(".bases-toolbar-sort-menu")
+        if (sortBtn) {
+            basesToolbar.insertBefore(btn, sortBtn)
+        } else {
+            basesToolbar.appendChild(btn)
+        }
+    }
+
     /** Build property info list with array detection from current entries. */
     private getPropertyInfos(): PropertyInfo[] {
         const arrayProps = new Set<string>()
@@ -515,7 +559,9 @@ export class SwimlaneView extends BasesView {
             this.app.vault.read(this.baseFile).then(content => {
                 this.automationRules = readAutomations(content)
                 // Update the automations button count if the board is still mounted.
-                const btn = this.boardEl.querySelector(".swimlane-automations-btn span:last-child")
+                const btn = this.boardEl.parentElement?.querySelector(
+                    ".swimlane-automations-btn .text-button-label",
+                )
                 if (btn) {
                     const count = this.automationRules.length
                     btn.textContent = count > 0 ? `Automations (${count})` : "Automations"
@@ -590,23 +636,17 @@ export class SwimlaneView extends BasesView {
 
         const rankProp = this.rankProp
 
+        // Inject the automations button into the Bases toolbar (sibling of containerEl).
+        this.injectBasesToolbarButton()
+
         if (!sortedByRank) {
-            const hint = this.boardEl.createEl("button", { cls: "swimlane-sort-hint" })
-            setIcon(hint.createSpan({ cls: "swimlane-sort-hint-icon" }), "arrow-up-down")
+            const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar" })
+            this.boardEl.insertBefore(toolbar, board)
+            const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+            setIcon(hint.createSpan(), "arrow-up-down")
             hint.createSpan({ text: "Sort by rank to enable re-ordering" })
             hint.addEventListener("click", () => this.setSortByRank())
-            // Move hint before the board so it sits above the columns.
-            this.boardEl.insertBefore(hint, board)
         }
-
-        const automationsBtn = this.boardEl.createEl("button", { cls: "swimlane-automations-btn" })
-        setIcon(automationsBtn.createSpan({ cls: "swimlane-automations-btn-icon" }), "zap")
-        const count = this.automationRules.length
-        automationsBtn.createSpan({
-            text: count > 0 ? `Automations (${count})` : "Automations",
-        })
-        automationsBtn.addEventListener("click", () => this.openAutomationsModal())
-        this.boardEl.insertBefore(automationsBtn, board)
 
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,

@@ -326,33 +326,34 @@
     font-size: var(--font-ui-small);
 }
 
-.swimlane-sort-hint {
+.swimlane-toolbar {
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-1) var(--size-4-3);
-    margin: var(--size-4-2) var(--size-4-4) 0;
+    padding: var(--size-4-2) var(--size-4-4);
+}
+
+.swimlane-toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    padding: var(--size-4-1) var(--size-4-2);
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
-    background: none;
-    border: var(--border-width) solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    border: none;
     border-radius: var(--radius-s);
     cursor: pointer;
 }
 
-.swimlane-sort-hint:hover {
+.swimlane-toolbar-btn:hover {
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
 }
 
-.swimlane-sort-hint-icon {
-    display: flex;
-    flex-shrink: 0;
-}
-
-.swimlane-sort-hint-icon svg {
-    width: 14px;
-    height: 14px;
+.swimlane-toolbar-btn svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
 }
 
 .swimlane-add-card-btn {
@@ -985,36 +986,11 @@
 }
 
 /* Automations button */
-.swimlane-automations-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--size-4-2);
-    padding: var(--size-4-1) var(--size-4-3);
-    margin: var(--size-4-2) var(--size-4-4) 0;
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    background: none;
-    border: var(--border-width) solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
-    cursor: pointer;
-}
-
-.swimlane-automations-btn:hover {
-    color: var(--text-normal);
-    background-color: var(--background-modifier-hover);
-}
-
-.swimlane-automations-btn-icon {
-    display: flex;
-    flex-shrink: 0;
-}
-
-.swimlane-automations-btn-icon svg {
-    width: 14px;
-    height: 14px;
-}
-
 /* Automations modal */
+.swimlane-automation-list {
+    grid-column: 1 / -1;
+}
+
 .swimlane-automation-rule {
     border: var(--border-width) solid var(--background-modifier-border);
     border-radius: var(--radius-s);
@@ -1032,7 +1008,21 @@
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     padding-left: var(--size-4-3);
-    line-height: var(--line-height-tight);
+    line-height: var(--line-height-normal);
+}
+
+.swimlane-automation-code {
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+    background-color: var(--background-modifier-hover);
+    padding: 1px var(--size-2-2);
+    border-radius: var(--radius-s);
+}
+
+.swimlane-automation-value-desc {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-style: italic;
 }
 
 .swimlane-automation-card-buttons {
@@ -1059,6 +1049,7 @@
     align-items: center;
     gap: var(--size-4-2);
     margin-bottom: var(--size-4-4);
+    flex-wrap: wrap;
 }
 
 .swimlane-automation-trigger-row select {
@@ -1075,6 +1066,7 @@
     align-items: center;
     gap: var(--size-4-2);
     margin-bottom: var(--size-4-2);
+    flex-wrap: wrap;
 }
 
 .swimlane-automation-action select {
@@ -1086,8 +1078,8 @@
 .swimlane-automation-action input {
     font-size: var(--font-ui-smaller);
     padding: var(--size-4-1) var(--size-4-2);
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 10ch;
+    min-width: 10ch;
 }
 
 .swimlane-automation-add-action-btn {
@@ -1097,9 +1089,11 @@
 }
 
 .swimlane-automation-add-btn {
+    display: block;
+    width: 100%;
     margin-top: var(--size-4-3);
     font-size: var(--font-ui-smaller);
-    padding: var(--size-4-1) var(--size-4-2);
+    padding: var(--size-4-2) var(--size-4-3);
 }
 
 .swimlane-automation-editor-buttons {
