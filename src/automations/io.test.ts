@@ -1,4 +1,4 @@
-import { readAutomations, writeAutomations } from "./io"
+import { readAutomations, writeAutomations, readScheduledActions, writeScheduledActions } from "./io"
 import type { AutomationRule } from "./types"
 
 // Helper to create test input — mock parseYaml uses JSON.parse
@@ -115,6 +115,85 @@ describe("readAutomations", () => {
             }
             expect(readAutomations(cfg({ automations: [rule] }))).toEqual([rule])
         }
+    })
+})
+
+describe("readScheduledActions", () => {
+    it("parses valid scheduled actions", () => {
+        const content = JSON.stringify({
+            scheduledActions: [
+                {
+                    file: "notes/task.md",
+                    due: "2026-03-29T14:30:00",
+                    whileInSwimlane: "Done",
+                    actions: [{ type: "set", property: "status", value: "Archived" }],
+                },
+            ],
+        })
+        const result = readScheduledActions(content)
+        expect(result).toHaveLength(1)
+        expect(result[0]!.file).toBe("notes/task.md")
+        expect(result[0]!.due).toBe("2026-03-29T14:30:00")
+        expect(result[0]!.whileInSwimlane).toBe("Done")
+        expect(result[0]!.actions).toHaveLength(1)
+    })
+
+    it("returns empty array for missing scheduledActions key", () => {
+        expect(readScheduledActions(JSON.stringify({}))).toEqual([])
+    })
+
+    it("returns empty array for empty string", () => {
+        expect(readScheduledActions("")).toEqual([])
+    })
+
+    it("drops entries with missing file", () => {
+        const content = JSON.stringify({
+            scheduledActions: [
+                { due: "2026-03-29T14:30:00", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+            ],
+        })
+        expect(readScheduledActions(content)).toEqual([])
+    })
+
+    it("drops entries with empty actions array", () => {
+        const content = JSON.stringify({
+            scheduledActions: [
+                { file: "a.md", due: "2026-03-29T14:30:00", whileInSwimlane: "Done", actions: [] },
+            ],
+        })
+        expect(readScheduledActions(content)).toEqual([])
+    })
+
+    it("drops entries with invalid action", () => {
+        const content = JSON.stringify({
+            scheduledActions: [
+                { file: "a.md", due: "2026-03-29T14:30:00", whileInSwimlane: "Done", actions: [{ type: "invalid" }] },
+            ],
+        })
+        expect(readScheduledActions(content)).toEqual([])
+    })
+})
+
+describe("writeScheduledActions", () => {
+    it("writes scheduled actions preserving other keys", () => {
+        const content = JSON.stringify({ automations: [], otherKey: 42 })
+        const actions = [
+            {
+                file: "notes/task.md",
+                due: "2026-03-29T14:30:00",
+                whileInSwimlane: "Done",
+                actions: [{ type: "set" as const, property: "status", value: "Archived" }],
+            },
+        ]
+        const result = JSON.parse(writeScheduledActions(content, actions))
+        expect(result.scheduledActions).toEqual(actions)
+        expect(result.automations).toEqual([])
+        expect(result.otherKey).toBe(42)
+    })
+
+    it("writes empty array when no actions", () => {
+        const result = JSON.parse(writeScheduledActions(JSON.stringify({}), []))
+        expect(result.scheduledActions).toEqual([])
     })
 })
 

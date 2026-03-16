@@ -1,5 +1,5 @@
 import { parseYaml, stringifyYaml } from "obsidian"
-import type { AutomationAction, AutomationRule } from "./types"
+import type { AutomationAction, AutomationRule, ScheduledAction } from "./types"
 
 const VALID_TRIGGER_TYPES = new Set(["enters", "leaves", "created_in"])
 
@@ -75,6 +75,46 @@ export function readAutomations(content: string): AutomationRule[] {
     }
 
     return config.automations.filter(isValidRule) as AutomationRule[]
+}
+
+function isValidMutationAction(action: unknown): boolean {
+    if (!action || typeof action !== "object") return false
+    const a = action as Record<string, unknown>
+    if (typeof a.type !== "string" || typeof a.property !== "string" || a.property === "") return false
+    if (a.type === "set" || a.type === "add" || a.type === "remove") return a.value !== undefined
+    if (a.type === "clear") return true
+    return false
+}
+
+function isValidScheduledAction(entry: unknown): entry is ScheduledAction {
+    if (!entry || typeof entry !== "object") return false
+    const e = entry as Record<string, unknown>
+    if (typeof e.file !== "string" || e.file === "") return false
+    if (typeof e.due !== "string" || e.due === "") return false
+    if (typeof e.whileInSwimlane !== "string" || e.whileInSwimlane === "") return false
+    if (!Array.isArray(e.actions) || e.actions.length === 0) return false
+    return e.actions.every(isValidMutationAction)
+}
+
+export function readScheduledActions(content: string): ScheduledAction[] {
+    if (!content || typeof content !== "string") return []
+    const parsed = parseYaml(content)
+    if (!parsed || typeof parsed !== "object") return []
+    const config = parsed as Record<string, unknown>
+    if (!Array.isArray(config.scheduledActions)) return []
+    return config.scheduledActions.filter(isValidScheduledAction)
+}
+
+export function writeScheduledActions(content: string, actions: ScheduledAction[]): string {
+    let config: Record<string, unknown> = {}
+    if (content && typeof content === "string") {
+        const parsed = parseYaml(content)
+        if (parsed && typeof parsed === "object") {
+            config = parsed as Record<string, unknown>
+        }
+    }
+    config.scheduledActions = actions
+    return stringifyYaml(config)
 }
 
 /**
