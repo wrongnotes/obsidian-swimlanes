@@ -31,8 +31,12 @@ import {
     readAutomations,
     AutomationsModal,
     writeAutomations,
+    addScheduledActions,
+    cancelScheduledActions,
+    readScheduledActions,
+    writeScheduledActions,
 } from "./automations"
-import type { AutomationRule, FrontmatterMutation, MatchedMutation, PropertyInfo } from "./automations"
+import type { AutomationRule, FrontmatterMutation, MatchedMutation, PropertyInfo, ScheduledAction } from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 
@@ -938,7 +942,10 @@ export class SwimlaneView extends BasesView {
             path = `${prefix}${title} ${++n}.md`
         }
         const file = await this.app.vault.create(path, "")
-        const mutations = this.getAutomationMutations(null, groupKey as string, "created_in")
+        const allMutations = this.getAutomationMutations(null, groupKey as string, "created_in")
+        const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
+            allMutations, file.path, groupKey as string, null,
+        )
         // No previous values to capture for a brand-new file.
         const prevValues: Record<string, unknown> = {}
 
@@ -952,6 +959,14 @@ export class SwimlaneView extends BasesView {
             resolvedAutomationMutations: mutations,
             automationPreviousValues: prevValues,
         })
+        if (scheduledEntries.length > 0 && this.baseFile) {
+            this.undoManager.pushOperation({
+                type: "ScheduleActions",
+                baseFilePath: this.baseFile.path,
+                entries: scheduledEntries,
+                delays,
+            })
+        }
         this.undoManager.endTransaction()
 
         await this.app.fileManager.processFrontMatter(file, fm => {
@@ -1093,10 +1108,12 @@ export class SwimlaneView extends BasesView {
                         prev: Record<string, unknown>
                     }
                 >()
+                const allScheduledEntries: ScheduledAction[] = []
+                const allDelays: string[] = []
                 await executeRmSwimlane(this.app, files, this.swimlaneProp, op, (file, fm) => {
-                    let mutations: FrontmatterMutation[] = []
+                    let allMutations: MatchedMutation[] = []
                     if (op.kind === "move") {
-                        mutations = [
+                        allMutations = [
                             ...this.getAutomationMutations(groupKey as string, null, "leaves"),
                             ...this.getAutomationMutations(
                                 groupKey as string,
@@ -1105,8 +1122,17 @@ export class SwimlaneView extends BasesView {
                             ),
                         ]
                     } else if (op.kind === "clear") {
-                        mutations = this.getAutomationMutations(groupKey as string, null, "leaves")
+                        allMutations = this.getAutomationMutations(groupKey as string, null, "leaves")
                     }
+                    const targetSwimlane = op.kind === "move" ? op.targetValue : null
+                    const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
+                        allMutations,
+                        file.path,
+                        targetSwimlane ?? groupKey as string,
+                        groupKey as string,
+                    )
+                    allScheduledEntries.push(...scheduledEntries)
+                    allDelays.push(...delays)
                     const prev: Record<string, unknown> = {}
                     for (const m of mutations) {
                         prev[m.property] = fm[m.property]
@@ -1129,6 +1155,14 @@ export class SwimlaneView extends BasesView {
                         automationPreviousValues: cardAutomationState.get(f.path)?.prev ?? {},
                     })),
                 })
+                if (allScheduledEntries.length > 0 && this.baseFile) {
+                    this.undoManager.pushOperation({
+                        type: "ScheduleActions",
+                        baseFilePath: this.baseFile.path,
+                        entries: allScheduledEntries,
+                        delays: allDelays,
+                    })
+                }
                 const order = this.swimlaneOrder.filter(k => k !== groupKey)
                 this.config.set(CONFIG_KEYS.swimlaneOrder, order)
                 this.undoManager.endTransaction()
@@ -1794,6 +1828,55 @@ export class SwimlaneView extends BasesView {
         )
     }
 
+    /**
+     * Partitions matched mutations into instant and delayed, then schedules the
+     * delayed ones by writing to the .base file. Returns only the instant mutations
+     * for immediate application, plus the scheduled entries and delay strings for undo.
+     */
+    private scheduleDelayedMutations(
+        allMutations: MatchedMutation[],
+        filePath: string,
+        targetSwimlane: string,
+        fromSwimlane: string | null,
+    ): { instant: FrontmatterMutation[]; scheduledEntries: ScheduledAction[]; delays: string[] } {
+        const instant: FrontmatterMutation[] = []
+        const delayed: MatchedMutation[] = []
+        for (const m of allMutations) {
+            if (m.delay) {
+                delayed.push(m)
+            } else {
+                const { delay: _, ...mutation } = m
+                instant.push(mutation)
+            }
+        }
+
+        if (delayed.length === 0) {
+            return { instant, scheduledEntries: [], delays: [] }
+        }
+
+        const now = Date.now()
+        const delays = delayed.map(m => m.delay!)
+
+        // Write to .base file: cancel old entries for source swimlane, add new for target
+        if (this.baseFile) {
+            this.app.vault.process(this.baseFile, content => {
+                let existing = readScheduledActions(content)
+                if (fromSwimlane) {
+                    existing = cancelScheduledActions(existing, filePath, fromSwimlane)
+                }
+                const updated = addScheduledActions(existing, filePath, targetSwimlane, delayed, now)
+                return writeScheduledActions(content, updated)
+            })
+            // Start the poller since we now have scheduled items
+            this.plugin.startPoller()
+        }
+
+        // Build entries for the undo operation
+        const scheduledEntries = addScheduledActions([], filePath, targetSwimlane, delayed, now)
+
+        return { instant, scheduledEntries, delays }
+    }
+
     private handleCardDrop(
         dragState: CardDragState,
         context: CardDropContext,
@@ -1863,11 +1946,19 @@ export class SwimlaneView extends BasesView {
         const toSwimlane = context.groupKey as string
         let mutations: FrontmatterMutation[] = []
         let prevValues: Record<string, unknown> = {}
+        let scheduledEntries: ScheduledAction[] = []
+        let delays: string[] = []
         if (isCrossColumn) {
-            mutations = [
+            const allMutations = [
                 ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
                 ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
             ]
+            const scheduled = this.scheduleDelayedMutations(
+                allMutations, file.path, toSwimlane, fromSwimlane,
+            )
+            mutations = scheduled.instant
+            scheduledEntries = scheduled.scheduledEntries
+            delays = scheduled.delays
             const cache = this.app.metadataCache.getFileCache(file)
             const fm = cache?.frontmatter ?? {}
             for (const m of mutations) {
@@ -1887,6 +1978,14 @@ export class SwimlaneView extends BasesView {
                 resolvedAutomationMutations: mutations,
                 automationPreviousValues: prevValues,
             })
+            if (scheduledEntries.length > 0 && this.baseFile) {
+                this.undoManager.pushOperation({
+                    type: "ScheduleActions",
+                    baseFilePath: this.baseFile.path,
+                    entries: scheduledEntries,
+                    delays,
+                })
+            }
         } else {
             this.undoManager.pushOperation({
                 type: "ReorderCard",
@@ -1949,11 +2048,19 @@ export class SwimlaneView extends BasesView {
         // Pre-compute mutations for the dragged card if cross-column.
         let draggedMutations: FrontmatterMutation[] = []
         let draggedPrevValues: Record<string, unknown> = {}
+        let draggedScheduledEntries: ScheduledAction[] = []
+        let draggedDelays: string[] = []
         if (isCrossColumn) {
-            draggedMutations = [
+            const allMutations = [
                 ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
                 ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
             ]
+            const scheduled = this.scheduleDelayedMutations(
+                allMutations, dragState.path, toSwimlane, fromSwimlane,
+            )
+            draggedMutations = scheduled.instant
+            draggedScheduledEntries = scheduled.scheduledEntries
+            draggedDelays = scheduled.delays
             const draggedFile = this.app.vault.getFileByPath(dragState.path)
             if (draggedFile) {
                 const cache = this.app.metadataCache.getFileCache(draggedFile)
@@ -1985,6 +2092,14 @@ export class SwimlaneView extends BasesView {
                     resolvedAutomationMutations: draggedMutations,
                     automationPreviousValues: draggedPrevValues,
                 })
+                if (draggedScheduledEntries.length > 0 && this.baseFile) {
+                    this.undoManager.pushOperation({
+                        type: "ScheduleActions",
+                        baseFilePath: this.baseFile.path,
+                        entries: draggedScheduledEntries,
+                        delays: draggedDelays,
+                    })
+                }
             } else {
                 this.undoManager.pushOperation({
                     type: "ReorderCard",
@@ -2028,10 +2143,13 @@ export class SwimlaneView extends BasesView {
                 const fromSwimlane = dragState.groupKey as string
                 const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
                 const toRank = midRank(null, null)
-                const mutations = [
+                const allMutations = [
                     ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
                     ...this.getAutomationMutations(fromSwimlane, columnName, "enters"),
                 ]
+                const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
+                    allMutations, file.path, columnName, fromSwimlane,
+                )
                 const cache = this.app.metadataCache.getFileCache(file)
                 const cachedFm = cache?.frontmatter ?? {}
                 const prevValues: Record<string, unknown> = {}
@@ -2054,6 +2172,14 @@ export class SwimlaneView extends BasesView {
                     resolvedAutomationMutations: mutations,
                     automationPreviousValues: prevValues,
                 })
+                if (scheduledEntries.length > 0 && this.baseFile) {
+                    this.undoManager.pushOperation({
+                        type: "ScheduleActions",
+                        baseFilePath: this.baseFile.path,
+                        entries: scheduledEntries,
+                        delays,
+                    })
+                }
                 this.undoManager.endTransaction()
 
                 this.app.fileManager.processFrontMatter(file, fm => {
