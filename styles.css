@@ -1034,7 +1034,8 @@
 
 .swimlane-automation-card-buttons button {
     font-size: var(--font-ui-smaller);
-    padding: var(--size-4-1) var(--size-4-2);
+    padding: var(--size-4-1) var(--size-4-3);
+    white-space: nowrap;
 }
 
 .swimlane-automation-editor {
@@ -1055,6 +1056,8 @@
 .swimlane-automation-trigger-row select {
     font-size: var(--font-ui-smaller);
     padding: var(--size-4-1) var(--size-4-2);
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .swimlane-automation-actions {
@@ -1078,8 +1081,8 @@
 .swimlane-automation-action input {
     font-size: var(--font-ui-smaller);
     padding: var(--size-4-1) var(--size-4-2);
-    flex: 1 1 10ch;
-    min-width: 10ch;
+    flex: 1 1 100%;
+    min-width: 0;
 }
 
 .swimlane-automation-add-action-btn {
@@ -1101,17 +1104,20 @@
     justify-content: flex-end;
     gap: var(--size-4-2);
     margin-top: var(--size-4-3);
+    flex-wrap: wrap;
 }
 
 .swimlane-automation-editor-buttons button {
     font-size: var(--font-ui-smaller);
     padding: var(--size-4-1) var(--size-4-3);
+    white-space: nowrap;
 }
 
 .swimlane-automation-remove-action-btn {
     font-size: var(--font-ui-smaller);
     padding: var(--size-4-1) var(--size-4-2);
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .swimlane-automation-label {
@@ -1134,4 +1140,49 @@
 .swimlane-suggest-description {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
+}
+
+/* Floating undo/redo controls */
+.swimlane-undo-float {
+    position: sticky;
+    bottom: var(--size-4-4);
+    left: var(--size-4-4);
+    display: flex;
+    gap: var(--size-4-1);
+    padding: var(--size-4-2);
+    margin: var(--size-4-4);
+    margin-top: auto;
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-s);
+    width: fit-content;
+    z-index: 10;
+    align-self: flex-end;
+}
+
+.swimlane-undo-float-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--size-4-2);
+    border: none;
+    border-radius: var(--radius-s);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.swimlane-undo-float-btn:hover:not(.swimlane-toolbar-disabled) {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.swimlane-undo-float-btn svg {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.swimlane-toolbar-disabled {
+    opacity: 0.3;
+    pointer-events: none;
 }
