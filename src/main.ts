@@ -1,10 +1,15 @@
-import { Plugin, Notice, parseYaml } from "obsidian"
+import { Plugin, Notice, parseYaml, TFile } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
-import { AutomationsModal, readAutomations, writeAutomations } from "./automations"
+import {
+    readAutomations, writeAutomations, readScheduledActions, writeScheduledActions,
+    AutomationsModal, getDueActions, applyMutations,
+} from "./automations"
 
 export default class SwimlanePlugin extends Plugin {
+    private pollerIntervalId: number | null = null
+
     async onload() {
         this.registerBasesView("swimlane", {
             name: "Swimlane",
@@ -70,7 +75,113 @@ export default class SwimlanePlugin extends Plugin {
         this.addRibbonIcon("square-kanban", "Create swimlane board", () => {
             new CreateBaseModal(this.app).open()
         })
+
+        // Check for due scheduled actions on load
+        this.processAllDueActions()
+
+        // Update file paths in scheduled actions when notes are renamed
+        this.registerEvent(
+            this.app.vault.on("rename", (file, oldPath) => {
+                if (file instanceof TFile && file.extension === "md") {
+                    this.updateScheduledActionPaths(oldPath, file.path)
+                }
+            }),
+        )
     }
 
-    onunload() {}
+    onunload() {
+        this.stopPoller()
+    }
+
+    /** Start the 5-minute poller if not already running. */
+    startPoller(): void {
+        if (this.pollerIntervalId !== null) return
+        this.pollerIntervalId = window.setInterval(() => this.processAllDueActions(), 5 * 60 * 1000)
+        this.registerInterval(this.pollerIntervalId)
+    }
+
+    /** Stop the poller. */
+    private stopPoller(): void {
+        if (this.pollerIntervalId !== null) {
+            window.clearInterval(this.pollerIntervalId)
+            this.pollerIntervalId = null
+        }
+    }
+
+    private async processAllDueActions(): Promise<void> {
+        const baseFiles = this.app.vault.getFiles().filter(f => f.extension === "base")
+        let hasAnyScheduled = false
+
+        for (const baseFile of baseFiles) {
+            const hadItems = await this.processDueActionsForFile(baseFile)
+            if (hadItems) hasAnyScheduled = true
+        }
+
+        // Demand-driven: start/stop poller based on whether items exist
+        if (hasAnyScheduled) {
+            this.startPoller()
+        } else {
+            this.stopPoller()
+        }
+    }
+
+    /** Process due actions for a single .base file. Returns true if there are still pending items. */
+    private async processDueActionsForFile(baseFile: TFile): Promise<boolean> {
+        const content = await this.app.vault.read(baseFile)
+        const allActions = readScheduledActions(content)
+        if (allActions.length === 0) return false
+
+        const { due, remaining } = getDueActions(allActions, Date.now())
+
+        if (due.length > 0) {
+            // Read swimlane property from .base config
+            const parsed = parseYaml(content) ?? {}
+            const swimView = parsed.views?.find(
+                (v: Record<string, unknown>) => v.type === "swimlane",
+            )
+            const swimlaneProp = swimView?.swimlaneProperty
+                ? String(swimView.swimlaneProperty).replace(/^note\./, "")
+                : "status"
+
+            for (const action of due) {
+                const file = this.app.vault.getFileByPath(action.file)
+                if (!file) continue
+
+                const cache = this.app.metadataCache.getFileCache(file)
+                const fm = cache?.frontmatter ?? {}
+                const currentSwimlane = fm[swimlaneProp]
+                if (currentSwimlane !== action.whileInSwimlane) continue
+
+                try {
+                    await this.app.fileManager.processFrontMatter(file, fileFm => {
+                        applyMutations(fileFm, action.actions)
+                    })
+                } catch {
+                    // File might have been deleted between check and apply
+                }
+            }
+
+            await this.app.vault.process(baseFile, c => writeScheduledActions(c, remaining))
+        }
+
+        return remaining.length > 0
+    }
+
+    private async updateScheduledActionPaths(oldPath: string, newPath: string): Promise<void> {
+        const baseFiles = this.app.vault.getFiles().filter(f => f.extension === "base")
+        for (const baseFile of baseFiles) {
+            const content = await this.app.vault.read(baseFile)
+            const actions = readScheduledActions(content)
+            let changed = false
+            for (const action of actions) {
+                if (action.file === oldPath) {
+                    action.file = newPath
+                    changed = true
+                }
+            }
+            if (changed) {
+                await this.app.vault.process(baseFile, c => writeScheduledActions(c, actions))
+            }
+        }
+    }
 }
