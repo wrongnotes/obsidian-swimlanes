@@ -32,7 +32,7 @@ import {
     AutomationsModal,
     writeAutomations,
 } from "./automations"
-import type { AutomationRule, FrontmatterMutation, PropertyInfo } from "./automations"
+import type { AutomationRule, FrontmatterMutation, MatchedMutation, PropertyInfo } from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 
@@ -1786,7 +1786,7 @@ export class SwimlaneView extends BasesView {
         sourceSwimlane: string | null,
         targetSwimlane: string | null,
         type: "enters" | "leaves" | "created_in",
-    ): FrontmatterMutation[] {
+    ): MatchedMutation[] {
         return matchRules(
             this.automationRules,
             { type, sourceSwimlane, targetSwimlane },

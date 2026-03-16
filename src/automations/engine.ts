@@ -1,5 +1,5 @@
 import { moment } from "obsidian"
-import type { AutomationContext, AutomationRule, FrontmatterMutation } from "./types"
+import type { AutomationContext, AutomationRule, FrontmatterMutation, MatchedMutation } from "./types"
 
 /**
  * Replaces template tokens in a string:
@@ -35,8 +35,8 @@ export function matchRules(
     rules: AutomationRule[],
     context: AutomationContext,
     swimlaneProp: string,
-): FrontmatterMutation[] {
-    const mutations: FrontmatterMutation[] = []
+): MatchedMutation[] {
+    const mutations: MatchedMutation[] = []
 
     for (const rule of rules) {
         if (rule.trigger.type !== context.type) {
@@ -56,12 +56,13 @@ export function matchRules(
                 continue
             }
             if (action.type === "clear") {
-                mutations.push({ type: "clear", property: action.property })
+                mutations.push({ type: "clear", property: action.property, delay: action.delay })
             } else {
                 mutations.push({
                     type: action.type,
                     property: action.property,
                     value: resolveValue(action.value, context),
+                    delay: action.delay,
                 })
             }
         }

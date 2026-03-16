@@ -260,6 +260,38 @@ describe("matchRules", () => {
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
+
+    it("preserves delay field in matched mutations", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [
+                    { type: "set", property: "completedAt", value: "{{now:YYYY-MM-DD}}" },
+                    { type: "set", property: "status", value: "Archived", delay: "2w" },
+                ],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "column")
+        expect(mutations).toHaveLength(2)
+        expect(mutations[0]!.delay).toBeUndefined()
+        expect(mutations[1]!.delay).toBe("2w")
+    })
+
+    it("does not include delay on instant actions", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "In Progress" },
+                actions: [{ type: "set", property: "startedAt", value: "yes" }],
+            },
+        ]
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
+        expect(mutations[0]!.delay).toBeUndefined()
+    })
 })
 
 // ---------------------------------------------------------------------------
