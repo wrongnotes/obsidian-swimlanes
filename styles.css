@@ -1186,3 +1186,15 @@
     opacity: 0.3;
     pointer-events: none;
 }
+
+.swimlane-card-scheduled-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.swimlane-card-scheduled-icon svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+    color: var(--text-muted);
+}

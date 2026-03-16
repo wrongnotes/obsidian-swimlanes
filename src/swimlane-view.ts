@@ -119,6 +119,7 @@ export class SwimlaneView extends BasesView {
     /** File path of a card that was just dropped cross-column; triggers expand animation on rebuild. */
     private expandingCardPath: string | null = null
     private automationRules: AutomationRule[] = []
+    private filesWithScheduledActions = new Set<string>()
     private baseFile: TFile | null = null
     /** Scroll positions saved at drop time, before frontmatter writes trigger rebuilds. */
     private savedScrollState: {
@@ -641,6 +642,8 @@ export class SwimlaneView extends BasesView {
         if (this.baseFile) {
             this.app.vault.read(this.baseFile).then(content => {
                 this.automationRules = readAutomations(content)
+                const scheduled = readScheduledActions(content)
+                this.filesWithScheduledActions = new Set(scheduled.map(a => a.file))
                 // Update the automations button count if the board is still mounted.
                 const btn = this.boardEl.parentElement?.querySelector(
                     ".swimlane-automations-btn .text-button-label",
@@ -810,6 +813,7 @@ export class SwimlaneView extends BasesView {
                 const card = renderCard(cardList, entry, this.app, {
                     ...cardOptions,
                     rank,
+                    hasScheduledActions: this.filesWithScheduledActions.has(entry.file.path),
                     getSwimlaneContext: () => ({
                         columns: this.swimlaneOrder as string[],
                         currentSwimlane: currentGroupKey,
