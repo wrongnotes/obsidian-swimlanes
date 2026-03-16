@@ -1,5 +1,5 @@
 import type { TFile } from "obsidian"
-import type { FrontmatterMutation } from "../automations"
+import type { FrontmatterMutation, ScheduledAction } from "../automations"
 import type { RmSwimlaneOp } from "../migration-workflows/operations"
 
 export type UndoOperation =
@@ -61,6 +61,18 @@ export type UndoOperation =
           type: "SetSort"
           previousSort: { property: string; direction: string }[]
           newSort: { property: string; direction: string }[]
+      }
+    | {
+          type: "ScheduleActions"
+          baseFilePath: string
+          entries: ScheduledAction[]
+          delays: string[]
+      }
+    | {
+          type: "ExecuteScheduledAction"
+          file: TFile
+          previousValues: Record<string, unknown>
+          mutations: FrontmatterMutation[]
       }
 
 export interface UndoTransaction {
