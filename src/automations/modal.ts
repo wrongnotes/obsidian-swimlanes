@@ -3,6 +3,7 @@ import { WrongNotesModal } from "../inputs/wrong-notes-modal"
 import type { AutomationRule, AutomationAction, TriggerType } from "./types"
 import { AutomationPropertySuggest } from "../inputs/automation-property-suggest"
 import { AutomationValueSuggest, TEMPLATE_SUGGESTIONS } from "../inputs/automation-value-suggest"
+import { parseDelay } from "./delay"
 
 export interface PropertyInfo {
     name: string
@@ -38,6 +39,23 @@ const VALUE_LABELS: Record<string, string> = {
 }
 
 const hasValue = (type: string) => type !== "clear"
+
+/** Converts "2w" → "2 weeks", "3d" → "3 days", etc. */
+function formatDelayHuman(delay: string): string | null {
+    const match = delay.match(/^(\d+(?:\.\d+)?)\s*([mhdw])$/i)
+    if (!match) return null
+    const value = parseFloat(match[1]!)
+    const unit = match[2]!.toLowerCase()
+    const unitNames: Record<string, [string, string]> = {
+        m: ["minute", "minutes"],
+        h: ["hour", "hours"],
+        d: ["day", "days"],
+        w: ["week", "weeks"],
+    }
+    const names = unitNames[unit]
+    if (!names) return null
+    return `${value} ${value === 1 ? names[0] : names[1]}`
+}
 
 /** Look up a human-readable description for a template token, if known. */
 function templateDescription(value: string): string | null {
@@ -84,6 +102,12 @@ function renderAction(container: HTMLElement, action: AutomationAction): void {
             container.createSpan({ text: "Clear " })
             container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
             break
+    }
+    if (action.delay) {
+        const delayText = formatDelayHuman(action.delay)
+        if (delayText) {
+            container.createSpan({ cls: "swimlane-automation-delay-text", text: ` after ${delayText}` })
+        }
     }
 }
 
@@ -316,6 +340,38 @@ export class AutomationsModal extends WrongNotesModal {
                 this.updateDraftAction(draftActions, i, { value: valueInput.value })
             })
 
+            row.createSpan({ cls: "swimlane-automation-label", text: "after" })
+
+            const delayNumber = row.createEl("input", {
+                cls: "swimlane-automation-delay-input",
+                attr: {
+                    type: "number",
+                    min: "0",
+                    placeholder: "0",
+                    value: action.delay ? action.delay.replace(/[mhdw]$/i, "") : "",
+                },
+            })
+
+            const delayUnit = row.createEl("select", {
+                cls: "swimlane-automation-delay-unit",
+            })
+            for (const [value, label] of [["m", "Minutes"], ["h", "Hours"], ["d", "Days"], ["w", "Weeks"]] as const) {
+                delayUnit.createEl("option", { text: label, attr: { value } })
+            }
+            if (action.delay) {
+                const unitMatch = action.delay.match(/[mhdw]$/i)
+                if (unitMatch) delayUnit.value = unitMatch[0].toLowerCase()
+            }
+
+            const updateDelay = () => {
+                const num = delayNumber.value.trim()
+                const unit = delayUnit.value
+                const newDelay = num && parseFloat(num) > 0 ? `${num}${unit}` : undefined
+                this.updateDraftAction(draftActions, i, { delay: newDelay })
+            }
+            delayNumber.addEventListener("input", updateDelay)
+            delayUnit.addEventListener("change", updateDelay)
+
             if (draftActions.length > 1) {
                 const removeBtn = row.createEl("button", {
                     cls: "swimlane-automation-remove-action-btn mod-warning",
@@ -384,6 +440,10 @@ export class AutomationsModal extends WrongNotesModal {
                     )
                     return
                 }
+                if (action.delay && !parseDelay(action.delay)) {
+                    this.showValidationError("Invalid delay format. Use a number followed by m, h, d, or w.")
+                    return
+                }
             }
 
             this.rules[index] = {
@@ -414,15 +474,16 @@ export class AutomationsModal extends WrongNotesModal {
     private updateDraftAction(
         draftActions: AutomationAction[],
         i: number,
-        patch: { property?: string; value?: string },
+        patch: { property?: string; value?: string; delay?: string },
     ): void {
         const cur = draftActions[i]!
         const prop = patch.property ?? cur.property
         const val = patch.value ?? (cur.type !== "clear" ? cur.value : "")
+        const delay = "delay" in patch ? patch.delay : cur.delay
         if (cur.type === "clear") {
-            draftActions[i] = { type: "clear", property: prop }
+            draftActions[i] = { type: "clear", property: prop, delay }
         } else {
-            draftActions[i] = { type: cur.type, property: prop, value: val }
+            draftActions[i] = { type: cur.type, property: prop, value: val, delay }
         }
     }
 }

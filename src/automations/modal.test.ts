@@ -427,4 +427,51 @@ describe("AutomationsModal — edit/add mode", () => {
         const removeBtn = modal.contentEl.querySelector(".swimlane-automation-remove-action-btn")
         expect(removeBtn).toBeNull()
     })
+
+    it("renders delay inputs in action editor row", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "set", property: "foo", value: "bar", delay: "2w" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
+        editBtn.click()
+        const delayInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-delay-input",
+        )
+        expect(delayInput).not.toBeNull()
+        expect(delayInput?.value).toBe("2")
+        const delayUnit = modal.contentEl.querySelector<HTMLSelectElement>(
+            ".swimlane-automation-delay-unit",
+        )
+        expect(delayUnit).not.toBeNull()
+        expect(delayUnit?.value).toBe("w")
+    })
+
+    it("read-only view shows delay text for delayed actions", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "set", property: "foo", value: "bar", delay: "2w" }],
+            },
+        ])
+        const summaries = modal.contentEl.querySelectorAll(".swimlane-automation-action-summary")
+        const texts = Array.from(summaries).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("after 2 weeks"))).toBe(true)
+    })
+
+    it("read-only view does not show delay text for instant actions", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "set", property: "foo", value: "bar" }],
+            },
+        ])
+        const summaries = modal.contentEl.querySelectorAll(".swimlane-automation-action-summary")
+        const texts = Array.from(summaries).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("after"))).toBe(false)
+    })
 })
