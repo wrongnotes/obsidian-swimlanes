@@ -1,6 +1,7 @@
 import type { App, TFile } from "obsidian"
 import { parseYaml, stringifyYaml, Notice } from "obsidian"
-import { applyMutations } from "../automations"
+import { applyMutations, readScheduledActions, writeScheduledActions } from "../automations"
+import { parseDelay } from "../automations/delay"
 import type { UndoTransaction, UndoOperation } from "./types"
 
 export interface UndoRedoContext {
@@ -136,6 +137,39 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             await writeSort(ctx, op.previousSort)
             break
         }
+
+        case "ScheduleActions": {
+            const baseFile = app.vault.getFileByPath(op.baseFilePath)
+            if (!baseFile) {
+                new Notice("Cannot undo: .base file no longer exists.")
+                return
+            }
+            await app.vault.process(baseFile, content => {
+                const actions = readScheduledActions(content)
+                const entryDues = new Set(op.entries.map(e => `${e.file}|${e.due}`))
+                const filtered = actions.filter(a => !entryDues.has(`${a.file}|${a.due}`))
+                return writeScheduledActions(content, filtered)
+            })
+            break
+        }
+
+        case "ExecuteScheduledAction": {
+            const file = app.vault.getFileByPath(op.file.path)
+            if (!file) {
+                new Notice("Cannot undo: file no longer exists.")
+                return
+            }
+            await app.fileManager.processFrontMatter(file, fm => {
+                for (const [key, value] of Object.entries(op.previousValues)) {
+                    if (value === undefined) {
+                        delete fm[key]
+                    } else {
+                        fm[key] = value
+                    }
+                }
+            })
+            break
+        }
     }
 }
 
@@ -247,6 +281,36 @@ async function redoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
 
         case "SetSort": {
             await writeSort(ctx, op.newSort)
+            break
+        }
+
+        case "ScheduleActions": {
+            const baseFile = app.vault.getFileByPath(op.baseFilePath)
+            if (!baseFile) {
+                new Notice("Cannot redo: .base file no longer exists.")
+                return
+            }
+            const now = Date.now()
+            const newEntries = op.entries.map((e, idx) => {
+                const delayMs = parseDelay(op.delays[idx] ?? "") ?? 0
+                return { ...e, due: new Date(now + delayMs).toISOString() }
+            })
+            await app.vault.process(baseFile, content => {
+                const actions = readScheduledActions(content)
+                return writeScheduledActions(content, [...actions, ...newEntries])
+            })
+            break
+        }
+
+        case "ExecuteScheduledAction": {
+            const file = app.vault.getFileByPath(op.file.path)
+            if (!file) {
+                new Notice("Cannot redo: file no longer exists.")
+                return
+            }
+            await app.fileManager.processFrontMatter(file, fm => {
+                applyMutations(fm, op.mutations)
+            })
             break
         }
     }
