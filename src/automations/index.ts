@@ -3,6 +3,8 @@ export type {
     AutomationAction,
     AutomationContext,
     FrontmatterMutation,
+    MatchedMutation,
+    ScheduledAction,
     TriggerType,
 } from "./types"
 export { matchRules, applyMutations } from "./engine"
