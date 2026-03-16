@@ -116,6 +116,34 @@ describe("readAutomations", () => {
             expect(readAutomations(cfg({ automations: [rule] }))).toEqual([rule])
         }
     })
+
+    it("accepts actions with valid delay field", () => {
+        const content = JSON.stringify({
+            automations: [
+                {
+                    trigger: { type: "enters", swimlane: "Done" },
+                    actions: [{ type: "set", property: "archived", value: "true", delay: "2w" }],
+                },
+            ],
+        })
+        const rules = readAutomations(content)
+        expect(rules).toHaveLength(1)
+        expect((rules[0]!.actions[0]! as any).delay).toBe("2w")
+    })
+
+    it("accepts actions without delay field (backward compatible)", () => {
+        const content = JSON.stringify({
+            automations: [
+                {
+                    trigger: { type: "enters", swimlane: "Done" },
+                    actions: [{ type: "set", property: "done", value: "true" }],
+                },
+            ],
+        })
+        const rules = readAutomations(content)
+        expect(rules).toHaveLength(1)
+        expect((rules[0]!.actions[0]! as any).delay).toBeUndefined()
+    })
 })
 
 describe("readScheduledActions", () => {
