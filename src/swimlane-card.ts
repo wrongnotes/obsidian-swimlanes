@@ -157,7 +157,7 @@ export function renderCard(
     content.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
 
     if (options.hasScheduledActions) {
-        const clockEl = content.createDiv({ cls: "swimlane-card-scheduled-icon" })
+        const clockEl = content.createSpan({ cls: "swimlane-card-scheduled-icon" })
         setIcon(clockEl, "clock")
     }
 

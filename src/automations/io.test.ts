@@ -200,6 +200,15 @@ describe("readScheduledActions", () => {
         })
         expect(readScheduledActions(content)).toEqual([])
     })
+
+    it("drops entries with invalid due date", () => {
+        const content = JSON.stringify({
+            scheduledActions: [
+                { file: "a.md", due: "not-a-date", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+            ],
+        })
+        expect(readScheduledActions(content)).toEqual([])
+    })
 })
 
 describe("writeScheduledActions", () => {

@@ -91,6 +91,7 @@ function isValidScheduledAction(entry: unknown): entry is ScheduledAction {
     const e = entry as Record<string, unknown>
     if (typeof e.file !== "string" || e.file === "") return false
     if (typeof e.due !== "string" || e.due === "") return false
+    if (isNaN(new Date(e.due as string).getTime())) return false
     if (typeof e.whileInSwimlane !== "string" || e.whileInSwimlane === "") return false
     if (!Array.isArray(e.actions) || e.actions.length === 0) return false
     return e.actions.every(isValidMutationAction)

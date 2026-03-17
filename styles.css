@@ -1203,7 +1203,8 @@
 .swimlane-card-scheduled-icon {
     display: inline-flex;
     align-items: center;
-    margin-left: auto;
+    vertical-align: middle;
+    margin-left: var(--size-2-1);
 }
 
 .swimlane-card-scheduled-icon svg {

@@ -1863,13 +1863,15 @@ export class SwimlaneView extends BasesView {
 
         // Write to .base file: cancel old entries for source swimlane, add new for target
         if (this.baseFile) {
-            this.app.vault.process(this.baseFile, content => {
+            void this.app.vault.process(this.baseFile, content => {
                 let existing = readScheduledActions(content)
                 if (fromSwimlane) {
                     existing = cancelScheduledActions(existing, filePath, fromSwimlane)
                 }
                 const updated = addScheduledActions(existing, filePath, targetSwimlane, delayed, now)
                 return writeScheduledActions(content, updated)
+            }).catch(() => {
+                // Write failed — scheduled actions not persisted. They will be re-scheduled on next move.
             })
             // Start the poller since we now have scheduled items
             this.plugin.startPoller()
