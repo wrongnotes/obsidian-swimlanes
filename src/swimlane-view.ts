@@ -324,45 +324,67 @@ export class SwimlaneView extends BasesView {
     }
 
     /**
-     * Returns true when Bases has an active filter or search, meaning some
-     * entries may be hidden. Detected via DOM since Bases pre-filters data.
+     * Returns all ranks in a column from the vault (unfiltered), sorted.
+     * Used to find correct rank positions when Bases filters hide some cards.
      */
-    private get isFiltered(): boolean {
-        const parent = this.boardEl.parentElement
-        if (!parent) return false
-        // Filter button has is-active when filters are applied
-        const filterActive =
-            parent
-                .querySelector(".bases-toolbar-filter-menu .text-icon-button")
-                ?.classList.contains("is-active") ?? false
-        // Search: look for any non-empty input within the Bases toolbar that isn't ours
-        const inputs = parent.querySelectorAll<HTMLInputElement>(".bases-toolbar input")
-        const searchActive = Array.from(inputs).some(
-            input => !input.closest(".swimlane-automations-btn") && input.value.length > 0,
-        )
-        return filterActive || searchActive
+    private getAllColumnRanks(groupKey: GroupKey, excludePath?: string): string[] {
+        const ranks: string[] = []
+        const swimlaneProp = this.swimlaneProp
+        const rankProp = this.rankProp
+        for (const file of this.app.vault.getMarkdownFiles()) {
+            if (excludePath && file.path === excludePath) continue
+            const cache = this.app.metadataCache.getFileCache(file)
+            const fm = cache?.frontmatter
+            if (!fm) continue
+            if (String(fm[swimlaneProp] ?? "") !== String(groupKey)) continue
+            const rank = fm[rankProp]
+            if (typeof rank === "string" && rank) {
+                ranks.push(rank)
+            }
+        }
+        return ranks.sort()
     }
 
     /**
-     * Attempts to clear Bases filter and search.
-     * Clears any search input values and clicks the filter button to deactivate.
+     * Adjusts beforeRank/afterRank to account for hidden cards when filters
+     * are active. Finds the tightest valid gap in the full unfiltered column
+     * so midRank doesn't collide with hidden cards.
      */
-    private clearFilterAndSearch(): void {
-        const parent = this.boardEl.parentElement
-        if (!parent) return
-        // Clear search inputs
-        const inputs = parent.querySelectorAll<HTMLInputElement>(".bases-toolbar input")
-        for (const input of inputs) {
-            if (!input.closest(".swimlane-automations-btn") && input.value.length > 0) {
-                input.value = ""
-                input.dispatchEvent(new Event("input", { bubbles: true }))
+    private adjustRanksForHiddenCards(
+        beforeRank: string | null,
+        afterRank: string | null,
+        groupKey: GroupKey,
+        draggedPath: string,
+    ): { beforeRank: string | null; afterRank: string | null } {
+        const ranks = this.getAllColumnRanks(groupKey, draggedPath)
+        if (ranks.length === 0) return { beforeRank, afterRank }
+
+        if (beforeRank !== null && afterRank !== null) {
+            // Find the tightest gap: the last rank <= beforeRank and first >= afterRank,
+            // accounting for any hidden cards between the visible before/after.
+            let actualBefore = beforeRank
+            for (const r of ranks) {
+                if (r > beforeRank && r < afterRank) {
+                    actualBefore = r
+                }
+            }
+            return { beforeRank: actualBefore, afterRank }
+        } else if (beforeRank !== null) {
+            // Dropping at the end — use the actual last rank in column
+            const actualLast = ranks[ranks.length - 1]!
+            return {
+                beforeRank: actualLast > beforeRank ? actualLast : beforeRank,
+                afterRank: null,
+            }
+        } else if (afterRank !== null) {
+            // Dropping at the start — use the actual first rank in column
+            const actualFirst = ranks[0]!
+            return {
+                beforeRank: null,
+                afterRank: actualFirst < afterRank ? afterRank : actualFirst,
             }
         }
-        // Click filter button to deactivate if active
-        const filterBtn = parent.querySelector<HTMLElement>(
-            ".bases-toolbar-filter-menu .text-icon-button.is-active",
-        )
-        filterBtn?.click()
+        return { beforeRank, afterRank }
     }
 
     private get isSortedByRank(): boolean {
@@ -765,34 +787,8 @@ export class SwimlaneView extends BasesView {
             }
         }
 
-        let filtered = this.isFiltered
-        let disableReorder = !sortedByRank || filtered
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
-        board.toggleClass("swimlane-column-drop-mode", disableReorder)
-
-        // Bases may update the toolbar DOM after calling onDataUpdated, so
-        // recheck the filter state after a frame and update the board if needed.
-        requestAnimationFrame(() => {
-            if (!board.isConnected) return
-            const nowFiltered = this.isFiltered
-            if (nowFiltered !== filtered) {
-                filtered = nowFiltered
-                disableReorder = !sortedByRank || filtered
-                board.toggleClass("swimlane-column-drop-mode", disableReorder)
-                // Add or remove the filter toolbar hint
-                const existingHint = this.boardEl.querySelector(".swimlane-filter-toolbar")
-                if (disableReorder && sortedByRank && !existingHint) {
-                    const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar swimlane-filter-toolbar" })
-                    this.boardEl.insertBefore(toolbar, board)
-                    const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
-                    setIcon(hint.createSpan(), "search")
-                    hint.createSpan({ text: "Clear search or filter to enable re-ordering" })
-                    hint.addEventListener("click", () => this.clearFilterAndSearch())
-                } else if (!disableReorder && existingHint) {
-                    existingHint.remove()
-                }
-            }
-        })
+        board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
         this.currentBoard = board
         this.columnDropTarget = null
 
@@ -832,20 +828,13 @@ export class SwimlaneView extends BasesView {
         // Inject the automations button into the Bases toolbar (sibling of containerEl).
         this.injectBasesToolbarButton()
 
-        if (disableReorder) {
+        if (!sortedByRank) {
             const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar" })
             this.boardEl.insertBefore(toolbar, board)
-            if (!sortedByRank) {
-                const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
-                setIcon(hint.createSpan(), "arrow-up-down")
-                hint.createSpan({ text: "Sort by rank to enable re-ordering" })
-                hint.addEventListener("click", () => this.setSortByRank())
-            } else if (filtered) {
-                const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
-                setIcon(hint.createSpan(), "search")
-                hint.createSpan({ text: "Clear search or filter to enable re-ordering" })
-                hint.addEventListener("click", () => this.clearFilterAndSearch())
-            }
+            const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+            setIcon(hint.createSpan(), "arrow-up-down")
+            hint.createSpan({ text: "Sort by rank to enable re-ordering" })
+            hint.addEventListener("click", () => this.setSortByRank())
         }
 
         // Floating undo/redo controls
@@ -2044,10 +2033,10 @@ export class SwimlaneView extends BasesView {
             this.expandingCardPath = dragState.path
         }
 
-        // When sorted by a non-rank property or when a filter/search is active,
-        // block same-column reorders. Cross-column moves always work.
-        // The column-drop-mode CSS and toolbar hint already communicate this visually.
-        if (!isCrossColumn && (!this.isSortedByRank || this.isFiltered)) {
+        // When sorted by a non-rank property, block same-column reorders
+        // (the visual order is driven by that sort field, not rank).
+        // Cross-column moves always work.
+        if (!isCrossColumn && !this.isSortedByRank) {
             return
         }
 
@@ -2072,7 +2061,15 @@ export class SwimlaneView extends BasesView {
             return
         }
 
-        const newRank = midRank(position.beforeRank, position.afterRank)
+        // Adjust ranks to account for hidden cards (from filters/search)
+        // so midRank doesn't collide with cards that aren't currently visible.
+        const adjusted = this.adjustRanksForHiddenCards(
+            position.beforeRank,
+            position.afterRank,
+            context.groupKey,
+            dragState.path,
+        )
+        const newRank = midRank(adjusted.beforeRank, adjusted.afterRank)
         const fromRank = getFrontmatter<string>(this.app, file, this.rankProp) ?? ""
         const label = isCrossColumn ? "Move card" : "Reorder card"
 
