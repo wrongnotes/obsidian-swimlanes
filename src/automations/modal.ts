@@ -395,12 +395,22 @@ export class AutomationsModal extends WrongNotesModal {
                 this.updateDraftAction(draftActions, i, { value: moveSelect.value })
             })
 
+            // Delete tooltip
+            if (action.type === "delete") {
+                row.createDiv({
+                    cls: "swimlane-automation-delete-hint",
+                    text: "Delete cannot be combined with other actions.",
+                })
+            }
+
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as AutomationAction["type"]
                 const prop = propInput.value
                 const val = newType === "move" ? (this.ctx.swimlanes[0] ?? "") : valueInput.value
                 if (newType === "delete") {
-                    draftActions[i] = { type: "delete" }
+                    // Delete is exclusive — replace all actions with just delete
+                    draftActions.length = 0
+                    draftActions.push({ type: "delete" })
                 } else if (newType === "move") {
                     draftActions[i] = { type: "move", value: val }
                 } else if (newType === "clear") {
@@ -408,8 +418,8 @@ export class AutomationsModal extends WrongNotesModal {
                 } else {
                     draftActions[i] = { type: newType, property: prop, value: val }
                 }
-                // Re-render this row to update labels and visibility
                 renderActions()
+                updateAddActionBtn()
             })
 
             propInput.addEventListener("input", () => {
@@ -443,6 +453,12 @@ export class AutomationsModal extends WrongNotesModal {
             draftActions.push({ type: "set", property: "", value: "" })
             renderActions()
         })
+
+        const updateAddActionBtn = () => {
+            const isDelete = draftActions.length === 1 && draftActions[0]?.type === "delete"
+            addActionBtn.toggleClass("swimlane-automation-hidden", isDelete)
+        }
+        updateAddActionBtn()
 
         // --- Editor buttons ---
         const buttonsRow = editor.createDiv({ cls: "swimlane-automation-editor-buttons" })

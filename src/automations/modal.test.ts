@@ -506,6 +506,61 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(texts.some(t => t.includes("for 2 weeks"))).toBe(true)
     })
 
+    it("delete action is exclusive — hides add action button and shows hint", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        // Add action button should be hidden
+        const addBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-add-action-btn",
+        ) as HTMLButtonElement
+        expect(addBtn.classList.contains("swimlane-automation-hidden")).toBe(true)
+
+        // Hint text should be visible
+        const hint = modal.contentEl.querySelector(".swimlane-automation-delete-hint")
+        expect(hint).toBeTruthy()
+        expect(hint!.textContent).toContain("cannot be combined")
+    })
+
+    it("switching to delete replaces all actions with single delete", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [
+                    { type: "set", property: "a", value: "1" },
+                    { type: "set", property: "b", value: "2" },
+                ],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        // Should have 2 action rows
+        let actionRows = modal.contentEl.querySelectorAll(".swimlane-automation-action")
+        expect(actionRows.length).toBe(2)
+
+        // Change first action to delete
+        const typeSelect = actionRows[0]!.querySelector(
+            ".swimlane-automation-action-type-select",
+        ) as HTMLSelectElement
+        typeSelect.value = "delete"
+        typeSelect.dispatchEvent(new Event("change"))
+
+        // Should now have 1 action row
+        actionRows = modal.contentEl.querySelectorAll(".swimlane-automation-action")
+        expect(actionRows.length).toBe(1)
+    })
+
     it("read-only view shows 'Delete card' for delete action", () => {
         const { modal } = openModal([
             {
