@@ -31,6 +31,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
     add: "Add to",
     remove: "Remove from",
     clear: "Clear",
+    delete: "Delete card",
 }
 
 const VALUE_LABELS: Record<string, string> = {
@@ -39,7 +40,8 @@ const VALUE_LABELS: Record<string, string> = {
     remove: "value",
 }
 
-const hasValue = (type: string) => type !== "clear"
+const hasValue = (type: string) => type !== "clear" && type !== "delete"
+const needsProperty = (type: string) => type !== "delete"
 
 /** Converts "2w" → "2 weeks", "3d" → "3 days", etc. */
 function formatDelayHuman(delay: string): string | null {
@@ -108,6 +110,9 @@ function renderAction(container: HTMLElement, action: AutomationAction): void {
         case "clear":
             container.createSpan({ text: "Clear " })
             container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            break
+        case "delete":
+            container.createSpan({ text: "Delete card" })
             break
     }
 }
@@ -321,12 +326,14 @@ export class AutomationsModal extends WrongNotesModal {
             }
             typeSelect.value = action.type
 
-            row.createSpan({ cls: "swimlane-automation-label", text: "property" })
+            const propLabel = row.createSpan({ cls: "swimlane-automation-label", text: "property" })
+            propLabel.toggleClass("swimlane-automation-hidden", !needsProperty(action.type))
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
-                attr: { type: "text", placeholder: "Property name", value: action.property },
+                attr: { type: "text", placeholder: "Property name", value: action.type !== "delete" ? action.property : "" },
             })
+            propInput.toggleClass("swimlane-automation-hidden", !needsProperty(action.type))
 
             const propSuggest = new AutomationPropertySuggest(
                 this.ctx.app,
@@ -351,7 +358,7 @@ export class AutomationsModal extends WrongNotesModal {
                 attr: {
                     type: "text",
                     placeholder: "value or {{template}}",
-                    value: action.type !== "clear" ? action.value : "",
+                    value: hasValue(action.type) ? (action as { value?: string }).value ?? "" : "",
                 },
             })
             valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
@@ -366,7 +373,9 @@ export class AutomationsModal extends WrongNotesModal {
                 const newType = typeSelect.value as AutomationAction["type"]
                 const prop = propInput.value
                 const val = valueInput.value
-                if (newType === "clear") {
+                if (newType === "delete") {
+                    draftActions[i] = { type: "delete" }
+                } else if (newType === "clear") {
                     draftActions[i] = { type: "clear", property: prop }
                 } else {
                     draftActions[i] = { type: newType, property: prop, value: val }
@@ -416,7 +425,7 @@ export class AutomationsModal extends WrongNotesModal {
         })
         cancelBtn.addEventListener("click", () => {
             // Discard: if new rule (no prior state), remove it from rules array
-            if (rule.actions[0]?.property === "" && rule.actions.length === 1) {
+            if (rule.actions.length === 1 && rule.actions[0]?.type !== "delete" && (rule.actions[0] as { property?: string }).property === "") {
                 // Check if this was a newly added (empty) rule
                 const orig = this.ctx.rules[index]
                 if (!orig) {
@@ -443,6 +452,7 @@ export class AutomationsModal extends WrongNotesModal {
                 }
             }
             for (const action of draftActions) {
+                if (action.type === "delete") continue  // No property/value needed
                 if (!action.property.trim()) {
                     this.showValidationError("Every action must have a property name.")
                     return
@@ -490,11 +500,14 @@ export class AutomationsModal extends WrongNotesModal {
         patch: { property?: string; value?: string },
     ): void {
         const cur = draftActions[i]!
-        const prop = patch.property ?? cur.property
-        const val = patch.value ?? (cur.type !== "clear" ? cur.value : "")
-        if (cur.type === "clear") {
+        if (cur.type === "delete") {
+            draftActions[i] = { type: "delete" }
+        } else if (cur.type === "clear") {
+            const prop = patch.property ?? cur.property
             draftActions[i] = { type: "clear", property: prop }
         } else {
+            const prop = patch.property ?? cur.property
+            const val = patch.value ?? cur.value
             draftActions[i] = { type: cur.type, property: prop, value: val }
         }
     }

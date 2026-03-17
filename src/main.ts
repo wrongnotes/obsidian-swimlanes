@@ -152,6 +152,17 @@ export default class SwimlanePlugin extends Plugin {
                 const currentSwimlane = fm[swimlaneProp]
                 if (currentSwimlane !== action.whileInSwimlane) continue
 
+                // Check if this scheduled action contains a delete mutation
+                const hasDelete = action.actions.some(a => a.type === "delete")
+                if (hasDelete) {
+                    try {
+                        await this.app.fileManager.trashFile(file)
+                    } catch {
+                        // File might already be deleted
+                    }
+                    continue  // Skip frontmatter mutations — file is deleted
+                }
+
                 try {
                     await this.app.fileManager.processFrontMatter(file, fileFm => {
                         applyMutations(fileFm, action.actions)

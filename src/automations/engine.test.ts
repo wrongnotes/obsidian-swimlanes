@@ -315,6 +315,33 @@ describe("matchRules", () => {
         expect(mutations[1]!.delay).toBe("1d")
     })
 
+    it("handles delete action type", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "delete" }],
+            },
+        ]
+        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.type).toBe("delete")
+    })
+
+    it("remains_in with delete action gets delay from trigger", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ]
+        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.type).toBe("delete")
+        expect(mutations[0]!.delay).toBe("4w")
+    })
+
     it("does not include delay on instant actions", () => {
         const rules: AutomationRule[] = [
             {
@@ -416,5 +443,11 @@ describe("applyMutations", () => {
         const fm: Record<string, unknown> = {}
         applyMutations(fm, [{ type: "remove", property: "tags", value: "x" }])
         expect(fm).toEqual({})
+    })
+
+    it("delete mutation is a no-op on frontmatter", () => {
+        const fm: Record<string, unknown> = { foo: "bar" }
+        applyMutations(fm, [{ type: "delete", property: "" }])
+        expect(fm).toEqual({ foo: "bar" })
     })
 })

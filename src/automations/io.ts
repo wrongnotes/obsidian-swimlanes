@@ -12,6 +12,9 @@ function isValidAction(action: unknown): action is AutomationAction {
     if (typeof a.type !== "string") {
         return false
     }
+    if (a.type === "delete") {
+        return true
+    }
     if (typeof a.property !== "string" || a.property === "") {
         return false
     }
@@ -86,7 +89,9 @@ export function readAutomations(content: string): AutomationRule[] {
 function isValidMutationAction(action: unknown): boolean {
     if (!action || typeof action !== "object") return false
     const a = action as Record<string, unknown>
-    if (typeof a.type !== "string" || typeof a.property !== "string" || a.property === "") return false
+    if (typeof a.type !== "string") return false
+    if (a.type === "delete") return true
+    if (typeof a.property !== "string" || a.property === "") return false
     if (a.type === "set" || a.type === "add" || a.type === "remove") return a.value !== undefined
     if (a.type === "clear") return true
     return false

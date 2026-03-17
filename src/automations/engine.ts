@@ -57,6 +57,10 @@ export function matchRules(
         const delay = rule.trigger.type === "remains_in" ? rule.trigger.delay : undefined
 
         for (const action of rule.actions) {
+            if (action.type === "delete") {
+                mutations.push({ type: "delete", property: "", delay })
+                continue
+            }
             if (action.property === swimlaneProp) {
                 continue
             }
@@ -112,6 +116,9 @@ export function applyMutations(
             }
             case "clear":
                 delete fm[mutation.property]
+                break
+            case "delete":
+                // File deletion handled by caller, not frontmatter
                 break
         }
     }
