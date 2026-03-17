@@ -370,6 +370,33 @@ export class SwimlaneView extends BasesView {
         }
     }
 
+    /**
+     * Write the groupBy field into the `.base` file view config,
+     * setting it to the configured swimlane property.
+     */
+    private setGroupBy(): void {
+        const file = this.app.workspace.getActiveFile()
+        if (!file || file.extension !== "base") {
+            return
+        }
+        const viewName = this.config.name
+        const swimlanePropId = this.swimlanePropId
+        this.app.vault.process(file, content => {
+            const config = parseYaml(content)
+            if (!config?.views || !Array.isArray(config.views)) {
+                return content
+            }
+            const view = config.views.find(
+                (v: Record<string, unknown>) => v.name === viewName && v.type === "swimlane",
+            )
+            if (!view) {
+                return content
+            }
+            view.groupBy = { property: String(swimlanePropId), direction: "ASC" }
+            return stringifyYaml(config)
+        })
+    }
+
     private openAutomationsModal(): void {
         if (!this.baseFile) {
             return
@@ -671,6 +698,16 @@ export class SwimlaneView extends BasesView {
         if (!hasGroups && this.swimlaneOrder.length === 0) {
             const msg = 'Set a "Group by" property in the Bases toolbar to use the Swimlane view.'
             this.boardEl.createEl("p", { cls: "swimlane-empty", text: msg })
+            return
+        }
+
+        if (!hasGroups && this.swimlaneOrder.length > 0) {
+            this.injectBasesToolbarButton()
+            const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar" })
+            const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+            setIcon(hint.createSpan(), "columns-3")
+            hint.createSpan({ text: "Populate group by for cards to render in swimlanes" })
+            hint.addEventListener("click", () => this.setGroupBy())
             return
         }
 
