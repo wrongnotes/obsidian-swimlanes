@@ -131,6 +131,20 @@ describe("readAutomations", () => {
         expect(rules[0]!.actions[0]!.type).toBe("delete")
     })
 
+    it("accepts move action type", () => {
+        const content = JSON.stringify({
+            automations: [
+                {
+                    trigger: { type: "enters", swimlane: "Done" },
+                    actions: [{ type: "move", value: "Archived" }],
+                },
+            ],
+        })
+        const rules = readAutomations(content)
+        expect(rules).toHaveLength(1)
+        expect(rules[0]!.actions[0]!.type).toBe("move")
+    })
+
     it("accepts remains_in rule with delay", () => {
         const content = JSON.stringify({
             automations: [

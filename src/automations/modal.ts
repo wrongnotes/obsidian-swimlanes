@@ -31,6 +31,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
     add: "Add to",
     remove: "Remove from",
     clear: "Clear",
+    move: "Move card",
     delete: "Delete card",
 }
 
@@ -38,10 +39,11 @@ const VALUE_LABELS: Record<string, string> = {
     set: "to",
     add: "value",
     remove: "value",
+    move: "to",
 }
 
 const hasValue = (type: string) => type !== "clear" && type !== "delete"
-const needsProperty = (type: string) => type !== "delete"
+const needsProperty = (type: string) => type !== "delete" && type !== "move"
 
 /** Converts "2w" → "2 weeks", "3d" → "3 days", etc. */
 function formatDelayHuman(delay: string): string | null {
@@ -110,6 +112,10 @@ function renderAction(container: HTMLElement, action: AutomationAction): void {
         case "clear":
             container.createSpan({ text: "Clear " })
             container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
+            break
+        case "move":
+            container.createSpan({ text: "Move card to " })
+            container.createEl("code", { cls: "swimlane-automation-code", text: action.value })
             break
         case "delete":
             container.createSpan({ text: "Delete card" })
@@ -331,7 +337,7 @@ export class AutomationsModal extends WrongNotesModal {
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
-                attr: { type: "text", placeholder: "Property name", value: action.type !== "delete" ? action.property : "" },
+                attr: { type: "text", placeholder: "Property name", value: action.type !== "delete" && action.type !== "move" ? action.property : "" },
             })
             propInput.toggleClass("swimlane-automation-hidden", !needsProperty(action.type))
 
@@ -375,6 +381,8 @@ export class AutomationsModal extends WrongNotesModal {
                 const val = valueInput.value
                 if (newType === "delete") {
                     draftActions[i] = { type: "delete" }
+                } else if (newType === "move") {
+                    draftActions[i] = { type: "move", value: val }
                 } else if (newType === "clear") {
                     draftActions[i] = { type: "clear", property: prop }
                 } else {
@@ -453,6 +461,13 @@ export class AutomationsModal extends WrongNotesModal {
             }
             for (const action of draftActions) {
                 if (action.type === "delete") continue  // No property/value needed
+                if (action.type === "move") {
+                    if (!action.value.trim()) {
+                        this.showValidationError("Move action must have a target swimlane.")
+                        return
+                    }
+                    continue
+                }
                 if (!action.property.trim()) {
                     this.showValidationError("Every action must have a property name.")
                     return
@@ -502,6 +517,9 @@ export class AutomationsModal extends WrongNotesModal {
         const cur = draftActions[i]!
         if (cur.type === "delete") {
             draftActions[i] = { type: "delete" }
+        } else if (cur.type === "move") {
+            const val = patch.value ?? cur.value
+            draftActions[i] = { type: "move", value: val }
         } else if (cur.type === "clear") {
             const prop = patch.property ?? cur.property
             draftActions[i] = { type: "clear", property: prop }

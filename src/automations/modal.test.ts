@@ -518,6 +518,18 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(texts.some(t => t.includes("Delete card"))).toBe(true)
     })
 
+    it("read-only view shows 'Move card to' for move action", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ])
+        const summaries = modal.contentEl.querySelectorAll(".swimlane-automation-action-summary")
+        const texts = Array.from(summaries).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("Move card to") && t.includes("Archived"))).toBe(true)
+    })
+
     it("read-only view does not show delay text for enters trigger", () => {
         const { modal } = openModal([
             {

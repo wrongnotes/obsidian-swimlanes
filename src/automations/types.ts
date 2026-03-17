@@ -20,6 +20,7 @@ export type AutomationAction =
     | { type: "add"; property: string; value: string }
     | { type: "remove"; property: string; value: string }
     | { type: "clear"; property: string }
+    | { type: "move"; value: string }
     | { type: "delete" }
 
 export interface FrontmatterMutation {

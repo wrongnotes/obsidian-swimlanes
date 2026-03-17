@@ -342,6 +342,45 @@ describe("matchRules", () => {
         expect(mutations[0]!.delay).toBe("4w")
     })
 
+    it("move action resolves to set on swimlaneProp", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ]
+        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]).toEqual({ type: "set", property: "status", value: "Archived", delay: undefined })
+    })
+
+    it("move action bypasses swimlaneProp loop guard", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ]
+        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.property).toBe("status")
+        expect(mutations[0]!.delay).toBe("4w")
+    })
+
+    it("move action resolves template tokens in value", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Review" },
+                actions: [{ type: "move", value: "{{target.swimlane}}" }],
+            },
+        ]
+        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "Todo", targetSwimlane: "Review" }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations[0]!.value).toBe("Review")
+    })
+
     it("does not include delay on instant actions", () => {
         const rules: AutomationRule[] = [
             {

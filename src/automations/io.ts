@@ -15,6 +15,9 @@ function isValidAction(action: unknown): action is AutomationAction {
     if (a.type === "delete") {
         return true
     }
+    if (a.type === "move") {
+        return typeof a.value === "string" && a.value !== ""
+    }
     if (typeof a.property !== "string" || a.property === "") {
         return false
     }

@@ -61,6 +61,17 @@ export function matchRules(
                 mutations.push({ type: "delete", property: "", delay })
                 continue
             }
+            // "move" explicitly targets swimlaneProp — allowed (not a loop)
+            if (action.type === "move") {
+                mutations.push({
+                    type: "set",
+                    property: swimlaneProp,
+                    value: resolveValue(action.value, context),
+                    delay,
+                })
+                continue
+            }
+            // All other actions targeting swimlaneProp are filtered (loop guard)
             if (action.property === swimlaneProp) {
                 continue
             }
