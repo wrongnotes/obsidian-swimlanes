@@ -359,15 +359,17 @@ export class AutomationsModal extends WrongNotesModal {
             })
             valueLabel.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
 
+            const isMove = action.type === "move"
+
             const valueInput = row.createEl("input", {
                 cls: "swimlane-automation-value-input",
                 attr: {
                     type: "text",
                     placeholder: "value or {{template}}",
-                    value: hasValue(action.type) ? (action as { value?: string }).value ?? "" : "",
+                    value: hasValue(action.type) && !isMove ? (action as { value?: string }).value ?? "" : "",
                 },
             })
-            valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type))
+            valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type) || isMove)
 
             const valueSuggest = new AutomationValueSuggest(this.ctx.app, valueInput, value => {
                 valueInput.value = value
@@ -375,10 +377,28 @@ export class AutomationsModal extends WrongNotesModal {
             })
             valueSuggest.close()
 
+            // Swimlane picker for "move" actions
+            const moveSelect = row.createEl("select", {
+                cls: "swimlane-automation-move-select",
+            })
+            for (const lane of this.ctx.swimlanes) {
+                const opt = moveSelect.createEl("option", { text: lane, attr: { value: lane } })
+                if (isMove && (action as { value?: string }).value === lane) {
+                    opt.selected = true
+                }
+            }
+            if (isMove && (action as { value?: string }).value) {
+                moveSelect.value = (action as { value?: string }).value!
+            }
+            moveSelect.toggleClass("swimlane-automation-hidden", !isMove)
+            moveSelect.addEventListener("change", () => {
+                this.updateDraftAction(draftActions, i, { value: moveSelect.value })
+            })
+
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as AutomationAction["type"]
                 const prop = propInput.value
-                const val = valueInput.value
+                const val = newType === "move" ? (this.ctx.swimlanes[0] ?? "") : valueInput.value
                 if (newType === "delete") {
                     draftActions[i] = { type: "delete" }
                 } else if (newType === "move") {

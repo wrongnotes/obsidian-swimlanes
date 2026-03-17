@@ -518,6 +518,33 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(texts.some(t => t.includes("Delete card"))).toBe(true)
     })
 
+    it("move action shows swimlane select in editor", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "move", value: "Backlog" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        const moveSelect = modal.contentEl.querySelector(
+            ".swimlane-automation-move-select",
+        ) as HTMLSelectElement
+        expect(moveSelect).toBeTruthy()
+        expect(moveSelect.classList.contains("swimlane-automation-hidden")).toBe(false)
+        expect(moveSelect.value).toBe("Backlog")
+        expect(moveSelect.options.length).toBe(3) // Backlog, In Progress, Done
+
+        // Value text input should be hidden
+        const valueInput = modal.contentEl.querySelector(
+            ".swimlane-automation-value-input",
+        ) as HTMLInputElement
+        expect(valueInput.classList.contains("swimlane-automation-hidden")).toBe(true)
+    })
+
     it("read-only view shows 'Move card to' for move action", () => {
         const { modal } = openModal([
             {
