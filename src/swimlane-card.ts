@@ -39,8 +39,6 @@ export interface CardRenderOptions {
     highlightColumn: (column: string) => void
     /** When true, renders an inline menu button instead of relying on contextmenu. */
     mobile?: boolean
-    /** Whether this card has pending scheduled automation actions. */
-    hasScheduledActions?: boolean
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -155,11 +153,6 @@ export function renderCard(
 
     const content = imageUrl ? card.createDiv({ cls: "swimlane-card-content" }) : card
     content.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
-
-    if (options.hasScheduledActions) {
-        const clockEl = content.createSpan({ cls: "swimlane-card-scheduled-icon" })
-        setIcon(clockEl, "clock")
-    }
 
     if (properties.length > 0) {
         const rows: { icon: string; label: string; value: string }[] = []
