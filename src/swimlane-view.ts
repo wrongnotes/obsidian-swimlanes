@@ -324,20 +324,21 @@ export class SwimlaneView extends BasesView {
     }
 
     /**
-     * Returns true when the view sort is compatible with rank-based DnD.
-     * Empty sort returns true — on drop we auto-set it to rank.
-     * A non-rank sort returns false — in-column card DnD is disabled.
-     */
-    /**
-     * Returns true when Bases has an active filter/search.
-     * Detected via the `.is-active` class on the filter toolbar button,
-     * since Bases pre-filters data before passing it to the view.
+     * Returns true when Bases has an active filter or search, meaning some
+     * entries may be hidden. Detected via DOM since Bases pre-filters data.
      */
     private get isFiltered(): boolean {
-        const filterBtn = this.boardEl.parentElement?.querySelector(
-            ".bases-toolbar-filter-menu .text-icon-button",
+        const toolbar = this.boardEl.parentElement
+        // Filter button has is-active when filters are applied
+        const filterActive = toolbar
+            ?.querySelector(".bases-toolbar-filter-menu .text-icon-button")
+            ?.classList.contains("is-active") ?? false
+        // Search input: any input/search in the toolbar with a non-empty value
+        const searchInput = toolbar?.querySelector<HTMLInputElement>(
+            ".bases-toolbar input[type='search'], .bases-toolbar input[type='text']",
         )
-        return filterBtn?.classList.contains("is-active") ?? false
+        const searchActive = !!searchInput && searchInput.value.length > 0
+        return filterActive || searchActive
     }
 
     private get isSortedByRank(): boolean {
@@ -740,8 +741,10 @@ export class SwimlaneView extends BasesView {
             }
         }
 
+        const filtered = this.isFiltered
+        const disableReorder = !sortedByRank || filtered
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
-        board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
+        board.toggleClass("swimlane-column-drop-mode", disableReorder)
         this.currentBoard = board
         this.columnDropTarget = null
 
@@ -781,13 +784,19 @@ export class SwimlaneView extends BasesView {
         // Inject the automations button into the Bases toolbar (sibling of containerEl).
         this.injectBasesToolbarButton()
 
-        if (!sortedByRank) {
+        if (disableReorder) {
             const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar" })
             this.boardEl.insertBefore(toolbar, board)
-            const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
-            setIcon(hint.createSpan(), "arrow-up-down")
-            hint.createSpan({ text: "Sort by rank to enable re-ordering" })
-            hint.addEventListener("click", () => this.setSortByRank())
+            if (!sortedByRank) {
+                const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+                setIcon(hint.createSpan(), "arrow-up-down")
+                hint.createSpan({ text: "Sort by rank to enable re-ordering" })
+                hint.addEventListener("click", () => this.setSortByRank())
+            } else if (filtered) {
+                const hint = toolbar.createDiv({ cls: "swimlane-toolbar-btn swimlane-toolbar-disabled" })
+                setIcon(hint.createSpan(), "search")
+                hint.createSpan({ text: "Clear search or filter to enable re-ordering" })
+            }
         }
 
         // Floating undo/redo controls
@@ -1986,18 +1995,10 @@ export class SwimlaneView extends BasesView {
             this.expandingCardPath = dragState.path
         }
 
-        // When sorted by a non-rank property, block same-column reorders
-        // (the visual order is driven by that sort field, not rank).
-        // Cross-column moves always work.
-        if (!isCrossColumn && !this.isSortedByRank) {
-            new Notice("Sort by rank to re-order cards within a swimlane.")
-            return
-        }
-
-        // When a search/filter is active, block same-column reorders because
-        // hidden cards make rank positions unreliable.
-        if (!isCrossColumn && this.isFiltered) {
-            new Notice("Clear the search filter to re-order cards within a swimlane.")
+        // When sorted by a non-rank property or when a filter/search is active,
+        // block same-column reorders. Cross-column moves always work.
+        // The column-drop-mode CSS and toolbar hint already communicate this visually.
+        if (!isCrossColumn && (!this.isSortedByRank || this.isFiltered)) {
             return
         }
 
