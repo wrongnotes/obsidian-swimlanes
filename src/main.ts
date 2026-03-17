@@ -3,8 +3,13 @@ import { SwimlaneView } from "./swimlane-view"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
 import {
-    readAutomations, writeAutomations, readScheduledActions, writeScheduledActions,
-    AutomationsModal, getDueActions, applyMutations,
+    readAutomations,
+    writeAutomations,
+    readScheduledActions,
+    writeScheduledActions,
+    AutomationsModal,
+    getDueActions,
+    applyMutations,
 } from "./automations"
 
 export default class SwimlanePlugin extends Plugin {
@@ -95,7 +100,9 @@ export default class SwimlanePlugin extends Plugin {
 
     /** Start the 5-minute poller if not already running. */
     startPoller(): void {
-        if (this.pollerIntervalId !== null) return
+        if (this.pollerIntervalId !== null) {
+            return
+        }
         this.pollerIntervalId = window.setInterval(() => this.processAllDueActions(), 5 * 60 * 1000)
         this.registerInterval(this.pollerIntervalId)
     }
@@ -114,7 +121,9 @@ export default class SwimlanePlugin extends Plugin {
 
         for (const baseFile of baseFiles) {
             const hadItems = await this.processDueActionsForFile(baseFile)
-            if (hadItems) hasAnyScheduled = true
+            if (hadItems) {
+                hasAnyScheduled = true
+            }
         }
 
         // Demand-driven: start/stop poller based on whether items exist
@@ -129,7 +138,9 @@ export default class SwimlanePlugin extends Plugin {
     private async processDueActionsForFile(baseFile: TFile): Promise<boolean> {
         const content = await this.app.vault.read(baseFile)
         const allActions = readScheduledActions(content)
-        if (allActions.length === 0) return false
+        if (allActions.length === 0) {
+            return false
+        }
 
         const { due, remaining } = getDueActions(allActions, Date.now())
 
@@ -145,12 +156,16 @@ export default class SwimlanePlugin extends Plugin {
 
             for (const action of due) {
                 const file = this.app.vault.getFileByPath(action.file)
-                if (!file) continue
+                if (!file) {
+                    continue
+                }
 
                 const cache = this.app.metadataCache.getFileCache(file)
                 const fm = cache?.frontmatter ?? {}
                 const currentSwimlane = fm[swimlaneProp]
-                if (currentSwimlane !== action.whileInSwimlane) continue
+                if (currentSwimlane !== action.whileInSwimlane) {
+                    continue
+                }
 
                 // Check if this scheduled action contains a delete mutation
                 const hasDelete = action.actions.some(a => a.type === "delete")
@@ -160,7 +175,7 @@ export default class SwimlanePlugin extends Plugin {
                     } catch {
                         // File might already be deleted
                     }
-                    continue  // Skip frontmatter mutations — file is deleted
+                    continue // Skip frontmatter mutations — file is deleted
                 }
 
                 try {

@@ -48,7 +48,9 @@ const needsProperty = (type: string) => type !== "delete" && type !== "move"
 /** Converts "2w" → "2 weeks", "3d" → "3 days", etc. */
 function formatDelayHuman(delay: string): string | null {
     const match = delay.match(/^(\d+(?:\.\d+)?)\s*([mhdw])$/i)
-    if (!match) return null
+    if (!match) {
+        return null
+    }
     const value = parseFloat(match[1]!)
     const unit = match[2]!.toLowerCase()
     const unitNames: Record<string, [string, string]> = {
@@ -58,7 +60,9 @@ function formatDelayHuman(delay: string): string | null {
         w: ["week", "weeks"],
     }
     const names = unitNames[unit]
-    if (!names) return null
+    if (!names) {
+        return null
+    }
     return `${value} ${value === 1 ? names[0] : names[1]}`
 }
 
@@ -83,7 +87,10 @@ function renderTrigger(
     if (trigger.type === "remains_in" && trigger.delay) {
         const delayText = formatDelayHuman(trigger.delay)
         if (delayText) {
-            container.createSpan({ cls: "swimlane-automation-delay-text", text: ` for ${delayText}` })
+            container.createSpan({
+                cls: "swimlane-automation-delay-text",
+                text: ` for ${delayText}`,
+            })
         }
     }
 }
@@ -278,12 +285,19 @@ export class AutomationsModal extends WrongNotesModal {
         const delayUnit = triggerRow.createEl("select", {
             cls: "swimlane-automation-delay-unit",
         })
-        for (const [value, label] of [["m", "Minutes"], ["h", "Hours"], ["d", "Days"], ["w", "Weeks"]] as const) {
+        for (const [value, label] of [
+            ["m", "Minutes"],
+            ["h", "Hours"],
+            ["d", "Days"],
+            ["w", "Weeks"],
+        ] as const) {
             delayUnit.createEl("option", { text: label, attr: { value } })
         }
         if (draftTrigger.delay) {
             const unitMatch = draftTrigger.delay.match(/[mhdw]$/i)
-            if (unitMatch) delayUnit.value = unitMatch[0].toLowerCase()
+            if (unitMatch) {
+                delayUnit.value = unitMatch[0].toLowerCase()
+            }
         }
 
         const updateTriggerDelay = () => {
@@ -341,7 +355,12 @@ export class AutomationsModal extends WrongNotesModal {
 
             const propInput = row.createEl("input", {
                 cls: "swimlane-automation-prop-input",
-                attr: { type: "text", placeholder: "Property name", value: action.type !== "delete" && action.type !== "move" ? action.property : "" },
+                attr: {
+                    type: "text",
+                    placeholder: "Property name",
+                    value:
+                        action.type !== "delete" && action.type !== "move" ? action.property : "",
+                },
             })
             propInput.toggleClass("swimlane-automation-hidden", !needsProperty(action.type))
 
@@ -370,7 +389,10 @@ export class AutomationsModal extends WrongNotesModal {
                 attr: {
                     type: "text",
                     placeholder: "value or {{template}}",
-                    value: hasValue(action.type) && !isMove ? (action as { value?: string }).value ?? "" : "",
+                    value:
+                        hasValue(action.type) && !isMove
+                            ? ((action as { value?: string }).value ?? "")
+                            : "",
                 },
             })
             valueInput.toggleClass("swimlane-automation-hidden", !hasValue(action.type) || isMove)
@@ -398,7 +420,6 @@ export class AutomationsModal extends WrongNotesModal {
             moveSelect.addEventListener("change", () => {
                 this.updateDraftAction(draftActions, i, { value: moveSelect.value })
             })
-
 
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as AutomationAction["type"]
@@ -464,7 +485,11 @@ export class AutomationsModal extends WrongNotesModal {
         })
         cancelBtn.addEventListener("click", () => {
             // Discard: if new rule (no prior state), remove it from rules array
-            if (rule.actions.length === 1 && rule.actions[0]?.type !== "delete" && (rule.actions[0] as { property?: string }).property === "") {
+            if (
+                rule.actions.length === 1 &&
+                rule.actions[0]?.type !== "delete" &&
+                (rule.actions[0] as { property?: string }).property === ""
+            ) {
                 // Check if this was a newly added (empty) rule
                 const orig = this.ctx.rules[index]
                 if (!orig) {
@@ -486,12 +511,16 @@ export class AutomationsModal extends WrongNotesModal {
             }
             if (draftTrigger.type === "remains_in") {
                 if (!draftTrigger.delay || !parseDelay(draftTrigger.delay)) {
-                    this.showValidationError("remains in trigger requires a valid delay. Use a number followed by m, h, d, or w.")
+                    this.showValidationError(
+                        "remains in trigger requires a valid delay. Use a number followed by m, h, d, or w.",
+                    )
                     return
                 }
             }
             for (const action of draftActions) {
-                if (action.type === "delete") continue  // No property/value needed
+                if (action.type === "delete") {
+                    continue
+                } // No property/value needed
                 if (action.type === "move") {
                     if (!action.value.trim()) {
                         this.showValidationError("Move action must have a target swimlane.")

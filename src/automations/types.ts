@@ -10,7 +10,7 @@ export interface AutomationRule {
     trigger: {
         type: TriggerType
         swimlane: string
-        delay?: string  // required for remains_in, absent for others
+        delay?: string // required for remains_in, absent for others
     }
     actions: AutomationAction[]
 }
@@ -35,7 +35,7 @@ export type MatchedMutation = FrontmatterMutation & { delay?: string }
 /** A scheduled action stored in the .base file, pending future execution. */
 export interface ScheduledAction {
     file: string
-    due: string  // ISO 8601 timestamp
+    due: string // ISO 8601 timestamp
     whileInSwimlane: string
     actions: FrontmatterMutation[]
 }

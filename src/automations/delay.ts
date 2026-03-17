@@ -10,14 +10,22 @@ const UNIT_MS: Record<string, number> = {
  * Returns null for invalid input or non-positive values.
  */
 export function parseDelay(s: string): number | null {
-    if (!s) return null
+    if (!s) {
+        return null
+    }
     const match = s.match(/^(\d+(?:\.\d+)?)\s*([mhdw])$/i)
-    if (!match) return null
+    if (!match) {
+        return null
+    }
     const value = parseFloat(match[1]!)
-    if (value <= 0 || !isFinite(value)) return null
+    if (value <= 0 || !isFinite(value)) {
+        return null
+    }
     const unit = match[2]!.toLowerCase()
     const multiplier = UNIT_MS[unit]
-    if (!multiplier) return null
+    if (!multiplier) {
+        return null
+    }
     return value * multiplier
 }
 

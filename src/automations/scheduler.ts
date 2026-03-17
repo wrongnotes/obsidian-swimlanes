@@ -16,7 +16,9 @@ export function addScheduledActions(
     now: number,
 ): ScheduledAction[] {
     const delayed = mutations.filter(m => m.delay)
-    if (delayed.length === 0) return existing
+    if (delayed.length === 0) {
+        return existing
+    }
 
     // Group by delay value
     const byDelay = new Map<string, FrontmatterMutation[]>()
@@ -33,7 +35,9 @@ export function addScheduledActions(
     const newEntries: ScheduledAction[] = []
     for (const [delayStr, actions] of byDelay) {
         const delayMs = parseDelay(delayStr)
-        if (!delayMs) continue
+        if (!delayMs) {
+            continue
+        }
         newEntries.push({
             file: filePath,
             due: new Date(now + delayMs).toISOString(),
@@ -42,7 +46,9 @@ export function addScheduledActions(
         })
     }
 
-    if (newEntries.length === 0) return existing
+    if (newEntries.length === 0) {
+        return existing
+    }
 
     // Remove existing entries for same file + swimlane (dedup)
     const filtered = existing.filter(
@@ -61,9 +67,7 @@ export function cancelScheduledActions(
     filePath: string,
     swimlane: string,
 ): ScheduledAction[] {
-    return existing.filter(
-        a => !(a.file === filePath && a.whileInSwimlane === swimlane),
-    )
+    return existing.filter(a => !(a.file === filePath && a.whileInSwimlane === swimlane))
 }
 
 /**

@@ -90,33 +90,63 @@ export function readAutomations(content: string): AutomationRule[] {
 }
 
 function isValidMutationAction(action: unknown): boolean {
-    if (!action || typeof action !== "object") return false
+    if (!action || typeof action !== "object") {
+        return false
+    }
     const a = action as Record<string, unknown>
-    if (typeof a.type !== "string") return false
-    if (a.type === "delete") return true
-    if (typeof a.property !== "string" || a.property === "") return false
-    if (a.type === "set" || a.type === "add" || a.type === "remove") return a.value !== undefined
-    if (a.type === "clear") return true
+    if (typeof a.type !== "string") {
+        return false
+    }
+    if (a.type === "delete") {
+        return true
+    }
+    if (typeof a.property !== "string" || a.property === "") {
+        return false
+    }
+    if (a.type === "set" || a.type === "add" || a.type === "remove") {
+        return a.value !== undefined
+    }
+    if (a.type === "clear") {
+        return true
+    }
     return false
 }
 
 function isValidScheduledAction(entry: unknown): entry is ScheduledAction {
-    if (!entry || typeof entry !== "object") return false
+    if (!entry || typeof entry !== "object") {
+        return false
+    }
     const e = entry as Record<string, unknown>
-    if (typeof e.file !== "string" || e.file === "") return false
-    if (typeof e.due !== "string" || e.due === "") return false
-    if (isNaN(new Date(e.due as string).getTime())) return false
-    if (typeof e.whileInSwimlane !== "string" || e.whileInSwimlane === "") return false
-    if (!Array.isArray(e.actions) || e.actions.length === 0) return false
+    if (typeof e.file !== "string" || e.file === "") {
+        return false
+    }
+    if (typeof e.due !== "string" || e.due === "") {
+        return false
+    }
+    if (isNaN(new Date(e.due as string).getTime())) {
+        return false
+    }
+    if (typeof e.whileInSwimlane !== "string" || e.whileInSwimlane === "") {
+        return false
+    }
+    if (!Array.isArray(e.actions) || e.actions.length === 0) {
+        return false
+    }
     return e.actions.every(isValidMutationAction)
 }
 
 export function readScheduledActions(content: string): ScheduledAction[] {
-    if (!content || typeof content !== "string") return []
+    if (!content || typeof content !== "string") {
+        return []
+    }
     const parsed = parseYaml(content)
-    if (!parsed || typeof parsed !== "object") return []
+    if (!parsed || typeof parsed !== "object") {
+        return []
+    }
     const config = parsed as Record<string, unknown>
-    if (!Array.isArray(config.scheduledActions)) return []
+    if (!Array.isArray(config.scheduledActions)) {
+        return []
+    }
     return config.scheduledActions.filter(isValidScheduledAction)
 }
 

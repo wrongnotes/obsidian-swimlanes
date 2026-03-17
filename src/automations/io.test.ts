@@ -1,4 +1,9 @@
-import { readAutomations, writeAutomations, readScheduledActions, writeScheduledActions } from "./io"
+import {
+    readAutomations,
+    writeAutomations,
+    readScheduledActions,
+    writeScheduledActions,
+} from "./io"
 import type { AutomationRule } from "./types"
 
 // Helper to create test input — mock parseYaml uses JSON.parse
@@ -205,7 +210,11 @@ describe("readScheduledActions", () => {
     it("drops entries with missing file", () => {
         const content = JSON.stringify({
             scheduledActions: [
-                { due: "2026-03-29T14:30:00", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+                {
+                    due: "2026-03-29T14:30:00",
+                    whileInSwimlane: "Done",
+                    actions: [{ type: "clear", property: "x" }],
+                },
             ],
         })
         expect(readScheduledActions(content)).toEqual([])
@@ -223,7 +232,12 @@ describe("readScheduledActions", () => {
     it("drops entries with invalid action", () => {
         const content = JSON.stringify({
             scheduledActions: [
-                { file: "a.md", due: "2026-03-29T14:30:00", whileInSwimlane: "Done", actions: [{ type: "invalid" }] },
+                {
+                    file: "a.md",
+                    due: "2026-03-29T14:30:00",
+                    whileInSwimlane: "Done",
+                    actions: [{ type: "invalid" }],
+                },
             ],
         })
         expect(readScheduledActions(content)).toEqual([])
@@ -232,7 +246,12 @@ describe("readScheduledActions", () => {
     it("drops entries with invalid due date", () => {
         const content = JSON.stringify({
             scheduledActions: [
-                { file: "a.md", due: "not-a-date", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+                {
+                    file: "a.md",
+                    due: "not-a-date",
+                    whileInSwimlane: "Done",
+                    actions: [{ type: "clear", property: "x" }],
+                },
             ],
         })
         expect(readScheduledActions(content)).toEqual([])

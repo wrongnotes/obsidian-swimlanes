@@ -1,5 +1,10 @@
 import { moment } from "obsidian"
-import type { AutomationContext, AutomationRule, FrontmatterMutation, MatchedMutation } from "./types"
+import type {
+    AutomationContext,
+    AutomationRule,
+    FrontmatterMutation,
+    MatchedMutation,
+} from "./types"
 
 /**
  * Replaces template tokens in a string:
@@ -44,9 +49,13 @@ export function matchRules(
 
         // remains_in fires on "enters" context (card entering a swimlane)
         if (rule.trigger.type === "remains_in") {
-            if (context.type !== "enters") continue
+            if (context.type !== "enters") {
+                continue
+            }
         } else {
-            if (rule.trigger.type !== context.type) continue
+            if (rule.trigger.type !== context.type) {
+                continue
+            }
         }
 
         const swimlane = rule.trigger.swimlane

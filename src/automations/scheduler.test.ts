@@ -52,11 +52,14 @@ describe("addScheduledActions", () => {
 
     it("returns existing unchanged if no delayed mutations", () => {
         const existing: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-20T12:00:00Z", whileInSwimlane: "X", actions: [{ type: "clear", property: "y" }] },
+            {
+                file: "a.md",
+                due: "2026-03-20T12:00:00Z",
+                whileInSwimlane: "X",
+                actions: [{ type: "clear", property: "y" }],
+            },
         ]
-        const mutations: MatchedMutation[] = [
-            { type: "set", property: "startedAt", value: "yes" },
-        ]
+        const mutations: MatchedMutation[] = [{ type: "set", property: "startedAt", value: "yes" }]
         const result = addScheduledActions(existing, "a.md", "X", mutations, Date.now())
         expect(result).toEqual(existing)
     })
@@ -84,8 +87,18 @@ describe("addScheduledActions", () => {
 describe("cancelScheduledActions", () => {
     it("removes entries for file + whileInSwimlane match", () => {
         const existing: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
-            { file: "b.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "y" }] },
+            {
+                file: "a.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "x" }],
+            },
+            {
+                file: "b.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "y" }],
+            },
         ]
         const result = cancelScheduledActions(existing, "a.md", "Done")
         expect(result).toHaveLength(1)
@@ -94,7 +107,12 @@ describe("cancelScheduledActions", () => {
 
     it("returns same array if no matches", () => {
         const existing: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+            {
+                file: "a.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "x" }],
+            },
         ]
         const result = cancelScheduledActions(existing, "a.md", "InProgress")
         expect(result).toEqual(existing)
@@ -109,8 +127,18 @@ describe("getDueActions", () => {
     it("returns actions where due <= now", () => {
         const now = new Date("2026-03-30T00:00:00Z").getTime()
         const actions: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
-            { file: "b.md", due: "2026-03-31T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "y" }] },
+            {
+                file: "a.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "x" }],
+            },
+            {
+                file: "b.md",
+                due: "2026-03-31T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "y" }],
+            },
         ]
         const { due, remaining } = getDueActions(actions, now)
         expect(due).toHaveLength(1)
@@ -122,7 +150,12 @@ describe("getDueActions", () => {
     it("returns empty due when nothing is overdue", () => {
         const now = new Date("2026-03-01T00:00:00Z").getTime()
         const actions: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+            {
+                file: "a.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "x" }],
+            },
         ]
         const { due, remaining } = getDueActions(actions, now)
         expect(due).toHaveLength(0)
@@ -138,7 +171,12 @@ describe("getDueActions", () => {
     it("includes actions due exactly at now", () => {
         const now = new Date("2026-03-29T00:00:00Z").getTime()
         const actions: ScheduledAction[] = [
-            { file: "a.md", due: "2026-03-29T00:00:00Z", whileInSwimlane: "Done", actions: [{ type: "clear", property: "x" }] },
+            {
+                file: "a.md",
+                due: "2026-03-29T00:00:00Z",
+                whileInSwimlane: "Done",
+                actions: [{ type: "clear", property: "x" }],
+            },
         ]
         const { due, remaining } = getDueActions(actions, now)
         expect(due).toHaveLength(1)

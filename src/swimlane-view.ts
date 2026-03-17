@@ -36,7 +36,13 @@ import {
     readScheduledActions,
     writeScheduledActions,
 } from "./automations"
-import type { AutomationRule, FrontmatterMutation, MatchedMutation, PropertyInfo, ScheduledAction } from "./automations"
+import type {
+    AutomationRule,
+    FrontmatterMutation,
+    MatchedMutation,
+    PropertyInfo,
+    ScheduledAction,
+} from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 
@@ -984,9 +990,11 @@ export class SwimlaneView extends BasesView {
         }
         const file = await this.app.vault.create(path, "")
         const allMutations = this.getAutomationMutations(null, groupKey as string, "created_in")
-        const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
-            allMutations, file.path, groupKey as string, null,
-        )
+        const {
+            instant: mutations,
+            scheduledEntries,
+            delays,
+        } = this.scheduleDelayedMutations(allMutations, file.path, groupKey as string, null)
         // No previous values to capture for a brand-new file.
         const prevValues: Record<string, unknown> = {}
 
@@ -1163,13 +1171,21 @@ export class SwimlaneView extends BasesView {
                             ),
                         ]
                     } else if (op.kind === "clear") {
-                        allMutations = this.getAutomationMutations(groupKey as string, null, "leaves")
+                        allMutations = this.getAutomationMutations(
+                            groupKey as string,
+                            null,
+                            "leaves",
+                        )
                     }
                     const targetSwimlane = op.kind === "move" ? op.targetValue : null
-                    const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
+                    const {
+                        instant: mutations,
+                        scheduledEntries,
+                        delays,
+                    } = this.scheduleDelayedMutations(
                         allMutations,
                         file.path,
-                        targetSwimlane ?? groupKey as string,
+                        targetSwimlane ?? (groupKey as string),
                         groupKey as string,
                     )
                     allScheduledEntries.push(...scheduledEntries)
@@ -1900,16 +1916,24 @@ export class SwimlaneView extends BasesView {
 
         // Write to .base file: cancel old entries for source swimlane, add new for target
         if (this.baseFile) {
-            void this.app.vault.process(this.baseFile, content => {
-                let existing = readScheduledActions(content)
-                if (fromSwimlane) {
-                    existing = cancelScheduledActions(existing, filePath, fromSwimlane)
-                }
-                const updated = addScheduledActions(existing, filePath, targetSwimlane, delayed, now)
-                return writeScheduledActions(content, updated)
-            }).catch(() => {
-                // Write failed — scheduled actions not persisted. They will be re-scheduled on next move.
-            })
+            void this.app.vault
+                .process(this.baseFile, content => {
+                    let existing = readScheduledActions(content)
+                    if (fromSwimlane) {
+                        existing = cancelScheduledActions(existing, filePath, fromSwimlane)
+                    }
+                    const updated = addScheduledActions(
+                        existing,
+                        filePath,
+                        targetSwimlane,
+                        delayed,
+                        now,
+                    )
+                    return writeScheduledActions(content, updated)
+                })
+                .catch(() => {
+                    // Write failed — scheduled actions not persisted. They will be re-scheduled on next move.
+                })
             // Start the poller since we now have scheduled items
             this.plugin.startPoller()
         }
@@ -1997,7 +2021,10 @@ export class SwimlaneView extends BasesView {
                 ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
             ]
             const scheduled = this.scheduleDelayedMutations(
-                allMutations, file.path, toSwimlane, fromSwimlane,
+                allMutations,
+                file.path,
+                toSwimlane,
+                fromSwimlane,
             )
             mutations = scheduled.instant
             scheduledEntries = scheduled.scheduledEntries
@@ -2099,7 +2126,10 @@ export class SwimlaneView extends BasesView {
                 ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
             ]
             const scheduled = this.scheduleDelayedMutations(
-                allMutations, dragState.path, toSwimlane, fromSwimlane,
+                allMutations,
+                dragState.path,
+                toSwimlane,
+                fromSwimlane,
             )
             draggedMutations = scheduled.instant
             draggedScheduledEntries = scheduled.scheduledEntries
@@ -2190,9 +2220,11 @@ export class SwimlaneView extends BasesView {
                     ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
                     ...this.getAutomationMutations(fromSwimlane, columnName, "enters"),
                 ]
-                const { instant: mutations, scheduledEntries, delays } = this.scheduleDelayedMutations(
-                    allMutations, file.path, columnName, fromSwimlane,
-                )
+                const {
+                    instant: mutations,
+                    scheduledEntries,
+                    delays,
+                } = this.scheduleDelayedMutations(allMutations, file.path, columnName, fromSwimlane)
                 const cache = this.app.metadataCache.getFileCache(file)
                 const cachedFm = cache?.frontmatter ?? {}
                 const prevValues: Record<string, unknown> = {}

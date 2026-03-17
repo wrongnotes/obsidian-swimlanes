@@ -275,7 +275,12 @@ describe("matchRules", () => {
         }
         const mutations = matchRules(rules, ctx, "column")
         expect(mutations).toHaveLength(1)
-        expect(mutations[0]).toEqual({ type: "set", property: "archived", value: "true", delay: "2w" })
+        expect(mutations[0]).toEqual({
+            type: "set",
+            property: "archived",
+            value: "true",
+            delay: "2w",
+        })
     })
 
     it("remains_in trigger does not match on leaves context", () => {
@@ -322,7 +327,11 @@ describe("matchRules", () => {
                 actions: [{ type: "delete" }],
             },
         ]
-        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
         const mutations = matchRules(rules, ctx, "status")
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.type).toBe("delete")
@@ -335,7 +344,11 @@ describe("matchRules", () => {
                 actions: [{ type: "delete" }],
             },
         ]
-        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
         const mutations = matchRules(rules, ctx, "status")
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.type).toBe("delete")
@@ -349,10 +362,19 @@ describe("matchRules", () => {
                 actions: [{ type: "move", value: "Archived" }],
             },
         ]
-        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
         const mutations = matchRules(rules, ctx, "status")
         expect(mutations).toHaveLength(1)
-        expect(mutations[0]).toEqual({ type: "set", property: "status", value: "Archived", delay: undefined })
+        expect(mutations[0]).toEqual({
+            type: "set",
+            property: "status",
+            value: "Archived",
+            delay: undefined,
+        })
     })
 
     it("move action bypasses swimlaneProp loop guard", () => {
@@ -362,7 +384,11 @@ describe("matchRules", () => {
                 actions: [{ type: "move", value: "Archived" }],
             },
         ]
-        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "In Progress", targetSwimlane: "Done" }
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
         const mutations = matchRules(rules, ctx, "status")
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.property).toBe("status")
@@ -376,7 +402,11 @@ describe("matchRules", () => {
                 actions: [{ type: "move", value: "{{target.swimlane}}" }],
             },
         ]
-        const ctx: AutomationContext = { type: "enters", sourceSwimlane: "Todo", targetSwimlane: "Review" }
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "Todo",
+            targetSwimlane: "Review",
+        }
         const mutations = matchRules(rules, ctx, "status")
         expect(mutations[0]!.value).toBe("Review")
     })
