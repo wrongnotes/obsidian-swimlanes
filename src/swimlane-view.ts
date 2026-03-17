@@ -328,17 +328,41 @@ export class SwimlaneView extends BasesView {
      * entries may be hidden. Detected via DOM since Bases pre-filters data.
      */
     private get isFiltered(): boolean {
-        const toolbar = this.boardEl.parentElement
+        const parent = this.boardEl.parentElement
+        if (!parent) return false
         // Filter button has is-active when filters are applied
-        const filterActive = toolbar
-            ?.querySelector(".bases-toolbar-filter-menu .text-icon-button")
-            ?.classList.contains("is-active") ?? false
-        // Search input: any input/search in the toolbar with a non-empty value
-        const searchInput = toolbar?.querySelector<HTMLInputElement>(
-            ".bases-toolbar input[type='search'], .bases-toolbar input[type='text']",
+        const filterActive =
+            parent
+                .querySelector(".bases-toolbar-filter-menu .text-icon-button")
+                ?.classList.contains("is-active") ?? false
+        // Search: look for any non-empty input within the Bases toolbar that isn't ours
+        const inputs = parent.querySelectorAll<HTMLInputElement>(".bases-toolbar input")
+        const searchActive = Array.from(inputs).some(
+            input => !input.closest(".swimlane-automations-btn") && input.value.length > 0,
         )
-        const searchActive = !!searchInput && searchInput.value.length > 0
         return filterActive || searchActive
+    }
+
+    /**
+     * Attempts to clear Bases filter and search.
+     * Clears any search input values and clicks the filter button to deactivate.
+     */
+    private clearFilterAndSearch(): void {
+        const parent = this.boardEl.parentElement
+        if (!parent) return
+        // Clear search inputs
+        const inputs = parent.querySelectorAll<HTMLInputElement>(".bases-toolbar input")
+        for (const input of inputs) {
+            if (!input.closest(".swimlane-automations-btn") && input.value.length > 0) {
+                input.value = ""
+                input.dispatchEvent(new Event("input", { bubbles: true }))
+            }
+        }
+        // Click filter button to deactivate if active
+        const filterBtn = parent.querySelector<HTMLElement>(
+            ".bases-toolbar-filter-menu .text-icon-button.is-active",
+        )
+        filterBtn?.click()
     }
 
     private get isSortedByRank(): boolean {
@@ -741,10 +765,34 @@ export class SwimlaneView extends BasesView {
             }
         }
 
-        const filtered = this.isFiltered
-        const disableReorder = !sortedByRank || filtered
+        let filtered = this.isFiltered
+        let disableReorder = !sortedByRank || filtered
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
         board.toggleClass("swimlane-column-drop-mode", disableReorder)
+
+        // Bases may update the toolbar DOM after calling onDataUpdated, so
+        // recheck the filter state after a frame and update the board if needed.
+        requestAnimationFrame(() => {
+            if (!board.isConnected) return
+            const nowFiltered = this.isFiltered
+            if (nowFiltered !== filtered) {
+                filtered = nowFiltered
+                disableReorder = !sortedByRank || filtered
+                board.toggleClass("swimlane-column-drop-mode", disableReorder)
+                // Add or remove the filter toolbar hint
+                const existingHint = this.boardEl.querySelector(".swimlane-filter-toolbar")
+                if (disableReorder && sortedByRank && !existingHint) {
+                    const toolbar = this.boardEl.createDiv({ cls: "swimlane-toolbar swimlane-filter-toolbar" })
+                    this.boardEl.insertBefore(toolbar, board)
+                    const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
+                    setIcon(hint.createSpan(), "search")
+                    hint.createSpan({ text: "Clear search or filter to enable re-ordering" })
+                    hint.addEventListener("click", () => this.clearFilterAndSearch())
+                } else if (!disableReorder && existingHint) {
+                    existingHint.remove()
+                }
+            }
+        })
         this.currentBoard = board
         this.columnDropTarget = null
 
@@ -793,9 +841,10 @@ export class SwimlaneView extends BasesView {
                 hint.createSpan({ text: "Sort by rank to enable re-ordering" })
                 hint.addEventListener("click", () => this.setSortByRank())
             } else if (filtered) {
-                const hint = toolbar.createDiv({ cls: "swimlane-toolbar-btn swimlane-toolbar-disabled" })
+                const hint = toolbar.createEl("button", { cls: "swimlane-toolbar-btn" })
                 setIcon(hint.createSpan(), "search")
                 hint.createSpan({ text: "Clear search or filter to enable re-ordering" })
+                hint.addEventListener("click", () => this.clearFilterAndSearch())
             }
         }
 
