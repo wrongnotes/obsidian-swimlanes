@@ -328,6 +328,16 @@ export class SwimlaneView extends BasesView {
      * Empty sort returns true — on drop we auto-set it to rank.
      * A non-rank sort returns false — in-column card DnD is disabled.
      */
+    /**
+     * Returns true when Bases has an active filter/search, meaning some
+     * entries are hidden. We detect this by comparing the total entries
+     * in groupedData against data.data.
+     */
+    private get isFiltered(): boolean {
+        const groupedTotal = this.data.groupedData.reduce((n, g) => n + g.entries.length, 0)
+        return groupedTotal < this.data.data.length
+    }
+
     private get isSortedByRank(): boolean {
         const sort = this.config.getSort()
         if (sort.length === 0) {
@@ -1979,6 +1989,13 @@ export class SwimlaneView extends BasesView {
         // Cross-column moves always work.
         if (!isCrossColumn && !this.isSortedByRank) {
             new Notice("Sort by rank to re-order cards within a swimlane.")
+            return
+        }
+
+        // When a search/filter is active, block same-column reorders because
+        // hidden cards make rank positions unreliable.
+        if (!isCrossColumn && this.isFiltered) {
+            new Notice("Clear the search filter to re-order cards within a swimlane.")
             return
         }
 
