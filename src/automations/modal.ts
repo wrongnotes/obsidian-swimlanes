@@ -328,7 +328,11 @@ export class AutomationsModal extends WrongNotesModal {
                 cls: "swimlane-automation-action-type-select",
             })
             for (const [value, label] of Object.entries(ACTION_TYPE_LABELS)) {
-                typeSelect.createEl("option", { text: label, attr: { value } })
+                const opt = typeSelect.createEl("option", { text: label, attr: { value } })
+                // Disable "Delete card" when there are multiple actions
+                if (value === "delete" && draftActions.length > 1) {
+                    opt.disabled = true
+                }
             }
             typeSelect.value = action.type
 
@@ -395,22 +399,13 @@ export class AutomationsModal extends WrongNotesModal {
                 this.updateDraftAction(draftActions, i, { value: moveSelect.value })
             })
 
-            // Delete tooltip
-            if (action.type === "delete") {
-                row.createDiv({
-                    cls: "swimlane-automation-delete-hint",
-                    text: "Delete cannot be combined with other actions.",
-                })
-            }
 
             typeSelect.addEventListener("change", () => {
                 const newType = typeSelect.value as AutomationAction["type"]
                 const prop = propInput.value
                 const val = newType === "move" ? (this.ctx.swimlanes[0] ?? "") : valueInput.value
                 if (newType === "delete") {
-                    // Delete is exclusive — replace all actions with just delete
-                    draftActions.length = 0
-                    draftActions.push({ type: "delete" })
+                    draftActions[i] = { type: "delete" }
                 } else if (newType === "move") {
                     draftActions[i] = { type: "move", value: val }
                 } else if (newType === "clear") {

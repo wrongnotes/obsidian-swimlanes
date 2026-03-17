@@ -1144,13 +1144,6 @@
     font-style: italic;
 }
 
-.swimlane-automation-delete-hint {
-    color: var(--text-muted);
-    font-size: var(--font-ui-smaller);
-    font-style: italic;
-    margin-top: var(--size-2-1);
-}
-
 /* Automation suggestion dropdowns */
 .swimlane-suggest-token {
     font-family: var(--font-monospace);
