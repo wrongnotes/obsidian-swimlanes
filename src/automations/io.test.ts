@@ -106,7 +106,7 @@ describe("readAutomations", () => {
         expect(readAutomations(content)).toEqual([validRule, validRule2])
     })
 
-    it("accepts all three valid trigger types", () => {
+    it("accepts all four valid trigger types", () => {
         const types = ["enters", "leaves", "created_in"] as const
         for (const type of types) {
             const rule: AutomationRule = {
@@ -117,32 +117,32 @@ describe("readAutomations", () => {
         }
     })
 
-    it("accepts actions with valid delay field", () => {
+    it("accepts remains_in rule with delay", () => {
         const content = JSON.stringify({
             automations: [
                 {
-                    trigger: { type: "enters", swimlane: "Done" },
-                    actions: [{ type: "set", property: "archived", value: "true", delay: "2w" }],
+                    trigger: { type: "remains_in", swimlane: "Done", delay: "2w" },
+                    actions: [{ type: "set", property: "archived", value: "true" }],
                 },
             ],
         })
         const rules = readAutomations(content)
         expect(rules).toHaveLength(1)
-        expect((rules[0]!.actions[0]! as any).delay).toBe("2w")
+        expect(rules[0]!.trigger.type).toBe("remains_in")
+        expect(rules[0]!.trigger.delay).toBe("2w")
     })
 
-    it("accepts actions without delay field (backward compatible)", () => {
+    it("rejects remains_in rule without delay", () => {
         const content = JSON.stringify({
             automations: [
                 {
-                    trigger: { type: "enters", swimlane: "Done" },
-                    actions: [{ type: "set", property: "done", value: "true" }],
+                    trigger: { type: "remains_in", swimlane: "Done" },
+                    actions: [{ type: "set", property: "archived", value: "true" }],
                 },
             ],
         })
         const rules = readAutomations(content)
-        expect(rules).toHaveLength(1)
-        expect((rules[0]!.actions[0]! as any).delay).toBeUndefined()
+        expect(rules).toHaveLength(0)
     })
 })
 

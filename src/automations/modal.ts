@@ -23,6 +23,7 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
     enters: "enters",
     leaves: "leaves",
     created_in: "is created in",
+    remains_in: "remains in",
 }
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -65,7 +66,7 @@ function templateDescription(value: string): string | null {
 
 function renderTrigger(
     container: HTMLElement,
-    trigger: { type: TriggerType; swimlane: string },
+    trigger: { type: TriggerType; swimlane: string; delay?: string },
 ): void {
     container.createSpan({ text: "When a card " })
     container.createSpan({ text: TRIGGER_LABELS[trigger.type] })
@@ -74,6 +75,12 @@ function renderTrigger(
         container.createSpan({ text: "any swimlane" })
     } else {
         container.createEl("code", { cls: "swimlane-automation-code", text: trigger.swimlane })
+    }
+    if (trigger.type === "remains_in" && trigger.delay) {
+        const delayText = formatDelayHuman(trigger.delay)
+        if (delayText) {
+            container.createSpan({ cls: "swimlane-automation-delay-text", text: ` for ${delayText}` })
+        }
     }
 }
 
@@ -102,12 +109,6 @@ function renderAction(container: HTMLElement, action: AutomationAction): void {
             container.createSpan({ text: "Clear " })
             container.createEl("code", { cls: "swimlane-automation-code", text: action.property })
             break
-    }
-    if (action.delay) {
-        const delayText = formatDelayHuman(action.delay)
-        if (delayText) {
-            container.createSpan({ cls: "swimlane-automation-delay-text", text: ` after ${delayText}` })
-        }
     }
 }
 
@@ -235,10 +236,6 @@ export class AutomationsModal extends WrongNotesModal {
                 opt.selected = true
             }
         }
-        triggerSelect.addEventListener("change", () => {
-            draftTrigger.type = triggerSelect.value as TriggerType
-        })
-
         const swimlaneSelect = triggerRow.createEl("select", {
             cls: "swimlane-automation-swimlane-select",
         })
@@ -254,6 +251,52 @@ export class AutomationsModal extends WrongNotesModal {
         }
         swimlaneSelect.addEventListener("change", () => {
             draftTrigger.swimlane = swimlaneSelect.value
+        })
+
+        // --- Delay inputs (only for remains_in) ---
+        const delayLabel = triggerRow.createSpan({ cls: "swimlane-automation-label", text: "for" })
+        const delayNumber = triggerRow.createEl("input", {
+            cls: "swimlane-automation-delay-input",
+            attr: {
+                type: "number",
+                min: "0",
+                placeholder: "0",
+                value: draftTrigger.delay ? draftTrigger.delay.replace(/[mhdw]$/i, "") : "",
+            },
+        })
+        const delayUnit = triggerRow.createEl("select", {
+            cls: "swimlane-automation-delay-unit",
+        })
+        for (const [value, label] of [["m", "Minutes"], ["h", "Hours"], ["d", "Days"], ["w", "Weeks"]] as const) {
+            delayUnit.createEl("option", { text: label, attr: { value } })
+        }
+        if (draftTrigger.delay) {
+            const unitMatch = draftTrigger.delay.match(/[mhdw]$/i)
+            if (unitMatch) delayUnit.value = unitMatch[0].toLowerCase()
+        }
+
+        const updateTriggerDelay = () => {
+            const num = delayNumber.value.trim()
+            const unit = delayUnit.value
+            draftTrigger.delay = num && parseFloat(num) > 0 ? `${num}${unit}` : undefined
+        }
+        delayNumber.addEventListener("input", updateTriggerDelay)
+        delayUnit.addEventListener("change", updateTriggerDelay)
+
+        const updateDelayVisibility = () => {
+            const show = draftTrigger.type === "remains_in"
+            delayLabel.toggleClass("swimlane-automation-hidden", !show)
+            delayNumber.toggleClass("swimlane-automation-hidden", !show)
+            delayUnit.toggleClass("swimlane-automation-hidden", !show)
+        }
+        updateDelayVisibility()
+
+        triggerSelect.addEventListener("change", () => {
+            draftTrigger.type = triggerSelect.value as TriggerType
+            if (draftTrigger.type !== "remains_in") {
+                draftTrigger.delay = undefined
+            }
+            updateDelayVisibility()
         })
 
         // --- Actions list ---
@@ -340,38 +383,6 @@ export class AutomationsModal extends WrongNotesModal {
                 this.updateDraftAction(draftActions, i, { value: valueInput.value })
             })
 
-            row.createSpan({ cls: "swimlane-automation-label", text: "after" })
-
-            const delayNumber = row.createEl("input", {
-                cls: "swimlane-automation-delay-input",
-                attr: {
-                    type: "number",
-                    min: "0",
-                    placeholder: "0",
-                    value: action.delay ? action.delay.replace(/[mhdw]$/i, "") : "",
-                },
-            })
-
-            const delayUnit = row.createEl("select", {
-                cls: "swimlane-automation-delay-unit",
-            })
-            for (const [value, label] of [["m", "Minutes"], ["h", "Hours"], ["d", "Days"], ["w", "Weeks"]] as const) {
-                delayUnit.createEl("option", { text: label, attr: { value } })
-            }
-            if (action.delay) {
-                const unitMatch = action.delay.match(/[mhdw]$/i)
-                if (unitMatch) delayUnit.value = unitMatch[0].toLowerCase()
-            }
-
-            const updateDelay = () => {
-                const num = delayNumber.value.trim()
-                const unit = delayUnit.value
-                const newDelay = num && parseFloat(num) > 0 ? `${num}${unit}` : undefined
-                this.updateDraftAction(draftActions, i, { delay: newDelay })
-            }
-            delayNumber.addEventListener("input", updateDelay)
-            delayUnit.addEventListener("change", updateDelay)
-
             if (draftActions.length > 1) {
                 const removeBtn = row.createEl("button", {
                     cls: "swimlane-automation-remove-action-btn mod-warning",
@@ -425,6 +436,12 @@ export class AutomationsModal extends WrongNotesModal {
                 this.showValidationError("At least one action is required.")
                 return
             }
+            if (draftTrigger.type === "remains_in") {
+                if (!draftTrigger.delay || !parseDelay(draftTrigger.delay)) {
+                    this.showValidationError("remains in trigger requires a valid delay. Use a number followed by m, h, d, or w.")
+                    return
+                }
+            }
             for (const action of draftActions) {
                 if (!action.property.trim()) {
                     this.showValidationError("Every action must have a property name.")
@@ -438,10 +455,6 @@ export class AutomationsModal extends WrongNotesModal {
                     this.showValidationError(
                         `Property "${action.property}" cannot be the swimlane property (${this.ctx.swimlaneProp}).`,
                     )
-                    return
-                }
-                if (action.delay && !parseDelay(action.delay)) {
-                    this.showValidationError("Invalid delay format. Use a number followed by m, h, d, or w.")
                     return
                 }
             }
@@ -474,16 +487,15 @@ export class AutomationsModal extends WrongNotesModal {
     private updateDraftAction(
         draftActions: AutomationAction[],
         i: number,
-        patch: { property?: string; value?: string; delay?: string },
+        patch: { property?: string; value?: string },
     ): void {
         const cur = draftActions[i]!
         const prop = patch.property ?? cur.property
         const val = patch.value ?? (cur.type !== "clear" ? cur.value : "")
-        const delay = "delay" in patch ? patch.delay : cur.delay
         if (cur.type === "clear") {
-            draftActions[i] = { type: "clear", property: prop, delay }
+            draftActions[i] = { type: "clear", property: prop }
         } else {
-            draftActions[i] = { type: cur.type, property: prop, value: val, delay }
+            draftActions[i] = { type: cur.type, property: prop, value: val }
         }
     }
 }

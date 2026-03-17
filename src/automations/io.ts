@@ -1,7 +1,8 @@
 import { parseYaml, stringifyYaml } from "obsidian"
 import type { AutomationAction, AutomationRule, ScheduledAction } from "./types"
+import { parseDelay } from "./delay"
 
-const VALID_TRIGGER_TYPES = new Set(["enters", "leaves", "created_in"])
+const VALID_TRIGGER_TYPES = new Set(["enters", "leaves", "created_in", "remains_in"])
 
 function isValidAction(action: unknown): action is AutomationAction {
     if (!action || typeof action !== "object") {
@@ -40,6 +41,11 @@ function isValidRule(rule: unknown): rule is AutomationRule {
     }
     if (typeof t.swimlane !== "string" || t.swimlane === "") {
         return false
+    }
+    if (t.type === "remains_in") {
+        if (typeof t.delay !== "string" || t.delay === "" || !parseDelay(t.delay as string)) {
+            return false
+        }
     }
 
     // Validate actions

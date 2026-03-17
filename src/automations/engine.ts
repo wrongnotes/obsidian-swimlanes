@@ -39,30 +39,35 @@ export function matchRules(
     const mutations: MatchedMutation[] = []
 
     for (const rule of rules) {
-        if (rule.trigger.type !== context.type) {
-            continue
-        }
-
         const relevantValue =
             context.type === "leaves" ? context.sourceSwimlane : context.targetSwimlane
+
+        // remains_in fires on "enters" context (card entering a swimlane)
+        if (rule.trigger.type === "remains_in") {
+            if (context.type !== "enters") continue
+        } else {
+            if (rule.trigger.type !== context.type) continue
+        }
 
         const swimlane = rule.trigger.swimlane
         if (swimlane !== "*" && swimlane !== relevantValue) {
             continue
         }
 
+        const delay = rule.trigger.type === "remains_in" ? rule.trigger.delay : undefined
+
         for (const action of rule.actions) {
             if (action.property === swimlaneProp) {
                 continue
             }
             if (action.type === "clear") {
-                mutations.push({ type: "clear", property: action.property, delay: action.delay })
+                mutations.push({ type: "clear", property: action.property, delay })
             } else {
                 mutations.push({
                     type: action.type,
                     property: action.property,
                     value: resolveValue(action.value, context),
-                    delay: action.delay,
+                    delay,
                 })
             }
         }
