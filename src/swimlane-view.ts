@@ -329,13 +329,15 @@ export class SwimlaneView extends BasesView {
      * A non-rank sort returns false — in-column card DnD is disabled.
      */
     /**
-     * Returns true when Bases has an active filter/search, meaning some
-     * entries are hidden. We detect this by comparing the total entries
-     * in groupedData against data.data.
+     * Returns true when Bases has an active filter/search.
+     * Detected via the `.is-active` class on the filter toolbar button,
+     * since Bases pre-filters data before passing it to the view.
      */
     private get isFiltered(): boolean {
-        const groupedTotal = this.data.groupedData.reduce((n, g) => n + g.entries.length, 0)
-        return groupedTotal < this.data.data.length
+        const filterBtn = this.boardEl.parentElement?.querySelector(
+            ".bases-toolbar-filter-menu .text-icon-button",
+        )
+        return filterBtn?.classList.contains("is-active") ?? false
     }
 
     private get isSortedByRank(): boolean {
