@@ -1131,6 +1131,19 @@
     display: none;
 }
 
+.swimlane-automation-delay-input {
+    width: 60px;
+}
+
+.swimlane-automation-delay-unit {
+    width: auto;
+}
+
+.swimlane-automation-delay-text {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* Automation suggestion dropdowns */
 .swimlane-suggest-token {
     font-family: var(--font-monospace);

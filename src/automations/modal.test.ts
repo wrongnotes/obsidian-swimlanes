@@ -249,7 +249,7 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(values).toContain("Done")
     })
 
-    it("trigger type dropdown has all three options", () => {
+    it("trigger type dropdown has all four options", () => {
         const { modal } = openModal([])
         const addBtn = modal.contentEl.querySelector<HTMLButtonElement>(
             ".swimlane-automation-add-btn",
@@ -262,6 +262,7 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(values).toContain("enters")
         expect(values).toContain("leaves")
         expect(values).toContain("created_in")
+        expect(values).toContain("remains_in")
     })
 
     it("Save with valid data calls onSave", () => {
@@ -413,6 +414,47 @@ describe("AutomationsModal — edit/add mode", () => {
         expect(actionRows).toHaveLength(1)
     })
 
+    it("delete action hides property and value inputs in edit mode", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
+        editBtn.click()
+        const propInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-prop-input",
+        )
+        expect(propInput?.classList.contains("swimlane-automation-hidden")).toBe(true)
+        const valueInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-value-input",
+        )
+        expect(valueInput?.classList.contains("swimlane-automation-hidden")).toBe(true)
+    })
+
+    it("Save with delete action succeeds without property or value", () => {
+        const { modal, onSave } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
+        editBtn.click()
+        const saveBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-save-btn",
+        )!
+        saveBtn.click()
+        expect(onSave).toHaveBeenCalledTimes(1)
+        const saved = onSave.mock.calls[0][0] as AutomationRule[]
+        expect(saved[0]!.actions[0]!.type).toBe("delete")
+    })
+
     it("No Remove button when only one action", () => {
         const { modal } = openModal([
             {
@@ -426,5 +468,150 @@ describe("AutomationsModal — edit/add mode", () => {
         editBtn.click()
         const removeBtn = modal.contentEl.querySelector(".swimlane-automation-remove-action-btn")
         expect(removeBtn).toBeNull()
+    })
+
+    it("renders delay inputs in trigger row for remains_in", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "2w" },
+                actions: [{ type: "set", property: "foo", value: "bar" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector<HTMLButtonElement>(
+            ".swimlane-automation-edit-btn",
+        )!
+        editBtn.click()
+        const delayInput = modal.contentEl.querySelector<HTMLInputElement>(
+            ".swimlane-automation-delay-input",
+        )
+        expect(delayInput).not.toBeNull()
+        expect(delayInput?.value).toBe("2")
+        expect(delayInput?.classList.contains("swimlane-automation-hidden")).toBe(false)
+        const delayUnit = modal.contentEl.querySelector<HTMLSelectElement>(
+            ".swimlane-automation-delay-unit",
+        )
+        expect(delayUnit).not.toBeNull()
+        expect(delayUnit?.value).toBe("w")
+    })
+
+    it("read-only view shows delay text for remains_in trigger", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "2w" },
+                actions: [{ type: "set", property: "foo", value: "bar" }],
+            },
+        ])
+        const triggers = modal.contentEl.querySelectorAll(".swimlane-automation-trigger")
+        const texts = Array.from(triggers).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("for 2 weeks"))).toBe(true)
+    })
+
+    it("delete action hides add action button", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        const addBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-add-action-btn",
+        ) as HTMLButtonElement
+        expect(addBtn.classList.contains("swimlane-automation-hidden")).toBe(true)
+    })
+
+    it("delete option is disabled when there are multiple actions", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [
+                    { type: "set", property: "a", value: "1" },
+                    { type: "set", property: "b", value: "2" },
+                ],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        const actionRows = modal.contentEl.querySelectorAll(".swimlane-automation-action")
+        expect(actionRows.length).toBe(2)
+
+        // Check that the delete option is disabled in both rows
+        for (const row of actionRows) {
+            const typeSelect = row.querySelector(
+                ".swimlane-automation-action-type-select",
+            ) as HTMLSelectElement
+            const deleteOpt = Array.from(typeSelect.options).find(o => o.value === "delete")
+            expect(deleteOpt!.disabled).toBe(true)
+        }
+    })
+
+    it("read-only view shows 'Delete card' for delete action", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ])
+        const summaries = modal.contentEl.querySelectorAll(".swimlane-automation-action-summary")
+        const texts = Array.from(summaries).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("Delete card"))).toBe(true)
+    })
+
+    it("move action shows swimlane select in editor", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "move", value: "Backlog" }],
+            },
+        ])
+        const editBtn = modal.contentEl.querySelector(
+            ".swimlane-automation-edit-btn",
+        ) as HTMLButtonElement
+        editBtn.click()
+
+        const moveSelect = modal.contentEl.querySelector(
+            ".swimlane-automation-move-select",
+        ) as HTMLSelectElement
+        expect(moveSelect).toBeTruthy()
+        expect(moveSelect.classList.contains("swimlane-automation-hidden")).toBe(false)
+        expect(moveSelect.value).toBe("Backlog")
+        expect(moveSelect.options.length).toBe(3) // Backlog, In Progress, Done
+
+        // Value text input should be hidden
+        const valueInput = modal.contentEl.querySelector(
+            ".swimlane-automation-value-input",
+        ) as HTMLInputElement
+        expect(valueInput.classList.contains("swimlane-automation-hidden")).toBe(true)
+    })
+
+    it("read-only view shows 'Move card to' for move action", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ])
+        const summaries = modal.contentEl.querySelectorAll(".swimlane-automation-action-summary")
+        const texts = Array.from(summaries).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("Move card to") && t.includes("Archived"))).toBe(true)
+    })
+
+    it("read-only view does not show delay text for enters trigger", () => {
+        const { modal } = openModal([
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "set", property: "foo", value: "bar" }],
+            },
+        ])
+        const triggers = modal.contentEl.querySelectorAll(".swimlane-automation-trigger")
+        const texts = Array.from(triggers).map(el => el.textContent ?? "")
+        expect(texts.some(t => t.includes("for"))).toBe(false)
     })
 })

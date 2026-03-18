@@ -260,6 +260,167 @@ describe("matchRules", () => {
         expect(mutations).toHaveLength(1)
         expect(mutations[0]!.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     })
+
+    it("remains_in trigger matches on enters context", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "2w" },
+                actions: [{ type: "set", property: "archived", value: "true" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "column")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]).toEqual({
+            type: "set",
+            property: "archived",
+            value: "true",
+            delay: "2w",
+        })
+    })
+
+    it("remains_in trigger does not match on leaves context", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "2w" },
+                actions: [{ type: "set", property: "archived", value: "true" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "leaves",
+            sourceSwimlane: "Done",
+            targetSwimlane: "In Progress",
+        }
+        const mutations = matchRules(rules, ctx, "column")
+        expect(mutations).toHaveLength(0)
+    })
+
+    it("remains_in sets delay from trigger on all actions", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "1d" },
+                actions: [
+                    { type: "set", property: "archived", value: "true" },
+                    { type: "clear", property: "assignee" },
+                ],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "column")
+        expect(mutations).toHaveLength(2)
+        expect(mutations[0]!.delay).toBe("1d")
+        expect(mutations[1]!.delay).toBe("1d")
+    })
+
+    it("handles delete action type", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "delete" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.type).toBe("delete")
+    })
+
+    it("remains_in with delete action gets delay from trigger", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "delete" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.type).toBe("delete")
+        expect(mutations[0]!.delay).toBe("4w")
+    })
+
+    it("move action resolves to set on swimlaneProp", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Done" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]).toEqual({
+            type: "set",
+            property: "status",
+            value: "Archived",
+            delay: undefined,
+        })
+    })
+
+    it("move action bypasses swimlaneProp loop guard", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "remains_in", swimlane: "Done", delay: "4w" },
+                actions: [{ type: "move", value: "Archived" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "In Progress",
+            targetSwimlane: "Done",
+        }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations).toHaveLength(1)
+        expect(mutations[0]!.property).toBe("status")
+        expect(mutations[0]!.delay).toBe("4w")
+    })
+
+    it("move action resolves template tokens in value", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "Review" },
+                actions: [{ type: "move", value: "{{target.swimlane}}" }],
+            },
+        ]
+        const ctx: AutomationContext = {
+            type: "enters",
+            sourceSwimlane: "Todo",
+            targetSwimlane: "Review",
+        }
+        const mutations = matchRules(rules, ctx, "status")
+        expect(mutations[0]!.value).toBe("Review")
+    })
+
+    it("does not include delay on instant actions", () => {
+        const rules: AutomationRule[] = [
+            {
+                trigger: { type: "enters", swimlane: "In Progress" },
+                actions: [{ type: "set", property: "startedAt", value: "yes" }],
+            },
+        ]
+        const mutations = matchRules(rules, entersInProgress, swimlaneProp)
+        expect(mutations[0]!.delay).toBeUndefined()
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -351,5 +512,11 @@ describe("applyMutations", () => {
         const fm: Record<string, unknown> = {}
         applyMutations(fm, [{ type: "remove", property: "tags", value: "x" }])
         expect(fm).toEqual({})
+    })
+
+    it("delete mutation is a no-op on frontmatter", () => {
+        const fm: Record<string, unknown> = { foo: "bar" }
+        applyMutations(fm, [{ type: "delete", property: "" }])
+        expect(fm).toEqual({ foo: "bar" })
     })
 })

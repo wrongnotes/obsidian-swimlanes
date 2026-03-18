@@ -1,5 +1,10 @@
 import { moment } from "obsidian"
-import type { AutomationContext, AutomationRule, FrontmatterMutation } from "./types"
+import type {
+    AutomationContext,
+    AutomationRule,
+    FrontmatterMutation,
+    MatchedMutation,
+} from "./types"
 
 /**
  * Replaces template tokens in a string:
@@ -35,33 +40,58 @@ export function matchRules(
     rules: AutomationRule[],
     context: AutomationContext,
     swimlaneProp: string,
-): FrontmatterMutation[] {
-    const mutations: FrontmatterMutation[] = []
+): MatchedMutation[] {
+    const mutations: MatchedMutation[] = []
 
     for (const rule of rules) {
-        if (rule.trigger.type !== context.type) {
-            continue
-        }
-
         const relevantValue =
             context.type === "leaves" ? context.sourceSwimlane : context.targetSwimlane
+
+        // remains_in fires on "enters" context (card entering a swimlane)
+        if (rule.trigger.type === "remains_in") {
+            if (context.type !== "enters") {
+                continue
+            }
+        } else {
+            if (rule.trigger.type !== context.type) {
+                continue
+            }
+        }
 
         const swimlane = rule.trigger.swimlane
         if (swimlane !== "*" && swimlane !== relevantValue) {
             continue
         }
 
+        const delay = rule.trigger.type === "remains_in" ? rule.trigger.delay : undefined
+
         for (const action of rule.actions) {
+            if (action.type === "delete") {
+                mutations.push({ type: "delete", property: "", delay })
+                continue
+            }
+            // "move" explicitly targets swimlaneProp — allowed (not a loop)
+            if (action.type === "move") {
+                mutations.push({
+                    type: "set",
+                    property: swimlaneProp,
+                    value: resolveValue(action.value, context),
+                    delay,
+                })
+                continue
+            }
+            // All other actions targeting swimlaneProp are filtered (loop guard)
             if (action.property === swimlaneProp) {
                 continue
             }
             if (action.type === "clear") {
-                mutations.push({ type: "clear", property: action.property })
+                mutations.push({ type: "clear", property: action.property, delay })
             } else {
                 mutations.push({
                     type: action.type,
                     property: action.property,
                     value: resolveValue(action.value, context),
+                    delay,
                 })
             }
         }
@@ -106,6 +136,9 @@ export function applyMutations(
             }
             case "clear":
                 delete fm[mutation.property]
+                break
+            case "delete":
+                // File deletion handled by caller, not frontmatter
                 break
         }
     }
