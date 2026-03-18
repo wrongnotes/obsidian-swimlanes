@@ -647,7 +647,7 @@ export class SwimlaneView extends BasesView {
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
-        const excluded = new Set([this.rankPropId, this.swimlanePropId, "file.name"])
+        const excluded = new Set([this.rankPropId, this.swimlanePropId, "file.name", "note.tags", "file.tags"])
         return this.data.properties
             .filter(propId => !excluded.has(propId))
             .map(propId => ({ propId, alias: "" }))
@@ -895,6 +895,10 @@ export class SwimlaneView extends BasesView {
         redoBtn.addEventListener("click", () => this.performRedo())
         redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
 
+        const showTags = this.data.properties.some(
+            p => p === "note.tags" || p === "file.tags",
+        )
+
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
             properties: this.cardPropertyAliases,
@@ -944,9 +948,20 @@ export class SwimlaneView extends BasesView {
             for (const entry of group?.entries ?? []) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
                 const currentGroupKey = groupKey
+                let entryTags: string[] | undefined
+                if (showTags) {
+                    const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter?.tags
+                    entryTags = Array.isArray(tagsRaw)
+                        ? tagsRaw.filter((t): t is string => typeof t === "string")
+                        : typeof tagsRaw === "string"
+                            ? [tagsRaw]
+                            : undefined
+                    if (entryTags && entryTags.length === 0) entryTags = undefined
+                }
                 const card = renderCard(cardList, entry, this.app, {
                     ...cardOptions,
                     rank,
+                    tags: entryTags,
                     getSwimlaneContext: () => ({
                         columns: this.swimlaneOrder as string[],
                         currentSwimlane: currentGroupKey,
