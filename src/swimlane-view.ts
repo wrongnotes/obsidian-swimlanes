@@ -378,9 +378,9 @@ export class SwimlaneView extends BasesView {
         // Determine drag direction from the dragged card's current rank.
         const draggedFile = this.app.vault.getFileByPath(draggedPath)
         const draggedRank = draggedFile
-            ? (this.app.metadataCache.getFileCache(draggedFile)?.frontmatter?.[this.rankProp] as
+            ? ((this.app.metadataCache.getFileCache(draggedFile)?.frontmatter?.[this.rankProp] as
                   | string
-                  | undefined) ?? null
+                  | undefined) ?? null)
             : null
         // movingUp = dragging toward the start of the list (lower ranks)
         const movingUp = draggedRank !== null && beforeRank !== null && draggedRank > beforeRank
@@ -399,19 +399,21 @@ export class SwimlaneView extends BasesView {
                 return { beforeRank, afterRank: hidden[0]! }
             }
         } else if (beforeRank !== null) {
-            // Dropping at the end — use the actual last rank in column
-            const actualLast = ranks[ranks.length - 1]!
-            return {
-                beforeRank: actualLast > beforeRank ? actualLast : beforeRank,
-                afterRank: null,
+            // Dropping at the end (dragging down past last visible card).
+            // Hug the beforeRank side → place before any hidden cards after the last visible.
+            const hidden = ranks.filter(r => r > beforeRank)
+            if (hidden.length > 0) {
+                return { beforeRank, afterRank: hidden[0]! }
             }
+            return { beforeRank, afterRank: null }
         } else if (afterRank !== null) {
-            // Dropping at the start — use the actual first rank in column
-            const actualFirst = ranks[0]!
-            return {
-                beforeRank: null,
-                afterRank: actualFirst < afterRank ? afterRank : actualFirst,
+            // Dropping at the start (dragging up past first visible card).
+            // Hug the afterRank side → place after any hidden cards before the first visible.
+            const hidden = ranks.filter(r => r < afterRank)
+            if (hidden.length > 0) {
+                return { beforeRank: hidden[hidden.length - 1]!, afterRank }
             }
+            return { beforeRank: null, afterRank }
         }
         return { beforeRank, afterRank }
     }
