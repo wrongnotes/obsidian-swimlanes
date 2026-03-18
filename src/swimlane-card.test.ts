@@ -283,6 +283,56 @@ describe("renderCard", () => {
     })
 })
 
+describe("tag rendering", () => {
+    it("renders tag chips when tags are provided", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: ["urgent", "bug"] }),
+        )
+        const tagRow = card.querySelector(".swimlane-card-tags")
+        expect(tagRow).not.toBeNull()
+        const chips = Array.from(card.querySelectorAll(".swimlane-card-tag"))
+        expect(chips).toHaveLength(2)
+        const [chip0, chip1] = chips
+        expect(chip0?.textContent).toBe("#urgent")
+        expect(chip1?.textContent).toBe("#bug")
+    })
+
+    it("does not render tag row when tags is empty", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: [] }),
+        )
+        expect(card.querySelector(".swimlane-card-tags")).toBeNull()
+    })
+
+    it("does not render tag row when tags is undefined", () => {
+        const container = document.createElement("div")
+        const card = renderCard(container, makeEntry("Note"), makeApp(), makeOptions())
+        expect(card.querySelector(".swimlane-card-tags")).toBeNull()
+    })
+
+    it("applies colored class and hue CSS variable when tagColorScheme is colored", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: ["test"], tagColorScheme: "colored" }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip).not.toBeNull()
+        expect(chip.classList.contains("swimlane-card-tag--colored")).toBe(true)
+        expect(chip.style.getPropertyValue("--tag-hue")).not.toBe("")
+    })
+})
+
 describe("card context menu actions", () => {
     it("calls getSwimlaneContext lazily on contextmenu", () => {
         const getSwimlaneContext = jest.fn(() => ({

@@ -39,6 +39,19 @@ export interface CardRenderOptions {
     highlightColumn: (column: string) => void
     /** When true, renders an inline menu button instead of relying on contextmenu. */
     mobile?: boolean
+    /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
+    tags?: string[]
+    /** Tag color scheme — "default" uses Obsidian native colors, "colored" uses deterministic hue. */
+    tagColorScheme?: "default" | "colored"
+}
+
+/** Simple string hash → hue (0-360) for deterministic tag coloring. */
+function tagHue(tag: string): number {
+    let hash = 0
+    for (let i = 0; i < tag.length; i++) {
+        hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
+    }
+    return ((hash % 360) + 360) % 360
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -153,6 +166,17 @@ export function renderCard(
 
     const content = imageUrl ? card.createDiv({ cls: "swimlane-card-content" }) : card
     content.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
+
+    if (options.tags && options.tags.length > 0) {
+        const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
+        for (const tag of options.tags) {
+            const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: `#${tag}` })
+            if (options.tagColorScheme === "colored") {
+                chip.style.setProperty("--tag-hue", String(tagHue(tag)))
+                chip.addClass("swimlane-card-tag--colored")
+            }
+        }
+    }
 
     if (properties.length > 0) {
         const rows: { icon: string; label: string; value: string }[] = []

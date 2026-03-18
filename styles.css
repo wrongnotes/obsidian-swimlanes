@@ -269,6 +269,35 @@
     padding-bottom: 0;
 }
 
+/* Tag chips */
+.swimlane-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-2-1);
+    padding-bottom: var(--size-4-2);
+}
+
+.swimlane-card-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--font-ui-smaller);
+    padding: 1px var(--size-4-2);
+    border-radius: var(--radius-s);
+    background-color: var(--tag-background);
+    color: var(--tag-color);
+    white-space: nowrap;
+}
+
+.swimlane-card-tag--colored {
+    background-color: hsl(var(--tag-hue), 40%, 90%);
+    color: hsl(var(--tag-hue), 60%, 30%);
+}
+
+.theme-dark .swimlane-card-tag--colored {
+    background-color: hsl(var(--tag-hue), 30%, 25%);
+    color: hsl(var(--tag-hue), 50%, 75%);
+}
+
 .swimlane-card-props {
     width: 100%;
     font-size: var(--font-ui-smaller);
