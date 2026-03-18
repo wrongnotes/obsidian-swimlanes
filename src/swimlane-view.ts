@@ -332,11 +332,17 @@ export class SwimlaneView extends BasesView {
         const swimlaneProp = this.swimlaneProp
         const rankProp = this.rankProp
         for (const file of this.app.vault.getMarkdownFiles()) {
-            if (excludePath && file.path === excludePath) continue
+            if (excludePath && file.path === excludePath) {
+                continue
+            }
             const cache = this.app.metadataCache.getFileCache(file)
             const fm = cache?.frontmatter
-            if (!fm) continue
-            if (String(fm[swimlaneProp] ?? "") !== String(groupKey)) continue
+            if (!fm) {
+                continue
+            }
+            if (String(fm[swimlaneProp] ?? "") !== String(groupKey)) {
+                continue
+            }
             const rank = fm[rankProp]
             if (typeof rank === "string" && rank) {
                 ranks.push(rank)
@@ -347,8 +353,16 @@ export class SwimlaneView extends BasesView {
 
     /**
      * Adjusts beforeRank/afterRank to account for hidden cards when filters
-     * are active. Finds the tightest valid gap in the full unfiltered column
-     * so midRank doesn't collide with hidden cards.
+     * are active. Uses the drag direction to decide which side of the hidden
+     * cards to place the dropped card:
+     *
+     * - Dragging UP (past the card above): hug the opposite side of the card
+     *   you crossed → land AFTER the last hidden card in the gap.
+     * - Dragging DOWN (past the card below): hug the opposite side →
+     *   land BEFORE the first hidden card in the gap.
+     *
+     * Direction is determined by comparing the dragged card's current rank
+     * against the drop position's beforeRank.
      */
     private adjustRanksForHiddenCards(
         beforeRank: string | null,
@@ -357,18 +371,33 @@ export class SwimlaneView extends BasesView {
         draggedPath: string,
     ): { beforeRank: string | null; afterRank: string | null } {
         const ranks = this.getAllColumnRanks(groupKey, draggedPath)
-        if (ranks.length === 0) return { beforeRank, afterRank }
+        if (ranks.length === 0) {
+            return { beforeRank, afterRank }
+        }
+
+        // Determine drag direction from the dragged card's current rank.
+        const draggedFile = this.app.vault.getFileByPath(draggedPath)
+        const draggedRank = draggedFile
+            ? (this.app.metadataCache.getFileCache(draggedFile)?.frontmatter?.[this.rankProp] as
+                  | string
+                  | undefined) ?? null
+            : null
+        // movingUp = dragging toward the start of the list (lower ranks)
+        const movingUp = draggedRank !== null && beforeRank !== null && draggedRank > beforeRank
 
         if (beforeRank !== null && afterRank !== null) {
-            // Find the tightest gap: the last rank <= beforeRank and first >= afterRank,
-            // accounting for any hidden cards between the visible before/after.
-            let actualBefore = beforeRank
-            for (const r of ranks) {
-                if (r > beforeRank && r < afterRank) {
-                    actualBefore = r
-                }
+            // Collect hidden cards between the visible before and after.
+            const hidden = ranks.filter(r => r > beforeRank && r < afterRank)
+            if (hidden.length === 0) {
+                return { beforeRank, afterRank }
             }
-            return { beforeRank: actualBefore, afterRank }
+            if (movingUp) {
+                // Dragging up → hug the afterRank side → after last hidden card
+                return { beforeRank: hidden[hidden.length - 1]!, afterRank }
+            } else {
+                // Dragging down → hug the beforeRank side → before first hidden card
+                return { beforeRank, afterRank: hidden[0]! }
+            }
         } else if (beforeRank !== null) {
             // Dropping at the end — use the actual last rank in column
             const actualLast = ranks[ranks.length - 1]!
