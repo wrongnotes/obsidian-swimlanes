@@ -7,16 +7,25 @@ import { AbstractInputSuggest } from "obsidian"
  */
 export class TagSuggest extends AbstractInputSuggest<string> {
     private onSelectTag: (tag: string) => void
+    private getExcluded: () => string[]
 
-    constructor(app: App, inputEl: HTMLInputElement, onSelectTag: (tag: string) => void) {
+    constructor(
+        app: App,
+        inputEl: HTMLInputElement,
+        onSelectTag: (tag: string) => void,
+        getExcluded?: () => string[],
+    ) {
         super(app, inputEl)
         this.onSelectTag = onSelectTag
+        this.getExcluded = getExcluded ?? (() => [])
     }
 
     getSuggestions(query: string): string[] {
         const cache = this.app.metadataCache as { getTags?: () => Record<string, number> }
+        const excluded = new Set(this.getExcluded())
         const allTags = Object.keys(cache.getTags?.() ?? {})
             .map(t => (t.startsWith("#") ? t.slice(1) : t))
+            .filter(t => !excluded.has(t))
             .sort()
         if (!query) {
             return allTags.slice(0, 20)
@@ -26,7 +35,7 @@ export class TagSuggest extends AbstractInputSuggest<string> {
     }
 
     renderSuggestion(tag: string, el: HTMLElement): void {
-        el.setText(`#${tag}`)
+        el.setText(tag)
     }
 
     selectSuggestion(tag: string): void {

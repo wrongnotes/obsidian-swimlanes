@@ -280,8 +280,8 @@
 .swimlane-card-tag {
     display: inline-flex;
     align-items: center;
-    font-size: var(--font-ui-smaller);
-    padding: 1px var(--size-4-2);
+    font-size: var(--font-ui-small);
+    padding: 2px var(--size-4-3);
     border-radius: var(--radius-s);
     background-color: var(--tag-background);
     color: var(--tag-color);
@@ -336,7 +336,7 @@
     outline: none;
     background: transparent;
     color: var(--text-normal);
-    font-size: var(--font-smallest);
+    font-size: var(--font-ui-small);
     padding: 2px 4px;
 }
 
@@ -352,7 +352,7 @@
     cursor: pointer;
     color: var(--text-muted);
     border-radius: var(--radius-s);
-    font-size: var(--font-smallest);
+    font-size: var(--font-ui-small);
     user-select: none;
 }
 

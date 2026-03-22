@@ -297,8 +297,8 @@ describe("tag rendering", () => {
         const chips = Array.from(card.querySelectorAll(".swimlane-card-tag"))
         expect(chips).toHaveLength(2)
         const [chip0, chip1] = chips
-        expect(chip0?.textContent).toBe("#urgent")
-        expect(chip1?.textContent).toBe("#bug")
+        expect(chip0?.textContent).toBe("urgent")
+        expect(chip1?.textContent).toBe("bug")
     })
 
     it("does not render tag row when tags is empty", () => {
@@ -379,7 +379,7 @@ describe("renderTagEditor", () => {
         renderTagEditor(card, makeFile(), ["bug", "urgent"], makeApp(), jest.fn())
         const chips = card.querySelectorAll(".swimlane-card-tag--editable")
         expect(chips).toHaveLength(2)
-        expect(chips[0]?.textContent).toContain("#bug")
+        expect(chips[0]?.textContent).toContain("bug")
         expect(chips[0]?.querySelector(".swimlane-card-tag-remove")).not.toBeNull()
     })
 

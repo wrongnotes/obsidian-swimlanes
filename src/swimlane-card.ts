@@ -173,7 +173,7 @@ export function renderCard(
     if (options.tags && options.tags.length > 0) {
         const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
         for (const tag of options.tags) {
-            const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: `#${tag}` })
+            const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: tag })
             if (options.tagColorScheme === "colored") {
                 chip.style.setProperty("--tag-hue", String(tagHue(tag)))
                 chip.addClass("swimlane-card-tag--colored")
@@ -280,8 +280,18 @@ export function renderTagEditor(
             return
         }
         settled = true
+        document.removeEventListener("pointerdown", onOutsidePointerDown, true)
         onDone()
     }
+
+    // Dismiss on outside click (pointerdown, not focusout — focusout fires
+    // during DOM detach/reattach and causes false dismissals).
+    function onOutsidePointerDown(e: PointerEvent) {
+        if (!container!.contains(e.target as Node)) {
+            settle()
+        }
+    }
+    document.addEventListener("pointerdown", onOutsidePointerDown, true)
 
     function renderChips() {
         // Clear and rebuild chips only (preserve input + done btn)
@@ -290,7 +300,7 @@ export function renderTagEditor(
         for (const tag of tags) {
             const chip = document.createElement("span")
             chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
-            chip.textContent = `#${tag}`
+            chip.textContent = tag
             const removeBtn = document.createElement("span")
             removeBtn.classList.add("swimlane-card-tag-remove")
             removeBtn.textContent = "×"
@@ -367,24 +377,15 @@ export function renderTagEditor(
     renderChips()
 
     // Attach autocomplete (TagSuggest extends AbstractInputSuggest)
-    new TagSuggest(app, input, tag => {
-        addTag(tag)
-        input.value = ""
-    })
-
-    // Blur detection: when focus leaves the container entirely
-    container.addEventListener("focusout", e => {
-        const related = (e as FocusEvent).relatedTarget as Node | null
-        if (related && container!.contains(related)) {
-            return
-        }
-        // Delay slightly to allow click events on done btn / remove btn to fire first
-        setTimeout(() => {
-            if (!settled && !container!.contains(document.activeElement)) {
-                settle()
-            }
-        }, 100)
-    })
+    new TagSuggest(
+        app,
+        input,
+        tag => {
+            addTag(tag)
+            input.value = ""
+        },
+        () => tags,
+    )
 
     // Focus the input
     input.focus()

@@ -77,6 +77,7 @@ const CONFIG_KEYS = {
     hiddenSwimlanes: "hiddenSwimlanes",
     forceMobileLayout: "forceMobileLayout",
     imageWidth: "imageWidth",
+    tagColorScheme: "tagColorScheme",
 } as const
 
 /** Sentinel groupKey used when a card is dropped onto the "Add column" button. */
@@ -287,6 +288,12 @@ export class SwimlaneView extends BasesView {
                 key: CONFIG_KEYS.showPropertyIcons,
                 displayName: "Show property icons",
                 default: true,
+            } satisfies ToggleOption,
+            {
+                type: "toggle",
+                key: CONFIG_KEYS.tagColorScheme,
+                displayName: "Color tags by name",
+                default: false,
             } satisfies ToggleOption,
             {
                 type: "toggle",
@@ -626,6 +633,10 @@ export class SwimlaneView extends BasesView {
         return val !== false
     }
 
+    private get tagColorScheme(): "default" | "colored" {
+        return this.config.get(CONFIG_KEYS.tagColorScheme) === true ? "colored" : "default"
+    }
+
     private get showAddColumn(): boolean {
         const val = this.config.get(CONFIG_KEYS.showAddColumn)
         return val !== false
@@ -919,6 +930,7 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             mobile,
+            tagColorScheme: this.tagColorScheme,
             onEditTags: (cardEl: HTMLElement) => {
                 const path = cardEl.dataset.path
                 if (!path) {
