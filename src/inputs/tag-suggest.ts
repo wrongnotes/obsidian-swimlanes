@@ -18,7 +18,9 @@ export class TagSuggest extends AbstractInputSuggest<string> {
         const allTags = Object.keys(cache.getTags?.() ?? {})
             .map(t => (t.startsWith("#") ? t.slice(1) : t))
             .sort()
-        if (!query) {return allTags.slice(0, 20)}
+        if (!query) {
+            return allTags.slice(0, 20)
+        }
         const lower = query.toLowerCase().replace(/^#/, "")
         return allTags.filter(t => t.toLowerCase().includes(lower)).slice(0, 20)
     }

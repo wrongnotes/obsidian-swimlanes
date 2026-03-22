@@ -303,12 +303,7 @@ describe("tag rendering", () => {
 
     it("does not render tag row when tags is empty", () => {
         const container = document.createElement("div")
-        const card = renderCard(
-            container,
-            makeEntry("Note"),
-            makeApp(),
-            makeOptions({ tags: [] }),
-        )
+        const card = renderCard(container, makeEntry("Note"), makeApp(), makeOptions({ tags: [] }))
         expect(card.querySelector(".swimlane-card-tags")).toBeNull()
     })
 

@@ -405,9 +405,7 @@ describe("applyUndo", () => {
 
         const transaction: UndoTransaction = {
             label: "Edit tags",
-            operations: [
-                { type: "EditTags", file: mockFile, previousTags: [], newTags: ["new"] },
-            ],
+            operations: [{ type: "EditTags", file: mockFile, previousTags: [], newTags: ["new"] }],
         }
 
         await applyUndo(transaction, ctx)
@@ -662,9 +660,7 @@ describe("applyRedo", () => {
 
         const transaction: UndoTransaction = {
             label: "Edit tags",
-            operations: [
-                { type: "EditTags", file: mockFile, previousTags: ["old"], newTags: [] },
-            ],
+            operations: [{ type: "EditTags", file: mockFile, previousTags: ["old"], newTags: [] }],
         }
 
         await applyRedo(transaction, ctx)

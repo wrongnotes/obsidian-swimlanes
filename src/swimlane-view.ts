@@ -649,7 +649,13 @@ export class SwimlaneView extends BasesView {
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
-        const excluded = new Set([this.rankPropId, this.swimlanePropId, "file.name", "note.tags", "file.tags"])
+        const excluded = new Set([
+            this.rankPropId,
+            this.swimlanePropId,
+            "file.name",
+            "note.tags",
+            "file.tags",
+        ])
         return this.data.properties
             .filter(propId => !excluded.has(propId))
             .map(propId => ({ propId, alias: "" }))
@@ -902,9 +908,7 @@ export class SwimlaneView extends BasesView {
         redoBtn.addEventListener("click", () => this.performRedo())
         redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
 
-        const showTags = this.data.properties.some(
-            p => p === "note.tags" || p === "file.tags",
-        )
+        const showTags = this.data.properties.some(p => p === "note.tags" || p === "file.tags")
 
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
@@ -917,9 +921,13 @@ export class SwimlaneView extends BasesView {
             mobile,
             onEditTags: (cardEl: HTMLElement) => {
                 const path = cardEl.dataset.path
-                if (!path) {return}
+                if (!path) {
+                    return
+                }
                 const file = this.app.vault.getFileByPath(path)
-                if (!file) {return}
+                if (!file) {
+                    return
+                }
 
                 // Capture previous tags for undo
                 const cache = this.app.metadataCache.getFileCache(file)
@@ -927,8 +935,8 @@ export class SwimlaneView extends BasesView {
                 const previousTags: string[] = Array.isArray(rawTags)
                     ? rawTags.filter((t): t is string => typeof t === "string")
                     : typeof rawTags === "string"
-                        ? [rawTags]
-                        : []
+                      ? [rawTags]
+                      : []
 
                 // Protect card from re-render
                 this.editingTagsPath = path
@@ -941,8 +949,8 @@ export class SwimlaneView extends BasesView {
                     const newTags: string[] = Array.isArray(finalRaw)
                         ? finalRaw.filter((t): t is string => typeof t === "string")
                         : typeof finalRaw === "string"
-                            ? [finalRaw]
-                            : []
+                          ? [finalRaw]
+                          : []
 
                     const changed =
                         previousTags.length !== newTags.length ||
@@ -1006,13 +1014,16 @@ export class SwimlaneView extends BasesView {
                 const currentGroupKey = groupKey
                 let entryTags: string[] | undefined
                 if (showTags) {
-                    const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter?.tags
+                    const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter
+                        ?.tags
                     entryTags = Array.isArray(tagsRaw)
                         ? tagsRaw.filter((t): t is string => typeof t === "string")
                         : typeof tagsRaw === "string"
-                            ? [tagsRaw]
-                            : undefined
-                    if (entryTags && entryTags.length === 0) {entryTags = undefined}
+                          ? [tagsRaw]
+                          : undefined
+                    if (entryTags && entryTags.length === 0) {
+                        entryTags = undefined
+                    }
                 }
                 const card = renderCard(cardList, entry, this.app, {
                     ...cardOptions,
@@ -1038,7 +1049,9 @@ export class SwimlaneView extends BasesView {
 
             // Reattach editing card if it belongs in this column
             if (this.editingTagsPath && this.editingTagsCardEl) {
-                const editingCard = cardList.querySelector(`[data-path="${CSS.escape(this.editingTagsPath)}"]`)
+                const editingCard = cardList.querySelector(
+                    `[data-path="${CSS.escape(this.editingTagsPath)}"]`,
+                )
                 if (editingCard) {
                     editingCard.replaceWith(this.editingTagsCardEl)
                 }
