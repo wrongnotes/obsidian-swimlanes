@@ -1,4 +1,5 @@
-import { Plugin, Notice, parseYaml, TFile } from "obsidian"
+import { Plugin, PluginSettingTab, Setting, Notice, parseYaml, TFile } from "obsidian"
+import type { App as ObsidianApp } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
@@ -12,10 +13,20 @@ import {
     applyMutations,
 } from "./automations"
 
+export interface SwimlaneSettings {
+    colorTagsByName: boolean
+}
+
+const DEFAULT_SETTINGS: SwimlaneSettings = {
+    colorTagsByName: false,
+}
+
 export default class SwimlanePlugin extends Plugin {
+    settings: SwimlaneSettings = DEFAULT_SETTINGS
     private pollerIntervalId: number | null = null
 
     async onload() {
+        await this.loadSettings()
         this.registerBasesView("swimlane", {
             name: "Swimlane",
             icon: "lucide-square-dashed-kanban",
@@ -80,6 +91,8 @@ export default class SwimlanePlugin extends Plugin {
         this.addRibbonIcon("square-kanban", "Create swimlane board", () => {
             new CreateBaseModal(this.app).open()
         })
+
+        this.addSettingTab(new SwimlaneSettingTab(this.app, this))
 
         // Check for due scheduled actions on load
         this.processAllDueActions()
@@ -193,6 +206,14 @@ export default class SwimlanePlugin extends Plugin {
         return remaining.length > 0
     }
 
+    async loadSettings(): Promise<void> {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+    }
+
+    async saveSettings(): Promise<void> {
+        await this.saveData(this.settings)
+    }
+
     private async updateScheduledActionPaths(oldPath: string, newPath: string): Promise<void> {
         const baseFiles = this.app.vault.getFiles().filter(f => f.extension === "base")
         for (const baseFile of baseFiles) {
@@ -209,5 +230,29 @@ export default class SwimlanePlugin extends Plugin {
                 await this.app.vault.process(baseFile, c => writeScheduledActions(c, actions))
             }
         }
+    }
+}
+
+class SwimlaneSettingTab extends PluginSettingTab {
+    plugin: SwimlanePlugin
+
+    constructor(app: ObsidianApp, plugin: SwimlanePlugin) {
+        super(app, plugin)
+        this.plugin = plugin
+    }
+
+    display(): void {
+        const { containerEl } = this
+        containerEl.empty()
+
+        new Setting(containerEl)
+            .setName("Color tags by name")
+            .setDesc("Assign each tag a unique color based on its name instead of using Obsidian's default tag colors.")
+            .addToggle(toggle =>
+                toggle.setValue(this.plugin.settings.colorTagsByName).onChange(async value => {
+                    this.plugin.settings.colorTagsByName = value
+                    await this.plugin.saveSettings()
+                }),
+            )
     }
 }
