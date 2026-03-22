@@ -287,9 +287,16 @@ export function renderTagEditor(
     // Dismiss on outside click (pointerdown, not focusout — focusout fires
     // during DOM detach/reattach and causes false dismissals).
     function onOutsidePointerDown(e: PointerEvent) {
-        if (!container!.contains(e.target as Node)) {
-            settle()
+        const target = e.target as HTMLElement
+        // Ignore clicks inside the editor container
+        if (container!.contains(target)) {
+            return
         }
+        // Ignore clicks on Obsidian's suggestion popup (rendered outside the card)
+        if (target.closest(".suggestion-container")) {
+            return
+        }
+        settle()
     }
     document.addEventListener("pointerdown", onOutsidePointerDown, true)
 

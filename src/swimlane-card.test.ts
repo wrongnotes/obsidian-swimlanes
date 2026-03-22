@@ -425,6 +425,62 @@ describe("renderTagEditor", () => {
         expect(app.fileManager.processFrontMatter).toHaveBeenCalled()
     })
 
+    it("remove actually updates frontmatter and chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const captured: Record<string, unknown>[] = []
+        const app = makeApp({
+            fileManager: {
+                processFrontMatter: jest.fn(async (_f: any, cb: (fm: any) => void) => {
+                    const fm: Record<string, unknown> = { tags: ["old"] }
+                    cb(fm)
+                    captured.push(fm)
+                }),
+                trashFile: jest.fn(),
+            },
+        })
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], app, jest.fn())
+
+        // Remove "bug" (first tag)
+        const removeBtn = card.querySelector(".swimlane-card-tag-remove") as HTMLElement
+        removeBtn?.click()
+
+        // Frontmatter should have ["urgent"] only
+        expect(captured).toHaveLength(1)
+        expect(captured[0]?.tags).toEqual(["urgent"])
+
+        // Only one chip should remain
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(1)
+        expect(chips[0]?.textContent).toContain("urgent")
+    })
+
+    it("add via Enter updates frontmatter and chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const captured: Record<string, unknown>[] = []
+        const app = makeApp({
+            fileManager: {
+                processFrontMatter: jest.fn(async (_f: any, cb: (fm: any) => void) => {
+                    const fm: Record<string, unknown> = {}
+                    cb(fm)
+                    captured.push(fm)
+                }),
+                trashFile: jest.fn(),
+            },
+        })
+        renderTagEditor(card, makeFile(), ["bug"], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "feature"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+
+        expect(captured).toHaveLength(1)
+        expect(captured[0]?.tags).toEqual(["bug", "feature"])
+
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(2)
+    })
+
     it("calls onDone when done button is clicked", () => {
         const card = document.createElement("div")
         card.classList.add("swimlane-card")

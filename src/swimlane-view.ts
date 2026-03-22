@@ -1055,6 +1055,9 @@ export class SwimlaneView extends BasesView {
                 )
                 if (editingCard) {
                     editingCard.replaceWith(this.editingTagsCardEl)
+                    // Restore focus to the tag input after reattach
+                    const tagInput = this.editingTagsCardEl.querySelector(".swimlane-tag-input") as HTMLInputElement | null
+                    tagInput?.focus()
                 }
             }
 
