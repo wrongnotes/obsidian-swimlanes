@@ -374,6 +374,49 @@ describe("applyUndo", () => {
         await expect(applyUndo(transaction, ctx)).resolves.toBeUndefined()
         expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
     })
+
+    test("EditTags: restores previous tags", async () => {
+        const app = makeMockApp()
+        const ctx = makeCtx(app)
+
+        const transaction: UndoTransaction = {
+            label: "Edit tags",
+            operations: [
+                {
+                    type: "EditTags",
+                    file: mockFile,
+                    previousTags: ["bug", "urgent"],
+                    newTags: ["bug"],
+                },
+            ],
+        }
+
+        await applyUndo(transaction, ctx)
+
+        const callback = app.fileManager.processFrontMatter.mock.calls[0][1]
+        const fm: Record<string, unknown> = {}
+        callback(fm)
+        expect(fm.tags).toEqual(["bug", "urgent"])
+    })
+
+    test("EditTags: deletes tags when previousTags is empty", async () => {
+        const app = makeMockApp()
+        const ctx = makeCtx(app)
+
+        const transaction: UndoTransaction = {
+            label: "Edit tags",
+            operations: [
+                { type: "EditTags", file: mockFile, previousTags: [], newTags: ["new"] },
+            ],
+        }
+
+        await applyUndo(transaction, ctx)
+
+        const callback = app.fileManager.processFrontMatter.mock.calls[0][1]
+        const fm: Record<string, unknown> = { tags: ["old"] }
+        callback(fm)
+        expect(fm.tags).toBeUndefined()
+    })
 })
 
 // ─── applyRedo ────────────────────────────────────────────────────────────────
@@ -587,6 +630,49 @@ describe("applyRedo", () => {
 
         await expect(applyRedo(transaction, ctx)).resolves.toBeUndefined()
         expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
+    })
+
+    test("EditTags: applies new tags", async () => {
+        const app = makeMockApp()
+        const ctx = makeCtx(app)
+
+        const transaction: UndoTransaction = {
+            label: "Edit tags",
+            operations: [
+                {
+                    type: "EditTags",
+                    file: mockFile,
+                    previousTags: ["bug"],
+                    newTags: ["bug", "feature"],
+                },
+            ],
+        }
+
+        await applyRedo(transaction, ctx)
+
+        const callback = app.fileManager.processFrontMatter.mock.calls[0][1]
+        const fm: Record<string, unknown> = {}
+        callback(fm)
+        expect(fm.tags).toEqual(["bug", "feature"])
+    })
+
+    test("EditTags: deletes tags when newTags is empty", async () => {
+        const app = makeMockApp()
+        const ctx = makeCtx(app)
+
+        const transaction: UndoTransaction = {
+            label: "Edit tags",
+            operations: [
+                { type: "EditTags", file: mockFile, previousTags: ["old"], newTags: [] },
+            ],
+        }
+
+        await applyRedo(transaction, ctx)
+
+        const callback = app.fileManager.processFrontMatter.mock.calls[0][1]
+        const fm: Record<string, unknown> = { tags: ["old"] }
+        callback(fm)
+        expect(fm.tags).toBeUndefined()
     })
 
     test("CreateCard redo with occupied path uses deduplication", async () => {
