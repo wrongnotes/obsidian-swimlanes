@@ -298,6 +298,69 @@
     color: hsl(var(--tag-hue), 50%, 75%);
 }
 
+/* ── Tag editor (inline editing mode) ──────────────────── */
+
+.swimlane-card-tags--editing {
+    background: var(--background-modifier-form-field);
+    border-radius: var(--radius-s);
+    padding: 4px;
+}
+
+.swimlane-card-tag--editable {
+    cursor: default;
+    padding-right: 2px;
+}
+
+.swimlane-card-tag-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    padding: 0 3px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: var(--radius-s);
+    font-size: 0.85em;
+    line-height: 1;
+}
+
+.swimlane-card-tag-remove:hover {
+    color: var(--text-error);
+    background: var(--background-modifier-hover);
+}
+
+.swimlane-tag-input {
+    flex: 1 1 60px;
+    min-width: 60px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-normal);
+    font-size: var(--font-smallest);
+    padding: 2px 4px;
+}
+
+.swimlane-tag-input::placeholder {
+    color: var(--text-faint);
+}
+
+.swimlane-tag-done-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: var(--radius-s);
+    font-size: var(--font-smallest);
+    user-select: none;
+}
+
+.swimlane-tag-done-btn:hover {
+    color: var(--text-accent);
+    background: var(--background-modifier-hover);
+}
+
 .swimlane-card-props {
     width: 100%;
     font-size: var(--font-ui-smaller);
