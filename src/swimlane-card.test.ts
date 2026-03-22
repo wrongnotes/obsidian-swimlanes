@@ -1,4 +1,4 @@
-import { renderCard, propLabel, CardRenderOptions } from "./swimlane-card"
+import { renderCard, renderTagEditor, propLabel, CardRenderOptions } from "./swimlane-card"
 import type { BasesEntry, BasesPropertyId } from "obsidian"
 import {
     StringValue,
@@ -370,5 +370,106 @@ describe("card context menu actions", () => {
         card.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }))
         card.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }))
         expect(getSwimlaneContext).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe("renderTagEditor", () => {
+    function makeFile(path = "note.md") {
+        return { path } as any
+    }
+
+    it("renders editable chips with remove buttons for existing tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], makeApp(), jest.fn())
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(2)
+        expect(chips[0]?.textContent).toContain("#bug")
+        expect(chips[0]?.querySelector(".swimlane-card-tag-remove")).not.toBeNull()
+    })
+
+    it("renders input and done button", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-tag-input")).not.toBeNull()
+        expect(card.querySelector(".swimlane-tag-done-btn")).not.toBeNull()
+    })
+
+    it("adds editing class to container", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-card-tags--editing")).not.toBeNull()
+    })
+
+    it("creates tag container when card has none", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-card-tags")).not.toBeNull()
+    })
+
+    it("reuses existing tag container", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const existing = document.createElement("div")
+        existing.classList.add("swimlane-card-tags")
+        card.appendChild(existing)
+        renderTagEditor(card, makeFile(), ["a"], makeApp(), jest.fn())
+        expect(card.querySelectorAll(".swimlane-card-tags")).toHaveLength(1)
+    })
+
+    it("calls processFrontMatter when remove button is clicked", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], app, jest.fn())
+        const removeBtn = card.querySelector(".swimlane-card-tag-remove") as HTMLElement
+        removeBtn?.click()
+        expect(app.fileManager.processFrontMatter).toHaveBeenCalled()
+    })
+
+    it("calls onDone when done button is clicked", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), [], makeApp(), onDone)
+        const doneBtn = card.querySelector(".swimlane-tag-done-btn") as HTMLElement
+        doneBtn?.click()
+        expect(onDone).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not call onDone twice (settled flag)", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), [], makeApp(), onDone)
+        const doneBtn = card.querySelector(".swimlane-tag-done-btn") as HTMLElement
+        doneBtn?.click()
+        doneBtn?.click()
+        expect(onDone).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not add duplicate tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), ["bug"], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "bug"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
+    })
+
+    it("ignores empty input on Enter", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), [], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = ""
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
     })
 })

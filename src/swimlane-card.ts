@@ -1,5 +1,6 @@
-import type { App, BasesPropertyId, Value } from "obsidian"
+import type { App, BasesPropertyId, TFile, Value } from "obsidian"
 import type { BasesEntry } from "obsidian"
+import { TagSuggest } from "./inputs/tag-suggest"
 import {
     BooleanValue,
     DateValue,
@@ -243,6 +244,142 @@ export function renderCard(
     })
 
     return card
+}
+
+/** Transform a card's tag row into an inline editor with removable chips + autocomplete input. */
+export function renderTagEditor(
+    cardEl: HTMLElement,
+    file: TFile,
+    currentTags: string[],
+    app: App,
+    onDone: () => void,
+): void {
+    const tags = [...currentTags]
+    let settled = false
+
+    // Find or create the tag container. It lives on the content wrapper (if images)
+    // or directly on the card.
+    const content = cardEl.querySelector(".swimlane-card-content") ?? cardEl
+    let container = content.querySelector(".swimlane-card-tags") as HTMLElement | null
+    if (!container) {
+        // Insert after title, before properties table
+        const title = content.querySelector(".swimlane-card-title")
+        container = document.createElement("div")
+        container.classList.add("swimlane-card-tags")
+        if (title?.nextSibling) {
+            content.insertBefore(container, title.nextSibling)
+        } else {
+            content.appendChild(container)
+        }
+    }
+
+    function settle() {
+        if (settled) return
+        settled = true
+        onDone()
+    }
+
+    function renderChips() {
+        // Clear and rebuild chips only (preserve input + done btn)
+        container!.querySelectorAll(".swimlane-card-tag--editable").forEach(el => el.remove())
+        const input = container!.querySelector(".swimlane-tag-input")
+        for (const tag of tags) {
+            const chip = document.createElement("span")
+            chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
+            chip.textContent = `#${tag}`
+            const removeBtn = document.createElement("span")
+            removeBtn.classList.add("swimlane-card-tag-remove")
+            removeBtn.textContent = "×"
+            removeBtn.addEventListener("click", e => {
+                e.stopPropagation()
+                const idx = tags.indexOf(tag)
+                if (idx !== -1) {
+                    tags.splice(idx, 1)
+                    writeTags()
+                    renderChips()
+                }
+            })
+            chip.appendChild(removeBtn)
+            if (input) {
+                container!.insertBefore(chip, input)
+            } else {
+                container!.prepend(chip)
+            }
+        }
+    }
+
+    function writeTags() {
+        app.fileManager.processFrontMatter(file, fm => {
+            if (tags.length === 0) {
+                delete fm.tags
+            } else {
+                fm.tags = [...tags]
+            }
+        })
+    }
+
+    function addTag(raw: string) {
+        const tag = raw.trim().replace(/^#/, "")
+        if (!tag || tags.includes(tag)) return
+        tags.push(tag)
+        writeTags()
+        renderChips()
+    }
+
+    // Clear container and set up editing UI
+    container.empty()
+    container.classList.add("swimlane-card-tags--editing")
+
+    // Input
+    const input = document.createElement("input")
+    input.type = "text"
+    input.placeholder = "Add tag…"
+    input.classList.add("swimlane-tag-input")
+    input.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+            e.preventDefault()
+            addTag(input.value)
+            input.value = ""
+        } else if (e.key === "Escape") {
+            e.preventDefault()
+            settle()
+        }
+    })
+    container.appendChild(input)
+
+    // Done button
+    const doneBtn = document.createElement("span")
+    doneBtn.classList.add("swimlane-tag-done-btn")
+    doneBtn.textContent = "✓"
+    doneBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        settle()
+    })
+    container.appendChild(doneBtn)
+
+    // Render initial chips (before the input)
+    renderChips()
+
+    // Attach autocomplete (TagSuggest extends AbstractInputSuggest)
+    new TagSuggest(app, input, tag => {
+        addTag(tag)
+        input.value = ""
+    })
+
+    // Blur detection: when focus leaves the container entirely
+    container.addEventListener("focusout", e => {
+        const related = (e as FocusEvent).relatedTarget as Node | null
+        if (related && container!.contains(related)) return
+        // Delay slightly to allow click events on done btn / remove btn to fire first
+        setTimeout(() => {
+            if (!settled && !container!.contains(document.activeElement)) {
+                settle()
+            }
+        }, 100)
+    })
+
+    // Focus the input
+    input.focus()
 }
 
 function showCardMenu(
