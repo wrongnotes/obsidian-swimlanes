@@ -20,7 +20,7 @@ import type {
     ViewOption,
 } from "obsidian"
 import { DragAndDropContext } from "./drag-drop"
-import { CardPropertyAlias, CardRenderOptions, renderCard } from "./swimlane-card"
+import { CardPropertyAlias, CardRenderOptions, renderCard, renderTagEditor } from "./swimlane-card"
 import { LexorankPosition, midRank } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
@@ -133,6 +133,8 @@ export class SwimlaneView extends BasesView {
         boardScrollTop: number
         boardScrollLeft: number
     } | null = null
+    private editingTagsPath: string | null = null
+    private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
 
@@ -753,6 +755,11 @@ export class SwimlaneView extends BasesView {
             this.savedScrollState?.boardScrollLeft ?? this.boardEl.scrollLeft
         this.savedScrollState = null
 
+        // Detach the card being tag-edited so empty() doesn't destroy it.
+        if (this.editingTagsPath && this.editingTagsCardEl) {
+            this.editingTagsCardEl.remove()
+        }
+
         this.boardEl.empty()
         // Clear stale column-drop references — the DOM elements were removed by empty().
         this.columnDropTarget = null
@@ -908,6 +915,55 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             mobile,
+            onEditTags: (cardEl: HTMLElement) => {
+                const path = cardEl.dataset.path
+                if (!path) return
+                const file = this.app.vault.getFileByPath(path)
+                if (!file) return
+
+                // Capture previous tags for undo
+                const cache = this.app.metadataCache.getFileCache(file)
+                const rawTags = cache?.frontmatter?.tags
+                const previousTags: string[] = Array.isArray(rawTags)
+                    ? rawTags.filter((t): t is string => typeof t === "string")
+                    : typeof rawTags === "string"
+                        ? [rawTags]
+                        : []
+
+                // Protect card from re-render
+                this.editingTagsPath = path
+                this.editingTagsCardEl = cardEl
+
+                renderTagEditor(cardEl, file, previousTags, this.app, () => {
+                    // onDone: create undo transaction and clear editing state
+                    const finalCache = this.app.metadataCache.getFileCache(file)
+                    const finalRaw = finalCache?.frontmatter?.tags
+                    const newTags: string[] = Array.isArray(finalRaw)
+                        ? finalRaw.filter((t): t is string => typeof t === "string")
+                        : typeof finalRaw === "string"
+                            ? [finalRaw]
+                            : []
+
+                    const changed =
+                        previousTags.length !== newTags.length ||
+                        previousTags.some((t, i) => t !== newTags[i])
+
+                    if (changed) {
+                        this.undoManager.beginTransaction("Edit tags")
+                        this.undoManager.pushOperation({
+                            type: "EditTags",
+                            file,
+                            previousTags,
+                            newTags,
+                        })
+                        this.undoManager.endTransaction()
+                    }
+
+                    this.editingTagsPath = null
+                    this.editingTagsCardEl = null
+                    this.rebuildBoard()
+                })
+            },
         }
 
         for (const groupKey of orderedKeys) {
@@ -978,6 +1034,14 @@ export class SwimlaneView extends BasesView {
                     )
                 }
                 this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+            }
+
+            // Reattach editing card if it belongs in this column
+            if (this.editingTagsPath && this.editingTagsCardEl) {
+                const editingCard = cardList.querySelector(`[data-path="${CSS.escape(this.editingTagsPath)}"]`)
+                if (editingCard) {
+                    editingCard.replaceWith(this.editingTagsCardEl)
+                }
             }
 
             if (this.showAddCard) {
