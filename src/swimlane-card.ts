@@ -276,7 +276,7 @@ export function renderTagEditor(
     }
 
     function settle() {
-        if (settled) return
+        if (settled) {return}
         settled = true
         onDone()
     }
@@ -322,7 +322,7 @@ export function renderTagEditor(
 
     function addTag(raw: string) {
         const tag = raw.trim().replace(/^#/, "")
-        if (!tag || tags.includes(tag)) return
+        if (!tag || tags.includes(tag)) {return}
         tags.push(tag)
         writeTags()
         renderChips()
@@ -371,7 +371,7 @@ export function renderTagEditor(
     // Blur detection: when focus leaves the container entirely
     container.addEventListener("focusout", e => {
         const related = (e as FocusEvent).relatedTarget as Node | null
-        if (related && container!.contains(related)) return
+        if (related && container!.contains(related)) {return}
         // Delay slightly to allow click events on done btn / remove btn to fire first
         setTimeout(() => {
             if (!settled && !container!.contains(document.activeElement)) {

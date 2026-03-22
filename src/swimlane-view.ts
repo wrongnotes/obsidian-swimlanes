@@ -917,9 +917,9 @@ export class SwimlaneView extends BasesView {
             mobile,
             onEditTags: (cardEl: HTMLElement) => {
                 const path = cardEl.dataset.path
-                if (!path) return
+                if (!path) {return}
                 const file = this.app.vault.getFileByPath(path)
-                if (!file) return
+                if (!file) {return}
 
                 // Capture previous tags for undo
                 const cache = this.app.metadataCache.getFileCache(file)
@@ -1012,7 +1012,7 @@ export class SwimlaneView extends BasesView {
                         : typeof tagsRaw === "string"
                             ? [tagsRaw]
                             : undefined
-                    if (entryTags && entryTags.length === 0) entryTags = undefined
+                    if (entryTags && entryTags.length === 0) {entryTags = undefined}
                 }
                 const card = renderCard(cardList, entry, this.app, {
                     ...cardOptions,
