@@ -44,6 +44,8 @@ export interface CardRenderOptions {
     tags?: string[]
     /** Tag color scheme — "default" uses Obsidian native colors, "colored" uses deterministic hue. */
     tagColorScheme?: "default" | "colored"
+    /** Called when the user selects "Edit tags…" from the context menu. */
+    onEditTags?: (cardEl: HTMLElement) => void
 }
 
 /** Simple string hash → hue (0-360) for deterministic tag coloring. */
@@ -231,7 +233,7 @@ export function renderCard(
                 return
             }
             const rect = menuBtn.getBoundingClientRect()
-            openMenu = showCardMenu({ x: rect.right, y: rect.bottom }, entry, app, options)
+            openMenu = showCardMenu({ x: rect.right, y: rect.bottom }, entry, app, options, card)
             openMenu.register(() => {
                 openMenu = null
             })
@@ -240,7 +242,7 @@ export function renderCard(
 
     card.addEventListener("contextmenu", e => {
         e.preventDefault()
-        showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options)
+        showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options, card)
     })
 
     return card
@@ -387,6 +389,7 @@ function showCardMenu(
     entry: BasesEntry,
     app: App,
     options: CardRenderOptions,
+    cardEl: HTMLElement,
 ): Menu {
     const menu = new Menu()
 
@@ -419,6 +422,16 @@ function showCardMenu(
             })
         }
     })
+
+    if (options.onEditTags) {
+        menu.addItem(item => {
+            item.setTitle("Edit tags…")
+                .setIcon("lucide-tags")
+                .onClick(() => {
+                    options.onEditTags!(cardEl)
+                })
+        })
+    }
 
     menu.addSeparator()
 
