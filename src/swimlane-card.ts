@@ -279,6 +279,23 @@ export function renderTagEditor(
         onDone()
     }
 
+    function cancel() {
+        if (settled) {
+            return
+        }
+        // Restore original tags
+        app.fileManager.processFrontMatter(file, fm => {
+            if (currentTags.length === 0) {
+                delete fm.tags
+            } else {
+                fm.tags = [...currentTags]
+            }
+        })
+        settled = true
+        document.removeEventListener("pointerdown", onOutsidePointerDown, true)
+        onDone()
+    }
+
     // Dismiss on outside click (pointerdown, not focusout — focusout fires
     // during DOM detach/reattach and causes false dismissals).
     // Skip pointerdown events that occur before the next animation frame,
@@ -364,7 +381,7 @@ export function renderTagEditor(
     container.classList.add("swimlane-card-tags--editing")
     container.setAttribute("data-no-drag", "")
 
-    // Input + done button row
+    // Input + add button row
     const inputRow = document.createElement("div")
     inputRow.classList.add("swimlane-tag-input-row")
     container.appendChild(inputRow)
@@ -380,19 +397,48 @@ export function renderTagEditor(
             input.value = ""
         } else if (e.key === "Escape") {
             e.preventDefault()
-            settle()
+            cancel()
         }
     })
     inputRow.appendChild(input)
 
+    const addBtn = document.createElement("span")
+    addBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(addBtn, "plus")
+    addBtn.title = "Add tag"
+    addBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        if (input.value.trim()) {
+            addTag(input.value)
+            input.value = ""
+        }
+    })
+    inputRow.appendChild(addBtn)
+
+    // Done / Cancel action row
+    const actionRow = document.createElement("div")
+    actionRow.classList.add("swimlane-tag-action-row")
+    container.appendChild(actionRow)
+
+    const cancelBtn = document.createElement("span")
+    cancelBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(cancelBtn, "x")
+    cancelBtn.title = "Cancel"
+    cancelBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        cancel()
+    })
+    actionRow.appendChild(cancelBtn)
+
     const doneBtn = document.createElement("span")
-    doneBtn.classList.add("swimlane-tag-done-btn")
-    doneBtn.textContent = "✓"
+    doneBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(doneBtn, "check")
+    doneBtn.title = "Done"
     doneBtn.addEventListener("click", e => {
         e.stopPropagation()
         settle()
     })
-    inputRow.appendChild(doneBtn)
+    actionRow.appendChild(doneBtn)
 
     // Render initial chips (before the input)
     renderChips()

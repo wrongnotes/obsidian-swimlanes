@@ -418,7 +418,7 @@ describe("renderTagEditor", () => {
         card.classList.add("swimlane-card")
         renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
         expect(card.querySelector(".swimlane-tag-input")).not.toBeNull()
-        expect(card.querySelector(".swimlane-tag-done-btn")).not.toBeNull()
+        expect(card.querySelector(".swimlane-tag-action-row")).not.toBeNull()
     })
 
     it("adds editing class to container", () => {
@@ -516,7 +516,8 @@ describe("renderTagEditor", () => {
         card.classList.add("swimlane-card")
         const onDone = jest.fn()
         renderTagEditor(card, makeFile(), [], makeApp(), onDone)
-        const doneBtn = card.querySelector(".swimlane-tag-done-btn") as HTMLElement
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const doneBtn = btns[1] as HTMLElement // second btn is done (check)
         doneBtn?.click()
         expect(onDone).toHaveBeenCalledTimes(1)
     })
@@ -526,10 +527,33 @@ describe("renderTagEditor", () => {
         card.classList.add("swimlane-card")
         const onDone = jest.fn()
         renderTagEditor(card, makeFile(), [], makeApp(), onDone)
-        const doneBtn = card.querySelector(".swimlane-tag-done-btn") as HTMLElement
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const doneBtn = btns[1] as HTMLElement
         doneBtn?.click()
         doneBtn?.click()
         expect(onDone).toHaveBeenCalledTimes(1)
+    })
+
+    it("cancel restores original tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), ["original"], app, onDone)
+        // Add a tag
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "new"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // Click cancel
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const cancelBtn = btns[0] as HTMLElement
+        cancelBtn?.click()
+        // Should have called processFrontMatter to restore original tags
+        const lastCall = app.fileManager.processFrontMatter.mock.calls.at(-1)
+        const fm: Record<string, unknown> = {}
+        lastCall?.[1](fm)
+        expect(fm.tags).toEqual(["original"])
+        expect(onDone).toHaveBeenCalled()
     })
 
     it("does not add duplicate tags", () => {

@@ -361,21 +361,31 @@
     color: var(--text-faint);
 }
 
-.swimlane-tag-done-btn {
+.swimlane-tag-editor-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 2px 6px;
     cursor: pointer;
     color: var(--text-muted);
     border-radius: var(--radius-s);
-    font-size: var(--font-ui-small);
     user-select: none;
 }
 
-.swimlane-tag-done-btn:hover {
-    color: var(--text-accent);
+.swimlane-tag-editor-btn svg {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.swimlane-tag-editor-btn:hover {
+    color: var(--text-normal);
     background: var(--background-modifier-hover);
+}
+
+.swimlane-tag-action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-2-2);
+    flex: 1 1 100%;
 }
 
 /* ── Tag color rules (settings) ────────────────────────── */
