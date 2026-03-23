@@ -1,6 +1,8 @@
 import { Plugin, PluginSettingTab, Setting, Notice, parseYaml, TFile } from "obsidian"
 import type { App as ObsidianApp } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
+import { TagColorResolver } from "./tag-colors"
+import type { TagColorRule } from "./tag-colors"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
 import {
@@ -14,15 +16,16 @@ import {
 } from "./automations"
 
 export interface SwimlaneSettings {
-    colorTagsByName: boolean
+    tagColorRules: TagColorRule[]
 }
 
 const DEFAULT_SETTINGS: SwimlaneSettings = {
-    colorTagsByName: false,
+    tagColorRules: [],
 }
 
 export default class SwimlanePlugin extends Plugin {
     settings: SwimlaneSettings = DEFAULT_SETTINGS
+    tagColorResolver: TagColorResolver = new TagColorResolver([])
     private pollerIntervalId: number | null = null
 
     async onload() {
@@ -208,10 +211,12 @@ export default class SwimlanePlugin extends Plugin {
 
     async loadSettings(): Promise<void> {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+        this.tagColorResolver = new TagColorResolver(this.settings.tagColorRules)
     }
 
     async saveSettings(): Promise<void> {
         await this.saveData(this.settings)
+        this.tagColorResolver = new TagColorResolver(this.settings.tagColorRules)
     }
 
     private async updateScheduledActionPaths(oldPath: string, newPath: string): Promise<void> {
