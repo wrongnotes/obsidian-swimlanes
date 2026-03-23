@@ -309,7 +309,7 @@ export function renderTagEditor(
             }
             const removeBtn = document.createElement("span")
             removeBtn.classList.add("swimlane-card-tag-remove")
-            removeBtn.textContent = "×"
+            setIcon(removeBtn, "x")
             removeBtn.addEventListener("click", e => {
                 e.stopPropagation()
                 const idx = tags.indexOf(tag)

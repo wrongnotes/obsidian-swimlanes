@@ -308,23 +308,19 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--icon-xs);
-    height: var(--icon-xs);
-    margin-left: var(--size-2-2);
-    padding-bottom: 1px;
+    margin-left: var(--size-2-1);
     cursor: pointer;
     color: inherit;
-    opacity: 0.6;
-    border-radius: 50%;
-    border: var(--border-width) solid transparent;
-    font-size: var(--font-smallest);
-    line-height: 1;
-    box-sizing: border-box;
+    opacity: 0.5;
+}
+
+.swimlane-card-tag-remove svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
 }
 
 .swimlane-card-tag-remove:hover {
     opacity: 1;
-    border-color: currentColor;
 }
 
 .swimlane-tag-input {
