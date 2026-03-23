@@ -368,6 +368,7 @@
     flex-direction: column;
     gap: 6px;
     margin-bottom: 12px;
+    padding-left: 20px;
 }
 
 .swimlane-tag-color-rule {
