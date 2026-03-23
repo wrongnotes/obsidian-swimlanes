@@ -251,11 +251,10 @@ class SwimlaneSettingTab extends PluginSettingTab {
         const { containerEl } = this
         containerEl.empty()
 
-        containerEl.createEl("h3", { text: "Tag color rules" })
-        containerEl.createEl("p", {
-            text: "Map tag patterns to colors. Use * as a wildcard. Last matching rule wins.",
-            cls: "setting-item-description",
-        })
+        new Setting(containerEl)
+            .setName("Tag color rules")
+            .setDesc("Map tag patterns to colors. Use * as a wildcard. Last matching rule wins.")
+            .setHeading()
 
         const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules" })
         this.renderRules(rulesContainer)
@@ -303,7 +302,7 @@ class SwimlaneSettingTab extends PluginSettingTab {
         // Pattern input
         const input = row.createEl("input", {
             cls: "swimlane-tag-color-rule-input",
-            attr: { type: "text", placeholder: "tag pattern", value: rule.pattern },
+            attr: { type: "text", placeholder: "Tag pattern", value: rule.pattern },
         })
         input.addEventListener("change", async () => {
             rule.pattern = input.value.trim().replace(/^#/, "")
