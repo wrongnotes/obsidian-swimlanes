@@ -355,6 +355,86 @@
     background: var(--background-modifier-hover);
 }
 
+/* ── Tag color rules (settings) ────────────────────────── */
+
+.swimlane-tag-color-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.swimlane-tag-color-rule {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+}
+
+.swimlane-tag-color-rule-btn {
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-tag-color-rule-input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.swimlane-tag-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.swimlane-tag-color-popover {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: var(--layer-popover);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: 8px;
+    box-shadow: var(--shadow-s);
+    margin-top: 4px;
+}
+
+.swimlane-tag-palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.swimlane-tag-palette-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.swimlane-tag-palette-swatch:hover {
+    border-color: var(--text-muted);
+}
+
+.swimlane-tag-palette-swatch--active {
+    border-color: var(--interactive-accent);
+}
+
+.swimlane-tag-color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
 .swimlane-card-props {
     width: 100%;
     font-size: var(--font-ui-smaller);

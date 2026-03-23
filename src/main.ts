@@ -1,7 +1,7 @@
 import { Plugin, PluginSettingTab, Setting, Notice, parseYaml, TFile } from "obsidian"
 import type { App as ObsidianApp } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
-import { TagColorResolver } from "./tag-colors"
+import { TagColorResolver, PRESET_PALETTE } from "./tag-colors"
 import type { TagColorRule } from "./tag-colors"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
@@ -240,6 +240,7 @@ export default class SwimlanePlugin extends Plugin {
 
 class SwimlaneSettingTab extends PluginSettingTab {
     plugin: SwimlanePlugin
+    private activePopover: HTMLElement | null = null
 
     constructor(app: ObsidianApp, plugin: SwimlanePlugin) {
         super(app, plugin)
@@ -250,14 +251,145 @@ class SwimlaneSettingTab extends PluginSettingTab {
         const { containerEl } = this
         containerEl.empty()
 
-        new Setting(containerEl)
-            .setName("Color tags by name")
-            .setDesc("Assign each tag a unique color based on its name instead of using Obsidian's default tag colors.")
-            .addToggle(toggle =>
-                toggle.setValue(this.plugin.settings.colorTagsByName).onChange(async value => {
-                    this.plugin.settings.colorTagsByName = value
-                    await this.plugin.saveSettings()
-                }),
-            )
+        containerEl.createEl("h3", { text: "Tag color rules" })
+        containerEl.createEl("p", {
+            text: "Map tag patterns to colors. Use * as a wildcard. Last matching rule wins.",
+            cls: "setting-item-description",
+        })
+
+        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules" })
+        this.renderRules(rulesContainer)
+
+        const addBtn = containerEl.createEl("button", { text: "Add rule" })
+        addBtn.addEventListener("click", async () => {
+            this.plugin.settings.tagColorRules.push({
+                pattern: "",
+                color: PRESET_PALETTE[0].color,
+            })
+            await this.plugin.saveSettings()
+            this.display()
+        })
+    }
+
+    private renderRules(container: HTMLElement): void {
+        const rules = this.plugin.settings.tagColorRules
+        for (let i = 0; i < rules.length; i++) {
+            this.renderRuleRow(container, i)
+        }
+    }
+
+    private renderRuleRow(container: HTMLElement, index: number): void {
+        const rules = this.plugin.settings.tagColorRules
+        const rule = rules[index]!
+        const row = container.createDiv({ cls: "swimlane-tag-color-rule" })
+
+        // Up/down buttons
+        const upBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "↑" })
+        upBtn.disabled = index === 0
+        upBtn.addEventListener("click", async () => {
+            ;[rules[index - 1], rules[index]] = [rules[index]!, rules[index - 1]!]
+            await this.plugin.saveSettings()
+            this.display()
+        })
+
+        const downBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "↓" })
+        downBtn.disabled = index === rules.length - 1
+        downBtn.addEventListener("click", async () => {
+            ;[rules[index], rules[index + 1]] = [rules[index + 1]!, rules[index]!]
+            await this.plugin.saveSettings()
+            this.display()
+        })
+
+        // Pattern input
+        const input = row.createEl("input", {
+            cls: "swimlane-tag-color-rule-input",
+            attr: { type: "text", placeholder: "tag pattern", value: rule.pattern },
+        })
+        input.addEventListener("change", async () => {
+            rule.pattern = input.value.trim().replace(/^#/, "")
+            input.value = rule.pattern
+            await this.plugin.saveSettings()
+        })
+
+        // Color swatch
+        const swatch = row.createDiv({ cls: "swimlane-tag-color-swatch" })
+        swatch.style.backgroundColor = rule.color
+        swatch.addEventListener("click", () => {
+            this.openColorPopover(swatch, rule)
+        })
+
+        // Delete button
+        const deleteBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "×" })
+        deleteBtn.addEventListener("click", async () => {
+            rules.splice(index, 1)
+            await this.plugin.saveSettings()
+            this.display()
+        })
+    }
+
+    private openColorPopover(swatch: HTMLElement, rule: TagColorRule): void {
+        this.closePopover()
+
+        const popover = document.createElement("div")
+        popover.classList.add("swimlane-tag-color-popover")
+        swatch.parentElement!.appendChild(popover)
+
+        // Preset palette
+        const palette = popover.createDiv({ cls: "swimlane-tag-palette" })
+        for (const preset of PRESET_PALETTE) {
+            const presetSwatch = palette.createDiv({ cls: "swimlane-tag-palette-swatch" })
+            presetSwatch.style.backgroundColor = preset.color
+            presetSwatch.title = preset.name
+            if (preset.color === rule.color) {
+                presetSwatch.classList.add("swimlane-tag-palette-swatch--active")
+            }
+            presetSwatch.addEventListener("click", async () => {
+                rule.color = preset.color
+                swatch.style.backgroundColor = rule.color
+                await this.plugin.saveSettings()
+                this.closePopover()
+            })
+        }
+
+        // Custom color picker
+        const pickerRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        pickerRow.createSpan({ text: "Custom: " })
+        const picker = pickerRow.createEl("input", {
+            attr: { type: "color", value: rule.color },
+        })
+        picker.addEventListener("input", async () => {
+            rule.color = picker.value
+            swatch.style.backgroundColor = rule.color
+            await this.plugin.saveSettings()
+        })
+
+        this.activePopover = popover
+
+        // Dismiss on outside click
+        const onPointerDown = (e: PointerEvent) => {
+            if (!popover.contains(e.target as Node) && e.target !== swatch) {
+                this.closePopover()
+                document.removeEventListener("pointerdown", onPointerDown, true)
+            }
+        }
+        setTimeout(() => {
+            document.addEventListener("pointerdown", onPointerDown, true)
+        }, 0)
+
+        // Dismiss on Escape
+        const onKeydown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                this.closePopover()
+                document.removeEventListener("keydown", onKeydown)
+            }
+        }
+        document.addEventListener("keydown", onKeydown)
+    }
+
+    private closePopover(): void {
+        if (this.activePopover) {
+            this.activePopover.remove()
+            this.activePopover = null
+        }
     }
 }
