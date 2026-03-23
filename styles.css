@@ -288,15 +288,6 @@
     white-space: nowrap;
 }
 
-.swimlane-card-tag--colored {
-    background-color: hsl(var(--tag-hue), 40%, 90%);
-    color: hsl(var(--tag-hue), 60%, 30%);
-}
-
-.theme-dark .swimlane-card-tag--colored {
-    background-color: hsl(var(--tag-hue), 30%, 25%);
-    color: hsl(var(--tag-hue), 50%, 75%);
-}
 
 /* ── Tag editor (inline editing mode) ──────────────────── */
 
