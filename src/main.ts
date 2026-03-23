@@ -265,11 +265,10 @@ class SwimlaneSettingTab extends PluginSettingTab {
             .setDesc("Map tag patterns to colors. Use * as a wildcard. First matching rule wins.")
             .setHeading()
 
-        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules setting-item" })
+        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules" })
         this.renderRules(rulesContainer)
 
-        const addBtnContainer = containerEl.createDiv({ cls: "setting-item" })
-        const addBtn = addBtnContainer.createEl("button", { text: "Add rule" })
+        const addBtn = rulesContainer.createEl("button", { text: "Add rule" })
         addBtn.addEventListener("click", async () => {
             this.plugin.settings.tagColorRules.push({
                 pattern: "",
@@ -365,9 +364,12 @@ class SwimlaneSettingTab extends PluginSettingTab {
             }
             presetSwatch.addEventListener("click", async () => {
                 rule.color = preset.color
-                swatch.style.backgroundColor = rule.color
+                if (!rule.textColor) {
+                    rule.textColor = undefined
+                }
                 await this.plugin.saveSettings()
                 this.closePopover()
+                this.display()
             })
         }
 
@@ -380,6 +382,14 @@ class SwimlaneSettingTab extends PluginSettingTab {
         picker.addEventListener("input", async () => {
             rule.color = picker.value
             swatch.style.backgroundColor = rule.color
+            // Update text swatch preview inline
+            const textSwatch = swatch.nextElementSibling as HTMLElement | null
+            if (textSwatch?.classList.contains("swimlane-tag-color-swatch--text")) {
+                textSwatch.style.backgroundColor = rule.color
+                if (!rule.textColor) {
+                    textSwatch.style.color = contrastingText(rule.color)
+                }
+            }
             await this.plugin.saveSettings()
         })
 
