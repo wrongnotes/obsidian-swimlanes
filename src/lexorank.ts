@@ -55,3 +55,32 @@ export interface LexorankPosition {
 
 const FIRST = "a".charCodeAt(0) // 97
 const LAST = "z".charCodeAt(0) // 122
+
+/**
+ * Generate `count` evenly-spaced lexorank strings across the full a–z space.
+ * Uses iterative midRank calls between consecutive positions.
+ */
+export function generateSpacedRanks(count: number): string[] {
+    if (count === 0) {
+        return []
+    }
+    const result: string[] = []
+    let prev: string | null = null
+    for (let i = 0; i < count; i++) {
+        // For each position, compute the midpoint between the previous rank
+        // and a synthetic "end" that leaves room for future insertions.
+        // We use null as the upper bound so midRank appends "m" to extend.
+        // To get even spacing, compute the fraction of the alphabet range.
+        const fraction = (i + 1) / (count + 1)
+        const charCode = Math.round(FIRST + fraction * (LAST - FIRST))
+        const rank = String.fromCharCode(charCode)
+        // If this rank collides with the previous, use midRank to break ties.
+        if (prev !== null && rank <= prev) {
+            result.push(midRank(prev, null))
+        } else {
+            result.push(rank)
+        }
+        prev = result[result.length - 1]!
+    }
+    return result
+}

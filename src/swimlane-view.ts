@@ -21,7 +21,7 @@ import type {
 } from "obsidian"
 import { DragAndDropContext } from "./drag-drop"
 import { CardPropertyAlias, CardRenderOptions, renderCard, renderTagEditor } from "./swimlane-card"
-import { LexorankPosition, midRank } from "./lexorank"
+import { LexorankPosition, midRank, generateSpacedRanks } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
@@ -2297,8 +2297,9 @@ export class SwimlaneView extends BasesView {
         const insertIdx = Math.min(position.dropIndex, paths.length)
         paths.splice(insertIdx, 0, dragState.path)
 
-        const step = Math.floor(26 / (paths.length + 1))
-        const base = "a".charCodeAt(0)
+        // Generate evenly-spaced ranks for all cards using midRank.
+        // Distribute across the full a–z space by bisecting recursively.
+        const ranks = generateSpacedRanks(paths.length)
         const isCrossColumn = context.groupKey !== dragState.groupKey
 
         // Build all operations BEFORE processFrontMatter calls — the callbacks
@@ -2343,8 +2344,7 @@ export class SwimlaneView extends BasesView {
             if (!cardFile) {
                 continue
             }
-            const charCode = base + step * (i + 1)
-            const rank = String.fromCharCode(Math.min(charCode, "z".charCodeAt(0)))
+            const rank = ranks[i]!
             const fromRank = getFrontmatter<string>(this.app, cardFile, this.rankProp) ?? ""
 
             if (path === dragState.path && isCrossColumn) {
