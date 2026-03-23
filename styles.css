@@ -310,15 +310,17 @@
     margin-left: 2px;
     padding: 0 3px;
     cursor: pointer;
-    color: var(--text-muted);
+    color: inherit;
+    opacity: 0.6;
     border-radius: var(--radius-s);
     font-size: 0.85em;
     line-height: 1;
 }
 
 .swimlane-card-tag-remove:hover {
-    color: var(--text-error);
-    background: var(--background-modifier-hover);
+    opacity: 1;
+    font-weight: bold;
+    text-shadow: 0 0 4px currentColor;
 }
 
 .swimlane-tag-input {
