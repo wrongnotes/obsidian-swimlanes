@@ -307,19 +307,21 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 2px;
-    padding: 0 3px;
+    width: 14px;
+    height: 14px;
+    margin-left: 3px;
     cursor: pointer;
     color: inherit;
     opacity: 0.6;
-    border-radius: var(--radius-s);
-    font-size: 0.85em;
+    border-radius: 50%;
+    font-size: 11px;
     line-height: 1;
+    vertical-align: middle;
 }
 
 .swimlane-card-tag-remove:hover {
     opacity: 1;
-    background: rgba(128, 128, 128, 0.25);
+    border: 1px solid currentColor;
 }
 
 .swimlane-tag-input {
