@@ -165,7 +165,8 @@ export function renderCard(
     if (options.tags && options.tags.length > 0) {
         const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
         for (const tag of options.tags) {
-            const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: tag })
+            const chip = tagRow.createSpan({ cls: "swimlane-card-tag" })
+            chip.createSpan({ cls: "swimlane-card-tag-text", text: tag })
             const resolved = options.resolveTagColor?.(tag) ?? null
             if (resolved) {
                 chip.style.backgroundColor = resolved.bg
@@ -308,7 +309,10 @@ export function renderTagEditor(
         for (const tag of tags) {
             const chip = document.createElement("span")
             chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
-            chip.textContent = tag
+            const textSpan = document.createElement("span")
+            textSpan.classList.add("swimlane-card-tag-text")
+            textSpan.textContent = tag
+            chip.appendChild(textSpan)
             const resolved = resolveTagColor?.(tag) ?? null
             if (resolved) {
                 chip.style.backgroundColor = resolved.bg
