@@ -17,8 +17,9 @@
 .swimlane-column {
     display: flex;
     flex-direction: column;
-    min-width: 240px;
-    max-width: 300px;
+    --col-base: 240px;
+    min-width: max(var(--col-base), calc(var(--swimlane-image-width, 64px) + 180px));
+    max-width: max(300px, calc(var(--swimlane-image-width, 64px) + 200px));
     flex-shrink: 0;
     background-color: var(--background-secondary);
     border-radius: var(--radius-m);

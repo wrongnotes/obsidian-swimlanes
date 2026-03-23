@@ -624,7 +624,7 @@ export class SwimlaneView extends BasesView {
     private get imageWidth(): number {
         const val = this.config.get(CONFIG_KEYS.imageWidth)
         const num = typeof val === "string" ? parseInt(val, 10) : typeof val === "number" ? val : 64
-        return num > 0 ? num : 64
+        return Math.min(Math.max(num, 1), 200)
     }
 
     private get showAddCard(): boolean {
@@ -840,6 +840,7 @@ export class SwimlaneView extends BasesView {
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
         board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
+        board.style.setProperty("--swimlane-image-width", `${this.imageWidth}px`)
         this.currentBoard = board
         this.columnDropTarget = null
 
