@@ -27,6 +27,12 @@ export default class SwimlanePlugin extends Plugin {
     settings: SwimlaneSettings = DEFAULT_SETTINGS
     tagColorResolver: TagColorResolver = new TagColorResolver([])
     private pollerIntervalId: number | null = null
+    private settingsListeners: Set<() => void> = new Set()
+
+    onSettingsChanged(cb: () => void): () => void {
+        this.settingsListeners.add(cb)
+        return () => this.settingsListeners.delete(cb)
+    }
 
     async onload() {
         await this.loadSettings()
@@ -217,6 +223,9 @@ export default class SwimlanePlugin extends Plugin {
     async saveSettings(): Promise<void> {
         await this.saveData(this.settings)
         this.tagColorResolver = new TagColorResolver(this.settings.tagColorRules)
+        for (const cb of this.settingsListeners) {
+            cb()
+        }
     }
 
     private async updateScheduledActionPaths(oldPath: string, newPath: string): Promise<void> {
@@ -253,13 +262,14 @@ class SwimlaneSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Tag color rules")
-            .setDesc("Map tag patterns to colors. Use * as a wildcard. Last matching rule wins.")
+            .setDesc("Map tag patterns to colors. Use * as a wildcard. First matching rule wins.")
             .setHeading()
 
-        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules" })
+        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules setting-item" })
         this.renderRules(rulesContainer)
 
-        const addBtn = containerEl.createEl("button", { text: "Add rule" })
+        const addBtnContainer = containerEl.createDiv({ cls: "setting-item" })
+        const addBtn = addBtnContainer.createEl("button", { text: "Add rule" })
         addBtn.addEventListener("click", async () => {
             this.plugin.settings.tagColorRules.push({
                 pattern: "",

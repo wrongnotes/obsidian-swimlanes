@@ -44,13 +44,12 @@ export class TagColorResolver {
     }
 
     private evaluate(tag: string): string | null {
-        let match: string | null = null
         for (const rule of this.compiled) {
             if (rule.regex.test(tag)) {
-                match = rule.color
+                return rule.color
             }
         }
-        return match
+        return null
     }
 }
 

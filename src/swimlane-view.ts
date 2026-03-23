@@ -101,6 +101,7 @@ export class SwimlaneView extends BasesView {
 
     private boardEl: HTMLElement
     private plugin: SwimlanePlugin
+    private unregisterSettingsListener: (() => void) | null = null
     private cardDnd: DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>
     private swimlaneDnd: DragAndDropContext<SwimlaneDragState, null, GroupKey | null>
     private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
@@ -142,6 +143,11 @@ export class SwimlaneView extends BasesView {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
+        this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
+            if (this.boardEl.isConnected) {
+                this.rebuildBoard()
+            }
+        })
 
         // The outer container handles horizontal scroll (so the scrollbar sits
         // at the viewport edge), while the inner board handles vertical scroll.
@@ -662,6 +668,7 @@ export class SwimlaneView extends BasesView {
     }
 
     onUnload(): void {
+        this.unregisterSettingsListener?.()
         this.carouselObserver?.disconnect()
         if (this.autoScrollRaf !== null) {
             cancelAnimationFrame(this.autoScrollRaf)

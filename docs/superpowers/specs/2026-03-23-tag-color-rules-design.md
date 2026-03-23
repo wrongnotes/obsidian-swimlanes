@@ -2,7 +2,7 @@
 
 ## Overview
 
-Replace the "Color tags by name" toggle with a user-defined ordered list of tag-to-color mapping rules in plugin settings. Each rule maps a tag pattern (with `*` wildcard support) to a specific color. Last matching rule wins. Unmatched tags use Obsidian's default tag styling.
+Replace the "Color tags by name" toggle with a user-defined ordered list of tag-to-color mapping rules in plugin settings. Each rule maps a tag pattern (with `*` wildcard support) to a specific color. First matching rule wins. Unmatched tags use Obsidian's default tag styling.
 
 ## Data Model
 
@@ -35,12 +35,12 @@ Examples:
 
 ### Rule Evaluation
 
-Rules are evaluated in order, **last match wins**. This lets users put general rules first and specific overrides later:
+Rules are evaluated in order, **first match wins**. This lets users put general rules first and specific overrides later:
 
 ```
-*         → gray    (catch-all)
-project/* → blue    (override for project tags)
-project/urgent → red (specific override)
+project/urgent → red (most specific, checked first)
+project/* → blue    (broader match)
+*         → gray    (catch-all fallback)
 ```
 
 ## TagColorResolver
@@ -57,7 +57,7 @@ class TagColorResolver {
     /** Returns hex color or null (use default). Map lookup in common case. */
     resolve(tag: string): string | null
 
-    /** Evaluate rules for a tag (last match wins). Called on cache miss. */
+    /** Evaluate rules for a tag (first match wins). Called on cache miss. */
     private evaluate(tag: string): string | null
 }
 ```

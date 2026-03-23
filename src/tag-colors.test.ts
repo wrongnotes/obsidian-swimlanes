@@ -44,15 +44,15 @@ describe("TagColorResolver", () => {
         expect(resolver.resolve("anything")).toBe("#888888")
     })
 
-    it("last match wins", () => {
+    it("first match wins", () => {
         const resolver = new TagColorResolver([
-            { pattern: "*", color: "#888888" },
-            { pattern: "project/*", color: "#5094e4" },
             { pattern: "project/urgent", color: "#e05252" },
+            { pattern: "project/*", color: "#5094e4" },
+            { pattern: "*", color: "#888888" },
         ])
-        expect(resolver.resolve("random")).toBe("#888888")
-        expect(resolver.resolve("project/alpha")).toBe("#5094e4")
         expect(resolver.resolve("project/urgent")).toBe("#e05252")
+        expect(resolver.resolve("project/alpha")).toBe("#5094e4")
+        expect(resolver.resolve("random")).toBe("#888888")
     })
 
     it("caches results", () => {
