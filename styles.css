@@ -326,8 +326,8 @@
 }
 
 .swimlane-tag-input {
-    flex: 1 1 60px;
-    min-width: 60px;
+    flex: 1 1 100%;
+    min-width: 100%;
     border: none;
     outline: none;
     background: transparent;
