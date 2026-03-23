@@ -304,6 +304,7 @@
     background: var(--background-modifier-form-field);
     border-radius: var(--radius-s);
     padding: 4px;
+    align-items: center;
 }
 
 .swimlane-card-tag--editable {
@@ -337,7 +338,9 @@
     background: transparent;
     color: var(--text-normal);
     font-size: var(--font-ui-small);
-    padding: 2px 4px;
+    padding: 0 4px;
+    line-height: 1;
+    height: auto;
 }
 
 .swimlane-tag-input::placeholder {
