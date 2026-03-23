@@ -310,18 +310,20 @@
     width: var(--icon-xs);
     height: var(--icon-xs);
     margin-left: var(--size-2-2);
+    padding-bottom: 1px;
     cursor: pointer;
     color: inherit;
     opacity: 0.6;
-    border-radius: var(--radius-xl);
+    border-radius: 50%;
+    border: var(--border-width) solid transparent;
     font-size: var(--font-smallest);
     line-height: 1;
-    vertical-align: middle;
+    box-sizing: border-box;
 }
 
 .swimlane-card-tag-remove:hover {
     opacity: 1;
-    border: var(--border-width) solid currentColor;
+    border-color: currentColor;
 }
 
 .swimlane-tag-input {
@@ -430,12 +432,24 @@
     border-color: var(--interactive-accent);
 }
 
+.swimlane-tag-color-swatch--text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-bold);
+    font-size: var(--font-ui-small);
+}
+
 .swimlane-tag-color-picker-row {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: var(--font-ui-small);
     color: var(--text-muted);
+}
+
+.swimlane-tag-opacity-slider {
+    flex: 1;
 }
 
 .swimlane-card-props {

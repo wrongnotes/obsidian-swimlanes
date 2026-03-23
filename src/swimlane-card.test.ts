@@ -321,7 +321,8 @@ describe("tag rendering", () => {
             makeApp(),
             makeOptions({
                 tags: ["bug"],
-                resolveTagColor: (tag: string) => (tag === "bug" ? "#e05252" : null),
+                resolveTagColor: (tag: string) =>
+                    tag === "bug" ? { bg: "#e05252", fg: "#fff" } : null,
             }),
         )
         const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
@@ -546,7 +547,7 @@ describe("renderTagEditor", () => {
         const card = document.createElement("div")
         card.classList.add("swimlane-card")
         renderTagEditor(card, makeFile(), ["bug"], makeApp(), jest.fn(), tag =>
-            tag === "bug" ? "#5094e4" : null,
+            tag === "bug" ? { bg: "#5094e4", fg: "#fff" } : null,
         )
         const chip = card.querySelector(".swimlane-card-tag--editable") as HTMLElement
         expect(chip.style.backgroundColor).toBeTruthy()

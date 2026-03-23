@@ -1,6 +1,6 @@
 import type { App, BasesPropertyId, TFile, Value } from "obsidian"
 import type { BasesEntry } from "obsidian"
-import { contrastingText } from "./tag-colors"
+import type { ResolvedTagColor } from "./tag-colors"
 import { TagSuggest } from "./inputs/tag-suggest"
 import {
     BooleanValue,
@@ -43,8 +43,8 @@ export interface CardRenderOptions {
     mobile?: boolean
     /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
     tags?: string[]
-    /** Resolve a tag to a hex color, or null for default Obsidian styling. */
-    resolveTagColor?: (tag: string) => string | null
+    /** Resolve a tag to background + text colors, or null for default Obsidian styling. */
+    resolveTagColor?: (tag: string) => ResolvedTagColor | null
     /** Called when the user selects "Edit tags…" from the context menu. */
     onEditTags?: (cardEl: HTMLElement) => void
 }
@@ -166,10 +166,10 @@ export function renderCard(
         const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
         for (const tag of options.tags) {
             const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: tag })
-            const color = options.resolveTagColor?.(tag) ?? null
-            if (color) {
-                chip.style.backgroundColor = color
-                chip.style.color = contrastingText(color)
+            const resolved = options.resolveTagColor?.(tag) ?? null
+            if (resolved) {
+                chip.style.backgroundColor = resolved.bg
+                chip.style.color = resolved.fg
             }
         }
     }
@@ -248,7 +248,7 @@ export function renderTagEditor(
     currentTags: string[],
     app: App,
     onDone: () => void,
-    resolveTagColor?: (tag: string) => string | null,
+    resolveTagColor?: (tag: string) => ResolvedTagColor | null,
 ): void {
     const tags = [...currentTags]
     let settled = false
@@ -302,10 +302,10 @@ export function renderTagEditor(
             const chip = document.createElement("span")
             chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
             chip.textContent = tag
-            const color = resolveTagColor?.(tag) ?? null
-            if (color) {
-                chip.style.backgroundColor = color
-                chip.style.color = contrastingText(color)
+            const resolved = resolveTagColor?.(tag) ?? null
+            if (resolved) {
+                chip.style.backgroundColor = resolved.bg
+                chip.style.color = resolved.fg
             }
             const removeBtn = document.createElement("span")
             removeBtn.classList.add("swimlane-card-tag-remove")

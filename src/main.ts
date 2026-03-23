@@ -1,7 +1,7 @@
 import { Plugin, PluginSettingTab, Setting, Notice, parseYaml, TFile } from "obsidian"
 import type { App as ObsidianApp } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
-import { TagColorResolver, PRESET_PALETTE } from "./tag-colors"
+import { TagColorResolver, PRESET_PALETTE, contrastingText } from "./tag-colors"
 import type { TagColorRule } from "./tag-colors"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
@@ -320,11 +320,22 @@ class SwimlaneSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
         })
 
-        // Color swatch
+        // Color swatch (background)
         const swatch = row.createDiv({ cls: "swimlane-tag-color-swatch" })
         swatch.style.backgroundColor = rule.color
+        swatch.style.opacity = String(rule.opacity ?? 1)
         swatch.addEventListener("click", () => {
             this.openColorPopover(swatch, rule)
+        })
+
+        // Text color swatch
+        const textSwatch = row.createDiv({ cls: "swimlane-tag-color-swatch swimlane-tag-color-swatch--text" })
+        textSwatch.textContent = "A"
+        textSwatch.style.color = rule.textColor || contrastingText(rule.color)
+        textSwatch.style.backgroundColor = rule.color
+        textSwatch.style.opacity = String(rule.opacity ?? 1)
+        textSwatch.addEventListener("click", () => {
+            this.openTextColorPopover(textSwatch, swatch, rule)
         })
 
         // Delete button
@@ -372,6 +383,29 @@ class SwimlaneSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
         })
 
+        // Opacity slider
+        const opacityRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        opacityRow.createSpan({ text: "Opacity: " })
+        const opacitySlider = opacityRow.createEl("input", {
+            attr: {
+                type: "range",
+                min: "0",
+                max: "1",
+                step: "0.05",
+                value: String(rule.opacity ?? 1),
+            },
+            cls: "swimlane-tag-opacity-slider",
+        })
+        const opacityLabel = opacityRow.createSpan({
+            text: `${Math.round((rule.opacity ?? 1) * 100)}%`,
+        })
+        opacitySlider.addEventListener("input", async () => {
+            rule.opacity = parseFloat(opacitySlider.value)
+            opacityLabel.textContent = `${Math.round(rule.opacity * 100)}%`
+            swatch.style.opacity = String(rule.opacity)
+            await this.plugin.saveSettings()
+        })
+
         this.activePopover = popover
 
         // Dismiss on outside click
@@ -386,6 +420,56 @@ class SwimlaneSettingTab extends PluginSettingTab {
         }, 0)
 
         // Dismiss on Escape
+        const onKeydown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                this.closePopover()
+                document.removeEventListener("keydown", onKeydown)
+            }
+        }
+        document.addEventListener("keydown", onKeydown)
+    }
+
+    private openTextColorPopover(textSwatch: HTMLElement, bgSwatch: HTMLElement, rule: TagColorRule): void {
+        this.closePopover()
+
+        const popover = document.createElement("div")
+        popover.classList.add("swimlane-tag-color-popover")
+        textSwatch.parentElement!.appendChild(popover)
+
+        // Auto option
+        const autoRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        const autoBtn = autoRow.createEl("button", { text: "Auto (contrast)" })
+        autoBtn.addEventListener("click", async () => {
+            delete rule.textColor
+            textSwatch.style.color = contrastingText(rule.color)
+            await this.plugin.saveSettings()
+            this.closePopover()
+        })
+
+        // Custom text color picker
+        const pickerRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        pickerRow.createSpan({ text: "Custom: " })
+        const picker = pickerRow.createEl("input", {
+            attr: { type: "color", value: rule.textColor || contrastingText(rule.color) },
+        })
+        picker.addEventListener("input", async () => {
+            rule.textColor = picker.value
+            textSwatch.style.color = rule.textColor
+            await this.plugin.saveSettings()
+        })
+
+        this.activePopover = popover
+
+        const onPointerDown = (e: PointerEvent) => {
+            if (!popover.contains(e.target as Node) && e.target !== textSwatch) {
+                this.closePopover()
+                document.removeEventListener("pointerdown", onPointerDown, true)
+            }
+        }
+        setTimeout(() => {
+            document.addEventListener("pointerdown", onPointerDown, true)
+        }, 0)
+
         const onKeydown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
                 this.closePopover()
