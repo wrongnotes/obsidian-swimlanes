@@ -1,5 +1,6 @@
 import type { App, BasesPropertyId, TFile, Value } from "obsidian"
 import type { BasesEntry } from "obsidian"
+import { contrastingText } from "./tag-colors"
 import { TagSuggest } from "./inputs/tag-suggest"
 import {
     BooleanValue,
@@ -42,19 +43,10 @@ export interface CardRenderOptions {
     mobile?: boolean
     /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
     tags?: string[]
-    /** Tag color scheme — "default" uses Obsidian native colors, "colored" uses deterministic hue. */
-    tagColorScheme?: "default" | "colored"
+    /** Resolve a tag to a hex color, or null for default Obsidian styling. */
+    resolveTagColor?: (tag: string) => string | null
     /** Called when the user selects "Edit tags…" from the context menu. */
     onEditTags?: (cardEl: HTMLElement) => void
-}
-
-/** Simple string hash → hue (0-360) for deterministic tag coloring. */
-function tagHue(tag: string): number {
-    let hash = 0
-    for (let i = 0; i < tag.length; i++) {
-        hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0
-    }
-    return ((hash % 360) + 360) % 360
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -174,9 +166,10 @@ export function renderCard(
         const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
         for (const tag of options.tags) {
             const chip = tagRow.createSpan({ cls: "swimlane-card-tag", text: tag })
-            if (options.tagColorScheme === "colored") {
-                chip.style.setProperty("--tag-hue", String(tagHue(tag)))
-                chip.addClass("swimlane-card-tag--colored")
+            const color = options.resolveTagColor?.(tag) ?? null
+            if (color) {
+                chip.style.backgroundColor = color
+                chip.style.color = contrastingText(color)
             }
         }
     }
@@ -255,6 +248,7 @@ export function renderTagEditor(
     currentTags: string[],
     app: App,
     onDone: () => void,
+    resolveTagColor?: (tag: string) => string | null,
 ): void {
     const tags = [...currentTags]
     let settled = false
@@ -308,6 +302,11 @@ export function renderTagEditor(
             const chip = document.createElement("span")
             chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
             chip.textContent = tag
+            const color = resolveTagColor?.(tag) ?? null
+            if (color) {
+                chip.style.backgroundColor = color
+                chip.style.color = contrastingText(color)
+            }
             const removeBtn = document.createElement("span")
             removeBtn.classList.add("swimlane-card-tag-remove")
             removeBtn.textContent = "×"

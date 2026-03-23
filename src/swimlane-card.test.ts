@@ -313,18 +313,47 @@ describe("tag rendering", () => {
         expect(card.querySelector(".swimlane-card-tags")).toBeNull()
     })
 
-    it("applies colored class and hue CSS variable when tagColorScheme is colored", () => {
+    it("applies inline color from resolveTagColor", () => {
         const container = document.createElement("div")
         const card = renderCard(
             container,
             makeEntry("Note"),
             makeApp(),
-            makeOptions({ tags: ["test"], tagColorScheme: "colored" }),
+            makeOptions({
+                tags: ["bug"],
+                resolveTagColor: (tag: string) => (tag === "bug" ? "#e05252" : null),
+            }),
         )
         const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
         expect(chip).not.toBeNull()
-        expect(chip.classList.contains("swimlane-card-tag--colored")).toBe(true)
-        expect(chip.style.getPropertyValue("--tag-hue")).not.toBe("")
+        expect(chip.style.backgroundColor).toBeTruthy()
+    })
+
+    it("uses default styling when resolveTagColor returns null", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({
+                tags: ["unmatched"],
+                resolveTagColor: () => null,
+            }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip.style.backgroundColor).toBe("")
+    })
+
+    it("uses default styling when resolveTagColor is not provided", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: ["test"] }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip.style.backgroundColor).toBe("")
     })
 })
 
@@ -511,6 +540,16 @@ describe("renderTagEditor", () => {
         input.value = "bug"
         input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
         expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
+    })
+
+    it("applies color from resolveTagColor to editable chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), ["bug"], makeApp(), jest.fn(), tag =>
+            tag === "bug" ? "#5094e4" : null,
+        )
+        const chip = card.querySelector(".swimlane-card-tag--editable") as HTMLElement
+        expect(chip.style.backgroundColor).toBeTruthy()
     })
 
     it("ignores empty input on Enter", () => {
