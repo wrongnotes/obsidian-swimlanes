@@ -280,22 +280,26 @@ export function renderTagEditor(
 
     // Dismiss on outside click (pointerdown, not focusout — focusout fires
     // during DOM detach/reattach and causes false dismissals).
+    // Skip pointerdown events that occur before the next animation frame,
+    // since the menu click that opened us may still be propagating.
+    let listenAfter = performance.now()
+    requestAnimationFrame(() => {
+        listenAfter = 0
+    })
     function onOutsidePointerDown(e: PointerEvent) {
+        if (listenAfter > 0) {
+            return
+        }
         const target = e.target as HTMLElement
-        // Ignore clicks inside the editor container
         if (container!.contains(target)) {
             return
         }
-        // Ignore clicks on Obsidian's suggestion popup (rendered outside the card)
         if (target.closest(".suggestion-container")) {
             return
         }
         settle()
     }
-    // Delay registration so the current menu click doesn't interfere
-    setTimeout(() => {
-        document.addEventListener("pointerdown", onOutsidePointerDown, true)
-    }, 0)
+    document.addEventListener("pointerdown", onOutsidePointerDown, true)
 
     function renderChips() {
         // Clear and rebuild chips only (preserve input row)
