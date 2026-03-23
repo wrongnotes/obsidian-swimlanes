@@ -352,6 +352,7 @@ export function renderTagEditor(
     // Clear container and set up editing UI
     container.empty()
     container.classList.add("swimlane-card-tags--editing")
+    container.setAttribute("data-no-drag", "")
 
     // Input
     const input = document.createElement("input")
