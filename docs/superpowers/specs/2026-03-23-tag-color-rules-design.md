@@ -17,11 +17,7 @@ interface SwimlaneSettings {
 }
 ```
 
-Stored via `plugin.saveData()` / `plugin.loadData()`. The `colorTagsByName` setting is removed.
-
-### Migration
-
-On `loadSettings()`, if `colorTagsByName === true` and `tagColorRules` is absent/empty, populate `tagColorRules` with a single catch-all rule `{ pattern: "*", color: "#888888" }` so existing users don't silently lose their coloring. Delete the `colorTagsByName` key from saved data.
+Stored via `plugin.saveData()` / `plugin.loadData()`. The `colorTagsByName` setting is removed (never released, no migration needed).
 
 ## Pattern Matching
 
@@ -174,7 +170,7 @@ function contrastingText(hex: string): string {
 
 | File | Changes |
 |------|---------|
-| `src/main.ts` | Remove `colorTagsByName`, add `tagColorRules` to settings, `TagColorResolver` class, migration, settings UI with rule list/color picker/reordering |
+| `src/main.ts` | Remove `colorTagsByName`, add `tagColorRules` to settings, `TagColorResolver` class, settings UI with rule list/color picker/reordering |
 | `src/swimlane-card.ts` | Remove `tagHue`, `tagColorScheme`, add `resolveTagColor` usage, `contrastingText` helper |
 | `src/swimlane-card.test.ts` | Update tests for new color resolution |
 | `src/swimlane-view.ts` | Wire `resolveTagColor` from plugin, remove `tagColorScheme`, pass resolver to `renderTagEditor` |
@@ -188,4 +184,3 @@ function contrastingText(hex: string): string {
 - **Duplicate patterns:** Both kept; last one wins per the ordering rule.
 - **Invalid hex color:** Shouldn't happen (color picker constrains input), but if encountered, treat as no match.
 - **Pattern with leading `#`:** Silently stripped on input.
-- **Migration:** `colorTagsByName: true` → single catch-all gray rule.
