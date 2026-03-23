@@ -274,7 +274,7 @@
 .swimlane-card-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--size-2-1);
+    gap: var(--size-2-3);
     padding-bottom: var(--size-4-2);
 }
 
