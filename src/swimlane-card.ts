@@ -292,12 +292,15 @@ export function renderTagEditor(
         }
         settle()
     }
-    document.addEventListener("pointerdown", onOutsidePointerDown, true)
+    // Delay registration so the current menu click doesn't interfere
+    setTimeout(() => {
+        document.addEventListener("pointerdown", onOutsidePointerDown, true)
+    }, 0)
 
     function renderChips() {
-        // Clear and rebuild chips only (preserve input + done btn)
+        // Clear and rebuild chips only (preserve input row)
         container!.querySelectorAll(".swimlane-card-tag--editable").forEach(el => el.remove())
-        const input = container!.querySelector(".swimlane-tag-input")
+        const inputRow = container!.querySelector(".swimlane-tag-input-row")
         for (const tag of tags) {
             const chip = document.createElement("span")
             chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
@@ -320,8 +323,8 @@ export function renderTagEditor(
                 }
             })
             chip.appendChild(removeBtn)
-            if (input) {
-                container!.insertBefore(chip, input)
+            if (inputRow) {
+                container!.insertBefore(chip, inputRow)
             } else {
                 container!.prepend(chip)
             }
