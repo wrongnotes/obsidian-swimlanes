@@ -299,6 +299,7 @@
     border-radius: var(--radius-s);
     padding: 4px;
     align-items: center;
+    overflow: hidden;
 }
 
 .swimlane-card-tag--editable {
@@ -334,6 +335,7 @@
 
 .swimlane-tag-input {
     flex: 1;
+    min-width: 0;
     border: none;
     outline: none;
     background: transparent;
