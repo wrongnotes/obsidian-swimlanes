@@ -276,6 +276,8 @@
     flex-wrap: wrap;
     gap: var(--size-2-3);
     padding-bottom: var(--size-4-2);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .swimlane-card-tag {
