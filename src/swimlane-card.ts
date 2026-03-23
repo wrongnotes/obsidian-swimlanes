@@ -353,7 +353,11 @@ export function renderTagEditor(
     container.classList.add("swimlane-card-tags--editing")
     container.setAttribute("data-no-drag", "")
 
-    // Input
+    // Input + done button row
+    const inputRow = document.createElement("div")
+    inputRow.classList.add("swimlane-tag-input-row")
+    container.appendChild(inputRow)
+
     const input = document.createElement("input")
     input.type = "text"
     input.placeholder = "Add tag…"
@@ -368,9 +372,8 @@ export function renderTagEditor(
             settle()
         }
     })
-    container.appendChild(input)
+    inputRow.appendChild(input)
 
-    // Done button
     const doneBtn = document.createElement("span")
     doneBtn.classList.add("swimlane-tag-done-btn")
     doneBtn.textContent = "✓"
@@ -378,7 +381,7 @@ export function renderTagEditor(
         e.stopPropagation()
         settle()
     })
-    container.appendChild(doneBtn)
+    inputRow.appendChild(doneBtn)
 
     // Render initial chips (before the input)
     renderChips()

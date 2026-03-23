@@ -325,9 +325,15 @@
     opacity: 1;
 }
 
-.swimlane-tag-input {
+.swimlane-tag-input-row {
+    display: flex;
+    align-items: center;
     flex: 1 1 100%;
-    min-width: 100%;
+    gap: var(--size-2-1);
+}
+
+.swimlane-tag-input {
+    flex: 1;
     border: none;
     outline: none;
     background: transparent;
