@@ -319,8 +319,7 @@
 
 .swimlane-card-tag-remove:hover {
     opacity: 1;
-    font-weight: bold;
-    text-shadow: 0 0 4px currentColor;
+    background: rgba(128, 128, 128, 0.25);
 }
 
 .swimlane-tag-input {
