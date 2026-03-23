@@ -919,7 +919,7 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             mobile,
-            tagColorScheme: this.plugin.settings.colorTagsByName ? "colored" : "default",
+            resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
             onEditTags: (cardEl: HTMLElement) => {
                 const path = cardEl.dataset.path
                 if (!path) {
@@ -971,7 +971,7 @@ export class SwimlaneView extends BasesView {
                     this.editingTagsPath = null
                     this.editingTagsCardEl = null
                     this.rebuildBoard()
-                })
+                }, (tag: string) => this.plugin.tagColorResolver.resolve(tag))
             },
         }
 
