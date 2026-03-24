@@ -34,6 +34,7 @@ function makeOptions(overrides?: Partial<CardRenderOptions>): CardRenderOptions 
             currentSwimlane: "Backlog",
         }),
         highlightColumn: jest.fn(),
+        openNoteBehavior: "same-tab" as const,
         ...overrides,
     }
 }

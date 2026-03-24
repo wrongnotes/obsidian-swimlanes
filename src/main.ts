@@ -15,12 +15,16 @@ import {
     applyMutations,
 } from "./automations"
 
+export type OpenNoteBehavior = "same-tab" | "new-tab" | "new-pane"
+
 export interface SwimlaneSettings {
     tagColorRules: TagColorRule[]
+    openNoteBehavior: OpenNoteBehavior
 }
 
 const DEFAULT_SETTINGS: SwimlaneSettings = {
     tagColorRules: [],
+    openNoteBehavior: "same-tab",
 }
 
 export default class SwimlanePlugin extends Plugin {
@@ -261,11 +265,24 @@ class SwimlaneSettingTab extends PluginSettingTab {
         containerEl.empty()
 
         new Setting(containerEl)
-            .setName("Tag color rules")
-            .setDesc("Map tag patterns to colors. Use * as a wildcard. First matching rule wins.")
-            .setHeading()
+            .setName("Open note behavior")
+            .setDesc("Choose how notes open when selected from a swimlane card.")
+            .addDropdown(dd => {
+                dd.addOption("same-tab", "Same tab")
+                dd.addOption("new-tab", "New tab")
+                dd.addOption("new-pane", "Split pane")
+                dd.setValue(this.plugin.settings.openNoteBehavior)
+                dd.onChange(async (value) => {
+                    this.plugin.settings.openNoteBehavior = value as OpenNoteBehavior
+                    await this.plugin.saveSettings()
+                })
+            })
 
-        const rulesContainer = containerEl.createDiv({ cls: "swimlane-tag-color-rules" })
+        const tagColorSetting = new Setting(containerEl)
+            .setName("Tag color rules")
+            .setDesc("Customize the appearance of your tags across all swimlane views by creating coloring rules below. Rules higher in the list take precedence. Use * as a wildcard to match tag patterns.")
+
+        const rulesContainer = tagColorSetting.settingEl.createDiv({ cls: "swimlane-tag-color-rules" })
         this.renderRules(rulesContainer)
 
         const addBtn = rulesContainer.createEl("button", { text: "Add rule" })
@@ -448,7 +465,9 @@ class SwimlaneSettingTab extends PluginSettingTab {
 
         // Auto option
         const autoRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
-        const autoBtn = autoRow.createEl("button", { text: "Auto (contrast)" })
+        const autoBtn = autoRow.createEl("button", { text: "Recommended", cls: "swimlane-tag-recommended-btn" })
+        const recommendedColor = contrastingText(rule.color)
+        autoBtn.style.setProperty("--recommended-color", recommendedColor)
         autoBtn.addEventListener("click", async () => {
             delete rule.textColor
             textSwatch.style.color = contrastingText(rule.color)

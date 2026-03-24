@@ -284,8 +284,8 @@
     display: inline-flex;
     align-items: center;
     font-size: var(--font-ui-small);
-    line-height: 1;
-    padding: var(--size-2-2) var(--size-4-3);
+    line-height: var(--line-height-tight);
+    padding: var(--size-2-1) var(--size-4-3);
     border-radius: var(--radius-s);
     background-color: var(--tag-background);
     color: var(--tag-color);
@@ -390,23 +390,27 @@
 
 /* ── Tag color rules (settings) ────────────────────────── */
 
+.setting-item:has(.swimlane-tag-color-rules) {
+    flex-wrap: wrap;
+}
+
 .swimlane-tag-color-rules {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
-    padding-left: 20px;
+    gap: var(--size-4-2);
+    width: 100%;
+    margin-top: var(--size-4-2);
 }
 
 .swimlane-tag-color-rule {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--size-4-2);
     position: relative;
 }
 
 .swimlane-tag-color-rule-btn {
-    padding: 2px 8px;
+    padding: var(--size-2-1) var(--size-4-2);
     cursor: pointer;
     font-size: var(--font-ui-small);
 }
@@ -433,16 +437,16 @@
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
-    padding: 8px;
+    padding: var(--size-4-2);
     box-shadow: var(--shadow-s);
-    margin-top: 4px;
+    margin-top: var(--size-4-1);
 }
 
 .swimlane-tag-palette {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: var(--size-4-1);
+    margin-bottom: var(--size-4-2);
 }
 
 .swimlane-tag-palette-swatch {
@@ -472,9 +476,27 @@
 .swimlane-tag-color-picker-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--size-4-2);
     font-size: var(--font-ui-small);
     color: var(--text-muted);
+    margin-top: var(--size-4-2);
+}
+
+.swimlane-tag-recommended-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-4-1);
+}
+
+.swimlane-tag-recommended-btn::before {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-s);
+    background-color: var(--recommended-color);
+    border: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
 }
 
 .swimlane-tag-opacity-slider {

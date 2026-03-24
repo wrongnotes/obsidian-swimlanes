@@ -138,6 +138,7 @@ export class SwimlaneView extends BasesView {
     private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+    private settingsDirty = false
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -146,8 +147,18 @@ export class SwimlaneView extends BasesView {
         this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
             if (this.boardEl.isConnected) {
                 this.rebuildBoard()
+            } else {
+                this.settingsDirty = true
             }
         })
+        // When the board is detached (e.g. settings modal open), settings changes
+        // are deferred. Rebuild once the layout settles and the board reconnects.
+        this.registerEvent(plugin.app.workspace.on("layout-change", () => {
+            if (this.settingsDirty && this.boardEl.isConnected) {
+                this.settingsDirty = false
+                this.rebuildBoard()
+            }
+        }))
 
         // The outer container handles horizontal scroll (so the scrollbar sits
         // at the viewport edge), while the inner board handles vertical scroll.
@@ -713,6 +724,8 @@ export class SwimlaneView extends BasesView {
     }
 
     onDataUpdated(): void {
+        // Flush pending settings changes (e.g. from settings modal while view was detached).
+        this.settingsDirty = false
         if (!this.baseFile) {
             const f = this.app.workspace.getActiveFile()
             if (f?.extension === "base") {
@@ -926,6 +939,7 @@ export class SwimlaneView extends BasesView {
             imageWidth: this.imageWidth,
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
+            openNoteBehavior: this.plugin.settings.openNoteBehavior,
             mobile,
             resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
             onEditTags: (cardEl: HTMLElement) => {

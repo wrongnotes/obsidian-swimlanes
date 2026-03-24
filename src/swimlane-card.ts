@@ -39,6 +39,8 @@ export interface CardRenderOptions {
     getSwimlaneContext: () => { columns: string[]; currentSwimlane: string }
     /** Highlight a swimlane column on the board (scroll into view + flash). */
     highlightColumn: (column: string) => void
+    /** How to open a note: same-tab, new-tab, or new-pane. */
+    openNoteBehavior: "same-tab" | "new-tab" | "new-pane"
     /** When true, renders an inline menu button instead of relying on contextmenu. */
     mobile?: boolean
     /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
@@ -471,7 +473,13 @@ function showCardMenu(
         item.setTitle("Open note")
             .setIcon("lucide-file-text")
             .onClick(() => {
-                app.workspace.openLinkText(entry.file.path, "")
+                const behavior = options.openNoteBehavior
+                const leaf = behavior === "new-pane"
+                    ? app.workspace.getLeaf("split")
+                    : behavior === "new-tab"
+                        ? app.workspace.getLeaf("tab")
+                        : app.workspace.getLeaf(false)
+                leaf.openFile(entry.file)
             })
     })
 
