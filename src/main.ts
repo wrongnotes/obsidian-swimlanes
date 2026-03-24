@@ -272,7 +272,7 @@ class SwimlaneSettingTab extends PluginSettingTab {
                 dd.addOption("new-tab", "New tab")
                 dd.addOption("new-pane", "Split pane")
                 dd.setValue(this.plugin.settings.openNoteBehavior)
-                dd.onChange(async (value) => {
+                dd.onChange(async value => {
                     this.plugin.settings.openNoteBehavior = value as OpenNoteBehavior
                     await this.plugin.saveSettings()
                 })
@@ -280,9 +280,13 @@ class SwimlaneSettingTab extends PluginSettingTab {
 
         const tagColorSetting = new Setting(containerEl)
             .setName("Tag color rules")
-            .setDesc("Customize the appearance of your tags across all swimlane views by creating coloring rules below. Rules higher in the list take precedence. Use * as a wildcard to match tag patterns.")
+            .setDesc(
+                "Customize the appearance of your tags across all swimlane views by creating coloring rules below. Rules higher in the list take precedence. Use * as a wildcard to match tag patterns.",
+            )
 
-        const rulesContainer = tagColorSetting.settingEl.createDiv({ cls: "swimlane-tag-color-rules" })
+        const rulesContainer = tagColorSetting.settingEl.createDiv({
+            cls: "swimlane-tag-color-rules",
+        })
         this.renderRules(rulesContainer)
 
         const addBtn = rulesContainer.createEl("button", { text: "Add rule" })
@@ -345,7 +349,9 @@ class SwimlaneSettingTab extends PluginSettingTab {
         })
 
         // Text color swatch
-        const textSwatch = row.createDiv({ cls: "swimlane-tag-color-swatch swimlane-tag-color-swatch--text" })
+        const textSwatch = row.createDiv({
+            cls: "swimlane-tag-color-swatch swimlane-tag-color-swatch--text",
+        })
         textSwatch.textContent = "A"
         textSwatch.style.color = rule.textColor || contrastingText(rule.color)
         textSwatch.style.backgroundColor = rule.color
@@ -456,7 +462,11 @@ class SwimlaneSettingTab extends PluginSettingTab {
         document.addEventListener("keydown", onKeydown)
     }
 
-    private openTextColorPopover(textSwatch: HTMLElement, bgSwatch: HTMLElement, rule: TagColorRule): void {
+    private openTextColorPopover(
+        textSwatch: HTMLElement,
+        bgSwatch: HTMLElement,
+        rule: TagColorRule,
+    ): void {
         this.closePopover()
 
         const popover = document.createElement("div")
@@ -465,7 +475,10 @@ class SwimlaneSettingTab extends PluginSettingTab {
 
         // Auto option
         const autoRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
-        const autoBtn = autoRow.createEl("button", { text: "Recommended", cls: "swimlane-tag-recommended-btn" })
+        const autoBtn = autoRow.createEl("button", {
+            text: "Recommended",
+            cls: "swimlane-tag-recommended-btn",
+        })
         const recommendedColor = contrastingText(rule.color)
         autoBtn.style.setProperty("--recommended-color", recommendedColor)
         autoBtn.addEventListener("click", async () => {

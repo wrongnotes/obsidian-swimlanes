@@ -474,11 +474,12 @@ function showCardMenu(
             .setIcon("lucide-file-text")
             .onClick(() => {
                 const behavior = options.openNoteBehavior
-                const leaf = behavior === "new-pane"
-                    ? app.workspace.getLeaf("split")
-                    : behavior === "new-tab"
-                        ? app.workspace.getLeaf("tab")
-                        : app.workspace.getLeaf(false)
+                const leaf =
+                    behavior === "new-pane"
+                        ? app.workspace.getLeaf("split")
+                        : behavior === "new-tab"
+                          ? app.workspace.getLeaf("tab")
+                          : app.workspace.getLeaf(false)
                 leaf.openFile(entry.file)
             })
     })

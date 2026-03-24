@@ -153,12 +153,14 @@ export class SwimlaneView extends BasesView {
         })
         // When the board is detached (e.g. settings modal open), settings changes
         // are deferred. Rebuild once the layout settles and the board reconnects.
-        this.registerEvent(plugin.app.workspace.on("layout-change", () => {
-            if (this.settingsDirty && this.boardEl.isConnected) {
-                this.settingsDirty = false
-                this.rebuildBoard()
-            }
-        }))
+        this.registerEvent(
+            plugin.app.workspace.on("layout-change", () => {
+                if (this.settingsDirty && this.boardEl.isConnected) {
+                    this.settingsDirty = false
+                    this.rebuildBoard()
+                }
+            }),
+        )
 
         // The outer container handles horizontal scroll (so the scrollbar sits
         // at the viewport edge), while the inner board handles vertical scroll.
@@ -965,35 +967,42 @@ export class SwimlaneView extends BasesView {
                 this.editingTagsPath = path
                 this.editingTagsCardEl = cardEl
 
-                renderTagEditor(cardEl, file, previousTags, this.app, () => {
-                    // onDone: create undo transaction and clear editing state
-                    const finalCache = this.app.metadataCache.getFileCache(file)
-                    const finalRaw = finalCache?.frontmatter?.tags
-                    const newTags: string[] = Array.isArray(finalRaw)
-                        ? finalRaw.filter((t): t is string => typeof t === "string")
-                        : typeof finalRaw === "string"
-                          ? [finalRaw]
-                          : []
+                renderTagEditor(
+                    cardEl,
+                    file,
+                    previousTags,
+                    this.app,
+                    () => {
+                        // onDone: create undo transaction and clear editing state
+                        const finalCache = this.app.metadataCache.getFileCache(file)
+                        const finalRaw = finalCache?.frontmatter?.tags
+                        const newTags: string[] = Array.isArray(finalRaw)
+                            ? finalRaw.filter((t): t is string => typeof t === "string")
+                            : typeof finalRaw === "string"
+                              ? [finalRaw]
+                              : []
 
-                    const changed =
-                        previousTags.length !== newTags.length ||
-                        previousTags.some((t, i) => t !== newTags[i])
+                        const changed =
+                            previousTags.length !== newTags.length ||
+                            previousTags.some((t, i) => t !== newTags[i])
 
-                    if (changed) {
-                        this.undoManager.beginTransaction("Edit tags")
-                        this.undoManager.pushOperation({
-                            type: "EditTags",
-                            file,
-                            previousTags,
-                            newTags,
-                        })
-                        this.undoManager.endTransaction()
-                    }
+                        if (changed) {
+                            this.undoManager.beginTransaction("Edit tags")
+                            this.undoManager.pushOperation({
+                                type: "EditTags",
+                                file,
+                                previousTags,
+                                newTags,
+                            })
+                            this.undoManager.endTransaction()
+                        }
 
-                    this.editingTagsPath = null
-                    this.editingTagsCardEl = null
-                    this.rebuildBoard()
-                }, (tag: string) => this.plugin.tagColorResolver.resolve(tag))
+                        this.editingTagsPath = null
+                        this.editingTagsCardEl = null
+                        this.rebuildBoard()
+                    },
+                    (tag: string) => this.plugin.tagColorResolver.resolve(tag),
+                )
             },
         }
 
@@ -1078,7 +1087,9 @@ export class SwimlaneView extends BasesView {
                 if (editingCard) {
                     editingCard.replaceWith(this.editingTagsCardEl)
                     // Restore focus to the tag input after reattach
-                    const tagInput = this.editingTagsCardEl.querySelector(".swimlane-tag-input") as HTMLInputElement | null
+                    const tagInput = this.editingTagsCardEl.querySelector(
+                        ".swimlane-tag-input",
+                    ) as HTMLInputElement | null
                     tagInput?.focus()
                 }
             }
