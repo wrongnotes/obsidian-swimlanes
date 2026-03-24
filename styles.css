@@ -17,8 +17,9 @@
 .swimlane-column {
     display: flex;
     flex-direction: column;
-    min-width: 240px;
-    max-width: 300px;
+    --col-base: 240px;
+    min-width: max(var(--col-base), calc(var(--swimlane-image-width, 64px) + 180px));
+    max-width: max(300px, calc(var(--swimlane-image-width, 64px) + 200px));
     flex-shrink: 0;
     background-color: var(--background-secondary);
     border-radius: var(--radius-m);
@@ -267,6 +268,238 @@
 
 .swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-title {
     padding-bottom: 0;
+}
+
+/* Tag chips */
+.swimlane-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-2-3);
+    padding-bottom: var(--size-4-2);
+    min-width: 0;
+    max-width: 100%;
+}
+
+.swimlane-card-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--font-ui-small);
+    line-height: var(--line-height-tight);
+    padding: var(--size-2-1) var(--size-4-3);
+    border-radius: var(--radius-s);
+    background-color: var(--tag-background);
+    color: var(--tag-color);
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.swimlane-card-tag-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Tag editor (inline editing mode) ──────────────────── */
+
+.swimlane-card-tags--editing {
+    background: var(--background-modifier-form-field);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.swimlane-card-tag--editable {
+    cursor: default;
+    padding-right: 2px;
+}
+
+.swimlane-card-tag-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: var(--size-2-1);
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+}
+
+.swimlane-card-tag-remove svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+}
+
+.swimlane-card-tag-remove:hover {
+    opacity: 1;
+}
+
+.swimlane-tag-input-row {
+    display: flex;
+    align-items: center;
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: var(--size-2-1);
+}
+
+.swimlane-tag-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    padding: 0 4px;
+    line-height: 1;
+    height: auto;
+}
+
+.swimlane-tag-input::placeholder {
+    color: var(--text-faint);
+}
+
+.swimlane-tag-editor-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: var(--radius-s);
+    user-select: none;
+}
+
+.swimlane-tag-editor-btn svg {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.swimlane-tag-editor-btn:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+
+.swimlane-tag-action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--size-2-2);
+    flex: 1 1 100%;
+}
+
+/* ── Tag color rules (settings) ────────────────────────── */
+
+.setting-item:has(.swimlane-tag-color-rules) {
+    flex-wrap: wrap;
+}
+
+.swimlane-tag-color-rules {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    width: 100%;
+    margin-top: var(--size-4-2);
+}
+
+.swimlane-tag-color-rule {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    position: relative;
+}
+
+.swimlane-tag-color-rule-btn {
+    padding: var(--size-2-1) var(--size-4-2);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-tag-color-rule-input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.swimlane-tag-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.swimlane-tag-color-popover {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: var(--layer-popover);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-2);
+    box-shadow: var(--shadow-s);
+    margin-top: var(--size-4-1);
+}
+
+.swimlane-tag-palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--size-4-1);
+    margin-bottom: var(--size-4-2);
+}
+
+.swimlane-tag-palette-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.swimlane-tag-palette-swatch:hover {
+    border-color: var(--text-muted);
+}
+
+.swimlane-tag-palette-swatch--active {
+    border-color: var(--interactive-accent);
+}
+
+.swimlane-tag-color-swatch--text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-bold);
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-tag-color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    margin-top: var(--size-4-2);
+}
+
+.swimlane-tag-recommended-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-4-1);
+}
+
+.swimlane-tag-recommended-btn::before {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--radius-s);
+    background-color: var(--recommended-color);
+    border: 1px solid var(--background-modifier-border);
+    flex-shrink: 0;
+}
+
+.swimlane-tag-opacity-slider {
+    flex: 1;
 }
 
 .swimlane-card-props {

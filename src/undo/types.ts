@@ -74,6 +74,12 @@ export type UndoOperation =
           previousValues: Record<string, unknown>
           mutations: FrontmatterMutation[]
       }
+    | {
+          type: "EditTags"
+          file: TFile
+          previousTags: string[]
+          newTags: string[]
+      }
 
 export interface UndoTransaction {
     label: string

@@ -1,4 +1,4 @@
-import { midRank } from "./lexorank"
+import { midRank, generateSpacedRanks } from "./lexorank"
 
 describe("midRank", () => {
     describe("both bounds null", () => {
@@ -132,5 +132,49 @@ describe("midRank", () => {
                 hi = mid // keep bisecting the lower half
             }
         })
+    })
+})
+
+describe("generateSpacedRanks", () => {
+    it("returns empty array for 0", () => {
+        expect(generateSpacedRanks(0)).toEqual([])
+    })
+
+    it("returns a single rank for 1", () => {
+        const ranks = generateSpacedRanks(1)
+        expect(ranks).toHaveLength(1)
+        expect(ranks[0]!.length).toBeGreaterThan(0)
+    })
+
+    it("returns strictly increasing ranks for 5 cards", () => {
+        const ranks = generateSpacedRanks(5)
+        expect(ranks).toHaveLength(5)
+        for (let i = 1; i < ranks.length; i++) {
+            expect(ranks[i]! > ranks[i - 1]!).toBe(true)
+        }
+    })
+
+    it("returns strictly increasing ranks for 50 cards", () => {
+        const ranks = generateSpacedRanks(50)
+        expect(ranks).toHaveLength(50)
+        for (let i = 1; i < ranks.length; i++) {
+            expect(ranks[i]! > ranks[i - 1]!).toBe(true)
+        }
+    })
+
+    it("returns strictly increasing ranks for 100 cards", () => {
+        const ranks = generateSpacedRanks(100)
+        expect(ranks).toHaveLength(100)
+        for (let i = 1; i < ranks.length; i++) {
+            expect(ranks[i]! > ranks[i - 1]!).toBe(true)
+        }
+    })
+
+    it("all ranks are non-empty strings", () => {
+        const ranks = generateSpacedRanks(100)
+        for (const r of ranks) {
+            expect(typeof r).toBe("string")
+            expect(r.length).toBeGreaterThan(0)
+        }
     })
 })

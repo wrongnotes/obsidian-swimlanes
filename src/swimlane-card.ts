@@ -1,5 +1,7 @@
-import type { App, BasesPropertyId, Value } from "obsidian"
+import type { App, BasesPropertyId, TFile, Value } from "obsidian"
 import type { BasesEntry } from "obsidian"
+import type { ResolvedTagColor } from "./tag-colors"
+import { TagSuggest } from "./inputs/tag-suggest"
 import {
     BooleanValue,
     DateValue,
@@ -37,8 +39,16 @@ export interface CardRenderOptions {
     getSwimlaneContext: () => { columns: string[]; currentSwimlane: string }
     /** Highlight a swimlane column on the board (scroll into view + flash). */
     highlightColumn: (column: string) => void
+    /** How to open a note: same-tab, new-tab, or new-pane. */
+    openNoteBehavior: "same-tab" | "new-tab" | "new-pane"
     /** When true, renders an inline menu button instead of relying on contextmenu. */
     mobile?: boolean
+    /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
+    tags?: string[]
+    /** Resolve a tag to background + text colors, or null for default Obsidian styling. */
+    resolveTagColor?: (tag: string) => ResolvedTagColor | null
+    /** Called when the user selects "Edit tags…" from the context menu. */
+    onEditTags?: (cardEl: HTMLElement) => void
 }
 
 /** Derive a display label from a BasesPropertyId: "note.priority" → "priority". */
@@ -154,6 +164,19 @@ export function renderCard(
     const content = imageUrl ? card.createDiv({ cls: "swimlane-card-content" }) : card
     content.createDiv({ cls: "swimlane-card-title", text: entry.file.basename })
 
+    if (options.tags && options.tags.length > 0) {
+        const tagRow = content.createDiv({ cls: "swimlane-card-tags" })
+        for (const tag of options.tags) {
+            const chip = tagRow.createSpan({ cls: "swimlane-card-tag" })
+            chip.createSpan({ cls: "swimlane-card-tag-text", text: tag })
+            const resolved = options.resolveTagColor?.(tag) ?? null
+            if (resolved) {
+                chip.style.backgroundColor = resolved.bg
+                chip.style.color = resolved.fg
+            }
+        }
+    }
+
     if (properties.length > 0) {
         const rows: { icon: string; label: string; value: string }[] = []
         for (const cfg of properties) {
@@ -206,7 +229,7 @@ export function renderCard(
                 return
             }
             const rect = menuBtn.getBoundingClientRect()
-            openMenu = showCardMenu({ x: rect.right, y: rect.bottom }, entry, app, options)
+            openMenu = showCardMenu({ x: rect.right, y: rect.bottom }, entry, app, options, card)
             openMenu.register(() => {
                 openMenu = null
             })
@@ -215,10 +238,226 @@ export function renderCard(
 
     card.addEventListener("contextmenu", e => {
         e.preventDefault()
-        showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options)
+        showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options, card)
     })
 
     return card
+}
+
+/** Transform a card's tag row into an inline editor with removable chips + autocomplete input. */
+export function renderTagEditor(
+    cardEl: HTMLElement,
+    file: TFile,
+    currentTags: string[],
+    app: App,
+    onDone: () => void,
+    resolveTagColor?: (tag: string) => ResolvedTagColor | null,
+): void {
+    const tags = [...currentTags]
+    let settled = false
+
+    // Find or create the tag container. It lives on the content wrapper (if images)
+    // or directly on the card.
+    const content = cardEl.querySelector(".swimlane-card-content") ?? cardEl
+    let container = content.querySelector(".swimlane-card-tags") as HTMLElement | null
+    if (!container) {
+        // Insert after title, before properties table
+        const title = content.querySelector(".swimlane-card-title")
+        container = document.createElement("div")
+        container.classList.add("swimlane-card-tags")
+        if (title?.nextSibling) {
+            content.insertBefore(container, title.nextSibling)
+        } else {
+            content.appendChild(container)
+        }
+    }
+
+    function settle() {
+        if (settled) {
+            return
+        }
+        settled = true
+        document.removeEventListener("pointerdown", onOutsidePointerDown, true)
+        onDone()
+    }
+
+    function cancel() {
+        if (settled) {
+            return
+        }
+        // Restore original tags
+        app.fileManager.processFrontMatter(file, fm => {
+            if (currentTags.length === 0) {
+                delete fm.tags
+            } else {
+                fm.tags = [...currentTags]
+            }
+        })
+        settled = true
+        document.removeEventListener("pointerdown", onOutsidePointerDown, true)
+        onDone()
+    }
+
+    // Dismiss on outside click (pointerdown, not focusout — focusout fires
+    // during DOM detach/reattach and causes false dismissals).
+    // Skip pointerdown events that occur before the next animation frame,
+    // since the menu click that opened us may still be propagating.
+    let listenAfter = performance.now()
+    requestAnimationFrame(() => {
+        listenAfter = 0
+    })
+    function onOutsidePointerDown(e: PointerEvent) {
+        if (listenAfter > 0) {
+            return
+        }
+        const target = e.target as HTMLElement
+        if (container!.contains(target)) {
+            return
+        }
+        if (target.closest(".suggestion-container")) {
+            return
+        }
+        settle()
+    }
+    document.addEventListener("pointerdown", onOutsidePointerDown, true)
+
+    function renderChips() {
+        // Clear and rebuild chips only (preserve input row)
+        container!.querySelectorAll(".swimlane-card-tag--editable").forEach(el => el.remove())
+        const inputRow = container!.querySelector(".swimlane-tag-input-row")
+        for (const tag of tags) {
+            const chip = document.createElement("span")
+            chip.classList.add("swimlane-card-tag", "swimlane-card-tag--editable")
+            const textSpan = document.createElement("span")
+            textSpan.classList.add("swimlane-card-tag-text")
+            textSpan.textContent = tag
+            chip.appendChild(textSpan)
+            const resolved = resolveTagColor?.(tag) ?? null
+            if (resolved) {
+                chip.style.backgroundColor = resolved.bg
+                chip.style.color = resolved.fg
+            }
+            const removeBtn = document.createElement("span")
+            removeBtn.classList.add("swimlane-card-tag-remove")
+            setIcon(removeBtn, "x")
+            removeBtn.addEventListener("click", e => {
+                e.stopPropagation()
+                const idx = tags.indexOf(tag)
+                if (idx !== -1) {
+                    tags.splice(idx, 1)
+                    writeTags()
+                    renderChips()
+                }
+            })
+            chip.appendChild(removeBtn)
+            if (inputRow) {
+                container!.insertBefore(chip, inputRow)
+            } else {
+                container!.prepend(chip)
+            }
+        }
+    }
+
+    function writeTags() {
+        app.fileManager.processFrontMatter(file, fm => {
+            if (tags.length === 0) {
+                delete fm.tags
+            } else {
+                fm.tags = [...tags]
+            }
+        })
+    }
+
+    function addTag(raw: string) {
+        const tag = raw.trim().replace(/^#/, "")
+        if (!tag || tags.includes(tag)) {
+            return
+        }
+        tags.push(tag)
+        writeTags()
+        renderChips()
+    }
+
+    // Clear container and set up editing UI
+    container.empty()
+    container.classList.add("swimlane-card-tags--editing")
+    container.setAttribute("data-no-drag", "")
+
+    // Input + add button row
+    const inputRow = document.createElement("div")
+    inputRow.classList.add("swimlane-tag-input-row")
+    container.appendChild(inputRow)
+
+    const input = document.createElement("input")
+    input.type = "text"
+    input.placeholder = "Add tag…"
+    input.classList.add("swimlane-tag-input")
+    input.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+            e.preventDefault()
+            addTag(input.value)
+            input.value = ""
+        } else if (e.key === "Escape") {
+            e.preventDefault()
+            cancel()
+        }
+    })
+    inputRow.appendChild(input)
+
+    const addBtn = document.createElement("span")
+    addBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(addBtn, "plus")
+    addBtn.title = "Add tag"
+    addBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        if (input.value.trim()) {
+            addTag(input.value)
+            input.value = ""
+        }
+    })
+    inputRow.appendChild(addBtn)
+
+    // Done / Cancel action row
+    const actionRow = document.createElement("div")
+    actionRow.classList.add("swimlane-tag-action-row")
+    container.appendChild(actionRow)
+
+    const cancelBtn = document.createElement("span")
+    cancelBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(cancelBtn, "x")
+    cancelBtn.title = "Cancel"
+    cancelBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        cancel()
+    })
+    actionRow.appendChild(cancelBtn)
+
+    const doneBtn = document.createElement("span")
+    doneBtn.classList.add("swimlane-tag-editor-btn")
+    setIcon(doneBtn, "check")
+    doneBtn.title = "Done"
+    doneBtn.addEventListener("click", e => {
+        e.stopPropagation()
+        settle()
+    })
+    actionRow.appendChild(doneBtn)
+
+    // Render initial chips (before the input)
+    renderChips()
+
+    // Attach autocomplete (TagSuggest extends AbstractInputSuggest)
+    new TagSuggest(
+        app,
+        input,
+        tag => {
+            addTag(tag)
+            input.value = ""
+        },
+        () => tags,
+    )
+
+    // Focus the input
+    input.focus()
 }
 
 function showCardMenu(
@@ -226,6 +465,7 @@ function showCardMenu(
     entry: BasesEntry,
     app: App,
     options: CardRenderOptions,
+    cardEl: HTMLElement,
 ): Menu {
     const menu = new Menu()
 
@@ -233,7 +473,14 @@ function showCardMenu(
         item.setTitle("Open note")
             .setIcon("lucide-file-text")
             .onClick(() => {
-                app.workspace.openLinkText(entry.file.path, "")
+                const behavior = options.openNoteBehavior
+                const leaf =
+                    behavior === "new-pane"
+                        ? app.workspace.getLeaf("split")
+                        : behavior === "new-tab"
+                          ? app.workspace.getLeaf("tab")
+                          : app.workspace.getLeaf(false)
+                leaf.openFile(entry.file)
             })
     })
 
@@ -258,6 +505,16 @@ function showCardMenu(
             })
         }
     })
+
+    if (options.onEditTags) {
+        menu.addItem(item => {
+            item.setTitle("Edit tags…")
+                .setIcon("lucide-tags")
+                .onClick(() => {
+                    options.onEditTags!(cardEl)
+                })
+        })
+    }
 
     menu.addSeparator()
 

@@ -1,4 +1,4 @@
-import { renderCard, propLabel, CardRenderOptions } from "./swimlane-card"
+import { renderCard, renderTagEditor, propLabel, CardRenderOptions } from "./swimlane-card"
 import type { BasesEntry, BasesPropertyId } from "obsidian"
 import {
     StringValue,
@@ -34,6 +34,7 @@ function makeOptions(overrides?: Partial<CardRenderOptions>): CardRenderOptions 
             currentSwimlane: "Backlog",
         }),
         highlightColumn: jest.fn(),
+        openNoteBehavior: "same-tab" as const,
         ...overrides,
     }
 }
@@ -283,6 +284,81 @@ describe("renderCard", () => {
     })
 })
 
+describe("tag rendering", () => {
+    it("renders tag chips when tags are provided", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: ["urgent", "bug"] }),
+        )
+        const tagRow = card.querySelector(".swimlane-card-tags")
+        expect(tagRow).not.toBeNull()
+        const chips = Array.from(card.querySelectorAll(".swimlane-card-tag"))
+        expect(chips).toHaveLength(2)
+        const [chip0, chip1] = chips
+        expect(chip0?.textContent).toBe("urgent")
+        expect(chip1?.textContent).toBe("bug")
+    })
+
+    it("does not render tag row when tags is empty", () => {
+        const container = document.createElement("div")
+        const card = renderCard(container, makeEntry("Note"), makeApp(), makeOptions({ tags: [] }))
+        expect(card.querySelector(".swimlane-card-tags")).toBeNull()
+    })
+
+    it("does not render tag row when tags is undefined", () => {
+        const container = document.createElement("div")
+        const card = renderCard(container, makeEntry("Note"), makeApp(), makeOptions())
+        expect(card.querySelector(".swimlane-card-tags")).toBeNull()
+    })
+
+    it("applies inline color from resolveTagColor", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({
+                tags: ["bug"],
+                resolveTagColor: (tag: string) =>
+                    tag === "bug" ? { bg: "#e05252", fg: "#fff" } : null,
+            }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip).not.toBeNull()
+        expect(chip.style.backgroundColor).toBeTruthy()
+    })
+
+    it("uses default styling when resolveTagColor returns null", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({
+                tags: ["unmatched"],
+                resolveTagColor: () => null,
+            }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip.style.backgroundColor).toBe("")
+    })
+
+    it("uses default styling when resolveTagColor is not provided", () => {
+        const container = document.createElement("div")
+        const card = renderCard(
+            container,
+            makeEntry("Note"),
+            makeApp(),
+            makeOptions({ tags: ["test"] }),
+        )
+        const chip = card.querySelector(".swimlane-card-tag") as HTMLElement
+        expect(chip.style.backgroundColor).toBe("")
+    })
+})
+
 describe("card context menu actions", () => {
     it("calls getSwimlaneContext lazily on contextmenu", () => {
         const getSwimlaneContext = jest.fn(() => ({
@@ -320,5 +396,196 @@ describe("card context menu actions", () => {
         card.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }))
         card.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }))
         expect(getSwimlaneContext).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe("renderTagEditor", () => {
+    function makeFile(path = "note.md") {
+        return { path } as any
+    }
+
+    it("renders editable chips with remove buttons for existing tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], makeApp(), jest.fn())
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(2)
+        expect(chips[0]?.textContent).toContain("bug")
+        expect(chips[0]?.querySelector(".swimlane-card-tag-remove")).not.toBeNull()
+    })
+
+    it("renders input and done button", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-tag-input")).not.toBeNull()
+        expect(card.querySelector(".swimlane-tag-action-row")).not.toBeNull()
+    })
+
+    it("adds editing class to container", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-card-tags--editing")).not.toBeNull()
+    })
+
+    it("creates tag container when card has none", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), [], makeApp(), jest.fn())
+        expect(card.querySelector(".swimlane-card-tags")).not.toBeNull()
+    })
+
+    it("reuses existing tag container", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const existing = document.createElement("div")
+        existing.classList.add("swimlane-card-tags")
+        card.appendChild(existing)
+        renderTagEditor(card, makeFile(), ["a"], makeApp(), jest.fn())
+        expect(card.querySelectorAll(".swimlane-card-tags")).toHaveLength(1)
+    })
+
+    it("calls processFrontMatter when remove button is clicked", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], app, jest.fn())
+        const removeBtn = card.querySelector(".swimlane-card-tag-remove") as HTMLElement
+        removeBtn?.click()
+        expect(app.fileManager.processFrontMatter).toHaveBeenCalled()
+    })
+
+    it("remove actually updates frontmatter and chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const captured: Record<string, unknown>[] = []
+        const app = makeApp({
+            fileManager: {
+                processFrontMatter: jest.fn(async (_f: any, cb: (fm: any) => void) => {
+                    const fm: Record<string, unknown> = { tags: ["old"] }
+                    cb(fm)
+                    captured.push(fm)
+                }),
+                trashFile: jest.fn(),
+            },
+        })
+        renderTagEditor(card, makeFile(), ["bug", "urgent"], app, jest.fn())
+
+        // Remove "bug" (first tag)
+        const removeBtn = card.querySelector(".swimlane-card-tag-remove") as HTMLElement
+        removeBtn?.click()
+
+        // Frontmatter should have ["urgent"] only
+        expect(captured).toHaveLength(1)
+        expect(captured[0]?.tags).toEqual(["urgent"])
+
+        // Only one chip should remain
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(1)
+        expect(chips[0]?.textContent).toContain("urgent")
+    })
+
+    it("add via Enter updates frontmatter and chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const captured: Record<string, unknown>[] = []
+        const app = makeApp({
+            fileManager: {
+                processFrontMatter: jest.fn(async (_f: any, cb: (fm: any) => void) => {
+                    const fm: Record<string, unknown> = {}
+                    cb(fm)
+                    captured.push(fm)
+                }),
+                trashFile: jest.fn(),
+            },
+        })
+        renderTagEditor(card, makeFile(), ["bug"], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "feature"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+
+        expect(captured).toHaveLength(1)
+        expect(captured[0]?.tags).toEqual(["bug", "feature"])
+
+        const chips = card.querySelectorAll(".swimlane-card-tag--editable")
+        expect(chips).toHaveLength(2)
+    })
+
+    it("calls onDone when done button is clicked", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), [], makeApp(), onDone)
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const doneBtn = btns[1] as HTMLElement // second btn is done (check)
+        doneBtn?.click()
+        expect(onDone).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not call onDone twice (settled flag)", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), [], makeApp(), onDone)
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const doneBtn = btns[1] as HTMLElement
+        doneBtn?.click()
+        doneBtn?.click()
+        expect(onDone).toHaveBeenCalledTimes(1)
+    })
+
+    it("cancel restores original tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        const onDone = jest.fn()
+        renderTagEditor(card, makeFile(), ["original"], app, onDone)
+        // Add a tag
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "new"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        // Click cancel
+        const btns = card.querySelectorAll(".swimlane-tag-action-row .swimlane-tag-editor-btn")
+        const cancelBtn = btns[0] as HTMLElement
+        cancelBtn?.click()
+        // Should have called processFrontMatter to restore original tags
+        const lastCall = app.fileManager.processFrontMatter.mock.calls.at(-1)
+        const fm: Record<string, unknown> = {}
+        lastCall?.[1](fm)
+        expect(fm.tags).toEqual(["original"])
+        expect(onDone).toHaveBeenCalled()
+    })
+
+    it("does not add duplicate tags", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), ["bug"], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = "bug"
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
+    })
+
+    it("applies color from resolveTagColor to editable chips", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        renderTagEditor(card, makeFile(), ["bug"], makeApp(), jest.fn(), tag =>
+            tag === "bug" ? { bg: "#5094e4", fg: "#fff" } : null,
+        )
+        const chip = card.querySelector(".swimlane-card-tag--editable") as HTMLElement
+        expect(chip.style.backgroundColor).toBeTruthy()
+    })
+
+    it("ignores empty input on Enter", () => {
+        const card = document.createElement("div")
+        card.classList.add("swimlane-card")
+        const app = makeApp()
+        renderTagEditor(card, makeFile(), [], app, jest.fn())
+        const input = card.querySelector(".swimlane-tag-input") as HTMLInputElement
+        input.value = ""
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+        expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled()
     })
 })

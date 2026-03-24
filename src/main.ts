@@ -1,5 +1,8 @@
-import { Plugin, Notice, parseYaml, TFile } from "obsidian"
+import { Plugin, PluginSettingTab, Setting, Notice, parseYaml, TFile } from "obsidian"
+import type { App as ObsidianApp } from "obsidian"
 import { SwimlaneView } from "./swimlane-view"
+import { TagColorResolver, PRESET_PALETTE, contrastingText } from "./tag-colors"
+import type { TagColorRule } from "./tag-colors"
 import { CreateBaseModal } from "./onboarding-workflows/create-base-modal"
 import { KanbanImportModal } from "./onboarding-workflows/kanban-import-modal"
 import {
@@ -12,10 +15,31 @@ import {
     applyMutations,
 } from "./automations"
 
+export type OpenNoteBehavior = "same-tab" | "new-tab" | "new-pane"
+
+export interface SwimlaneSettings {
+    tagColorRules: TagColorRule[]
+    openNoteBehavior: OpenNoteBehavior
+}
+
+const DEFAULT_SETTINGS: SwimlaneSettings = {
+    tagColorRules: [],
+    openNoteBehavior: "same-tab",
+}
+
 export default class SwimlanePlugin extends Plugin {
+    settings: SwimlaneSettings = DEFAULT_SETTINGS
+    tagColorResolver: TagColorResolver = new TagColorResolver([])
     private pollerIntervalId: number | null = null
+    private settingsListeners: Set<() => void> = new Set()
+
+    onSettingsChanged(cb: () => void): () => void {
+        this.settingsListeners.add(cb)
+        return () => this.settingsListeners.delete(cb)
+    }
 
     async onload() {
+        await this.loadSettings()
         this.registerBasesView("swimlane", {
             name: "Swimlane",
             icon: "lucide-square-dashed-kanban",
@@ -80,6 +104,8 @@ export default class SwimlanePlugin extends Plugin {
         this.addRibbonIcon("square-kanban", "Create swimlane board", () => {
             new CreateBaseModal(this.app).open()
         })
+
+        this.addSettingTab(new SwimlaneSettingTab(this.app, this))
 
         // Check for due scheduled actions on load
         this.processAllDueActions()
@@ -193,6 +219,19 @@ export default class SwimlanePlugin extends Plugin {
         return remaining.length > 0
     }
 
+    async loadSettings(): Promise<void> {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+        this.tagColorResolver = new TagColorResolver(this.settings.tagColorRules)
+    }
+
+    async saveSettings(): Promise<void> {
+        await this.saveData(this.settings)
+        this.tagColorResolver = new TagColorResolver(this.settings.tagColorRules)
+        for (const cb of this.settingsListeners) {
+            cb()
+        }
+    }
+
     private async updateScheduledActionPaths(oldPath: string, newPath: string): Promise<void> {
         const baseFiles = this.app.vault.getFiles().filter(f => f.extension === "base")
         for (const baseFile of baseFiles) {
@@ -208,6 +247,284 @@ export default class SwimlanePlugin extends Plugin {
             if (changed) {
                 await this.app.vault.process(baseFile, c => writeScheduledActions(c, actions))
             }
+        }
+    }
+}
+
+class SwimlaneSettingTab extends PluginSettingTab {
+    plugin: SwimlanePlugin
+    private activePopover: HTMLElement | null = null
+
+    constructor(app: ObsidianApp, plugin: SwimlanePlugin) {
+        super(app, plugin)
+        this.plugin = plugin
+    }
+
+    display(): void {
+        const { containerEl } = this
+        containerEl.empty()
+
+        new Setting(containerEl)
+            .setName("Open note behavior")
+            .setDesc("Choose how notes open when selected from a swimlane card.")
+            .addDropdown(dd => {
+                dd.addOption("same-tab", "Same tab")
+                dd.addOption("new-tab", "New tab")
+                dd.addOption("new-pane", "Split pane")
+                dd.setValue(this.plugin.settings.openNoteBehavior)
+                dd.onChange(async value => {
+                    this.plugin.settings.openNoteBehavior = value as OpenNoteBehavior
+                    await this.plugin.saveSettings()
+                })
+            })
+
+        const tagColorSetting = new Setting(containerEl)
+            .setName("Tag color rules")
+            .setDesc(
+                "Customize the appearance of your tags across all swimlane views by creating coloring rules below. Rules higher in the list take precedence. Use * as a wildcard to match tag patterns.",
+            )
+
+        const rulesContainer = tagColorSetting.settingEl.createDiv({
+            cls: "swimlane-tag-color-rules",
+        })
+        this.renderRules(rulesContainer)
+
+        const addBtn = rulesContainer.createEl("button", { text: "Add rule" })
+        addBtn.addEventListener("click", async () => {
+            this.plugin.settings.tagColorRules.push({
+                pattern: "",
+                color: PRESET_PALETTE[0].color,
+            })
+            await this.plugin.saveSettings()
+            this.display()
+        })
+    }
+
+    private renderRules(container: HTMLElement): void {
+        const rules = this.plugin.settings.tagColorRules
+        for (let i = 0; i < rules.length; i++) {
+            this.renderRuleRow(container, i)
+        }
+    }
+
+    private renderRuleRow(container: HTMLElement, index: number): void {
+        const rules = this.plugin.settings.tagColorRules
+        const rule = rules[index]!
+        const row = container.createDiv({ cls: "swimlane-tag-color-rule" })
+
+        // Up/down buttons
+        const upBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "↑" })
+        upBtn.disabled = index === 0
+        upBtn.addEventListener("click", async () => {
+            ;[rules[index - 1], rules[index]] = [rules[index]!, rules[index - 1]!]
+            await this.plugin.saveSettings()
+            this.display()
+        })
+
+        const downBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "↓" })
+        downBtn.disabled = index === rules.length - 1
+        downBtn.addEventListener("click", async () => {
+            ;[rules[index], rules[index + 1]] = [rules[index + 1]!, rules[index]!]
+            await this.plugin.saveSettings()
+            this.display()
+        })
+
+        // Pattern input
+        const input = row.createEl("input", {
+            cls: "swimlane-tag-color-rule-input",
+            attr: { type: "text", placeholder: "Tag pattern", value: rule.pattern },
+        })
+        input.addEventListener("change", async () => {
+            rule.pattern = input.value.trim().replace(/^#/, "")
+            input.value = rule.pattern
+            await this.plugin.saveSettings()
+        })
+
+        // Color swatch (background)
+        const swatch = row.createDiv({ cls: "swimlane-tag-color-swatch" })
+        swatch.style.backgroundColor = rule.color
+        swatch.style.opacity = String(rule.opacity ?? 1)
+        swatch.addEventListener("click", () => {
+            this.openColorPopover(swatch, rule)
+        })
+
+        // Text color swatch
+        const textSwatch = row.createDiv({
+            cls: "swimlane-tag-color-swatch swimlane-tag-color-swatch--text",
+        })
+        textSwatch.textContent = "A"
+        textSwatch.style.color = rule.textColor || contrastingText(rule.color)
+        textSwatch.style.backgroundColor = rule.color
+        textSwatch.style.opacity = String(rule.opacity ?? 1)
+        textSwatch.addEventListener("click", () => {
+            this.openTextColorPopover(textSwatch, swatch, rule)
+        })
+
+        // Delete button
+        const deleteBtn = row.createEl("button", { cls: "swimlane-tag-color-rule-btn", text: "×" })
+        deleteBtn.addEventListener("click", async () => {
+            rules.splice(index, 1)
+            await this.plugin.saveSettings()
+            this.display()
+        })
+    }
+
+    private openColorPopover(swatch: HTMLElement, rule: TagColorRule): void {
+        this.closePopover()
+
+        const popover = document.createElement("div")
+        popover.classList.add("swimlane-tag-color-popover")
+        swatch.parentElement!.appendChild(popover)
+
+        // Preset palette
+        const palette = popover.createDiv({ cls: "swimlane-tag-palette" })
+        for (const preset of PRESET_PALETTE) {
+            const presetSwatch = palette.createDiv({ cls: "swimlane-tag-palette-swatch" })
+            presetSwatch.style.backgroundColor = preset.color
+            presetSwatch.title = preset.name
+            if (preset.color === rule.color) {
+                presetSwatch.classList.add("swimlane-tag-palette-swatch--active")
+            }
+            presetSwatch.addEventListener("click", async () => {
+                rule.color = preset.color
+                if (!rule.textColor) {
+                    rule.textColor = undefined
+                }
+                await this.plugin.saveSettings()
+                this.closePopover()
+                this.display()
+            })
+        }
+
+        // Custom color picker
+        const pickerRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        pickerRow.createSpan({ text: "Custom: " })
+        const picker = pickerRow.createEl("input", {
+            attr: { type: "color", value: rule.color },
+        })
+        picker.addEventListener("input", async () => {
+            rule.color = picker.value
+            swatch.style.backgroundColor = rule.color
+            // Update text swatch preview inline
+            const textSwatch = swatch.nextElementSibling as HTMLElement | null
+            if (textSwatch?.classList.contains("swimlane-tag-color-swatch--text")) {
+                textSwatch.style.backgroundColor = rule.color
+                if (!rule.textColor) {
+                    textSwatch.style.color = contrastingText(rule.color)
+                }
+            }
+            await this.plugin.saveSettings()
+        })
+
+        // Opacity slider
+        const opacityRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        opacityRow.createSpan({ text: "Opacity: " })
+        const opacitySlider = opacityRow.createEl("input", {
+            attr: {
+                type: "range",
+                min: "0",
+                max: "1",
+                step: "0.05",
+                value: String(rule.opacity ?? 1),
+            },
+            cls: "swimlane-tag-opacity-slider",
+        })
+        const opacityLabel = opacityRow.createSpan({
+            text: `${Math.round((rule.opacity ?? 1) * 100)}%`,
+        })
+        opacitySlider.addEventListener("input", async () => {
+            rule.opacity = parseFloat(opacitySlider.value)
+            opacityLabel.textContent = `${Math.round(rule.opacity * 100)}%`
+            swatch.style.opacity = String(rule.opacity)
+            await this.plugin.saveSettings()
+        })
+
+        this.activePopover = popover
+
+        // Dismiss on outside click
+        const onPointerDown = (e: PointerEvent) => {
+            if (!popover.contains(e.target as Node) && e.target !== swatch) {
+                this.closePopover()
+                document.removeEventListener("pointerdown", onPointerDown, true)
+            }
+        }
+        setTimeout(() => {
+            document.addEventListener("pointerdown", onPointerDown, true)
+        }, 0)
+
+        // Dismiss on Escape
+        const onKeydown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                this.closePopover()
+                document.removeEventListener("keydown", onKeydown)
+            }
+        }
+        document.addEventListener("keydown", onKeydown)
+    }
+
+    private openTextColorPopover(
+        textSwatch: HTMLElement,
+        bgSwatch: HTMLElement,
+        rule: TagColorRule,
+    ): void {
+        this.closePopover()
+
+        const popover = document.createElement("div")
+        popover.classList.add("swimlane-tag-color-popover")
+        textSwatch.parentElement!.appendChild(popover)
+
+        // Auto option
+        const autoRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        const autoBtn = autoRow.createEl("button", {
+            text: "Recommended",
+            cls: "swimlane-tag-recommended-btn",
+        })
+        const recommendedColor = contrastingText(rule.color)
+        autoBtn.style.setProperty("--recommended-color", recommendedColor)
+        autoBtn.addEventListener("click", async () => {
+            delete rule.textColor
+            textSwatch.style.color = contrastingText(rule.color)
+            await this.plugin.saveSettings()
+            this.closePopover()
+        })
+
+        // Custom text color picker
+        const pickerRow = popover.createDiv({ cls: "swimlane-tag-color-picker-row" })
+        pickerRow.createSpan({ text: "Custom: " })
+        const picker = pickerRow.createEl("input", {
+            attr: { type: "color", value: rule.textColor || contrastingText(rule.color) },
+        })
+        picker.addEventListener("input", async () => {
+            rule.textColor = picker.value
+            textSwatch.style.color = rule.textColor
+            await this.plugin.saveSettings()
+        })
+
+        this.activePopover = popover
+
+        const onPointerDown = (e: PointerEvent) => {
+            if (!popover.contains(e.target as Node) && e.target !== textSwatch) {
+                this.closePopover()
+                document.removeEventListener("pointerdown", onPointerDown, true)
+            }
+        }
+        setTimeout(() => {
+            document.addEventListener("pointerdown", onPointerDown, true)
+        }, 0)
+
+        const onKeydown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                this.closePopover()
+                document.removeEventListener("keydown", onKeydown)
+            }
+        }
+        document.addEventListener("keydown", onKeydown)
+    }
+
+    private closePopover(): void {
+        if (this.activePopover) {
+            this.activePopover.remove()
+            this.activePopover = null
         }
     }
 }

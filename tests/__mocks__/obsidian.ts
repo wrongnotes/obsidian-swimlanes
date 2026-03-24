@@ -13,6 +13,7 @@ export const Platform = {
 export class Component {
     load() {}
     unload() {}
+    registerEvent() {}
 }
 
 export abstract class BasesView extends Component {

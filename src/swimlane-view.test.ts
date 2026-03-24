@@ -24,7 +24,12 @@ function makeView(groups: ReturnType<typeof makeGroup>[], configOverrides?: Reco
     basesToolbar.createDiv("bases-toolbar-item bases-toolbar-sort-menu")
     basesToolbar.createDiv("bases-toolbar-item bases-toolbar-new-item-menu")
     const container = basesView.createDiv()
-    const view = new SwimlaneView({} as any, container, {} as any)
+    const view = new SwimlaneView({} as any, container, {
+        settings: { tagColorRules: [] },
+        tagColorResolver: { resolve: () => null },
+        onSettingsChanged: () => () => {},
+        app: { workspace: { on: () => ({ unload: () => {} }) } },
+    } as any)
     view.data = { groupedData: groups, data: groups.flatMap(g => g.entries), properties: [] } as any
     view.app = {
         metadataCache: { getFileCache: () => null },

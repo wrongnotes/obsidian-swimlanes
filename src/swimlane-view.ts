@@ -20,8 +20,8 @@ import type {
     ViewOption,
 } from "obsidian"
 import { DragAndDropContext } from "./drag-drop"
-import { CardPropertyAlias, CardRenderOptions, renderCard } from "./swimlane-card"
-import { LexorankPosition, midRank } from "./lexorank"
+import { CardPropertyAlias, CardRenderOptions, renderCard, renderTagEditor } from "./swimlane-card"
+import { LexorankPosition, midRank, generateSpacedRanks } from "./lexorank"
 import { RmSwimlaneModal, AddSwimlaneViaDropModal, executeRmSwimlane } from "./migration-workflows"
 import { getFrontmatter } from "./utils"
 import type SwimlanePlugin from "./main"
@@ -101,6 +101,7 @@ export class SwimlaneView extends BasesView {
 
     private boardEl: HTMLElement
     private plugin: SwimlanePlugin
+    private unregisterSettingsListener: (() => void) | null = null
     private cardDnd: DragAndDropContext<CardDragState, CardDropContext, LexorankPosition>
     private swimlaneDnd: DragAndDropContext<SwimlaneDragState, null, GroupKey | null>
     private pendingHighlight: { groupKey: GroupKey; expiry: number } | null = null
@@ -133,13 +134,33 @@ export class SwimlaneView extends BasesView {
         boardScrollTop: number
         boardScrollLeft: number
     } | null = null
+    private editingTagsPath: string | null = null
+    private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
+    private settingsDirty = false
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
+        this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
+            if (this.boardEl.isConnected) {
+                this.rebuildBoard()
+            } else {
+                this.settingsDirty = true
+            }
+        })
+        // When the board is detached (e.g. settings modal open), settings changes
+        // are deferred. Rebuild once the layout settles and the board reconnects.
+        this.registerEvent(
+            plugin.app.workspace.on("layout-change", () => {
+                if (this.settingsDirty && this.boardEl.isConnected) {
+                    this.settingsDirty = false
+                    this.rebuildBoard()
+                }
+            }),
+        )
 
         // The outer container handles horizontal scroll (so the scrollbar sits
         // at the viewport edge), while the inner board handles vertical scroll.
@@ -616,7 +637,7 @@ export class SwimlaneView extends BasesView {
     private get imageWidth(): number {
         const val = this.config.get(CONFIG_KEYS.imageWidth)
         const num = typeof val === "string" ? parseInt(val, 10) : typeof val === "number" ? val : 64
-        return num > 0 ? num : 64
+        return Math.min(Math.max(num, 1), 200)
     }
 
     private get showAddCard(): boolean {
@@ -647,13 +668,20 @@ export class SwimlaneView extends BasesView {
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
-        const excluded = new Set([this.rankPropId, this.swimlanePropId, "file.name"])
+        const excluded = new Set([
+            this.rankPropId,
+            this.swimlanePropId,
+            "file.name",
+            "note.tags",
+            "file.tags",
+        ])
         return this.data.properties
             .filter(propId => !excluded.has(propId))
             .map(propId => ({ propId, alias: "" }))
     }
 
     onUnload(): void {
+        this.unregisterSettingsListener?.()
         this.carouselObserver?.disconnect()
         if (this.autoScrollRaf !== null) {
             cancelAnimationFrame(this.autoScrollRaf)
@@ -698,6 +726,8 @@ export class SwimlaneView extends BasesView {
     }
 
     onDataUpdated(): void {
+        // Flush pending settings changes (e.g. from settings modal while view was detached).
+        this.settingsDirty = false
         if (!this.baseFile) {
             const f = this.app.workspace.getActiveFile()
             if (f?.extension === "base") {
@@ -752,6 +782,11 @@ export class SwimlaneView extends BasesView {
         const savedBoardScrollLeft =
             this.savedScrollState?.boardScrollLeft ?? this.boardEl.scrollLeft
         this.savedScrollState = null
+
+        // Detach the card being tag-edited so empty() doesn't destroy it.
+        if (this.editingTagsPath && this.editingTagsCardEl) {
+            this.editingTagsCardEl.remove()
+        }
 
         this.boardEl.empty()
         // Clear stale column-drop references — the DOM elements were removed by empty().
@@ -820,6 +855,7 @@ export class SwimlaneView extends BasesView {
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
         board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
+        board.style.setProperty("--swimlane-image-width", `${this.imageWidth}px`)
         this.currentBoard = board
         this.columnDropTarget = null
 
@@ -895,6 +931,8 @@ export class SwimlaneView extends BasesView {
         redoBtn.addEventListener("click", () => this.performRedo())
         redoBtn.toggleClass("swimlane-toolbar-disabled", !this.undoManager.canRedo)
 
+        const showTags = this.data.properties.some(p => p === "note.tags" || p === "file.tags")
+
         const cardOptions: Omit<CardRenderOptions, "rank" | "getSwimlaneContext"> = {
             rankPropId: this.rankPropId,
             properties: this.cardPropertyAliases,
@@ -903,7 +941,69 @@ export class SwimlaneView extends BasesView {
             imageWidth: this.imageWidth,
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
+            openNoteBehavior: this.plugin.settings.openNoteBehavior,
             mobile,
+            resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
+            onEditTags: (cardEl: HTMLElement) => {
+                const path = cardEl.dataset.path
+                if (!path) {
+                    return
+                }
+                const file = this.app.vault.getFileByPath(path)
+                if (!file) {
+                    return
+                }
+
+                // Capture previous tags for undo
+                const cache = this.app.metadataCache.getFileCache(file)
+                const rawTags = cache?.frontmatter?.tags
+                const previousTags: string[] = Array.isArray(rawTags)
+                    ? rawTags.filter((t): t is string => typeof t === "string")
+                    : typeof rawTags === "string"
+                      ? [rawTags]
+                      : []
+
+                // Protect card from re-render
+                this.editingTagsPath = path
+                this.editingTagsCardEl = cardEl
+
+                renderTagEditor(
+                    cardEl,
+                    file,
+                    previousTags,
+                    this.app,
+                    () => {
+                        // onDone: create undo transaction and clear editing state
+                        const finalCache = this.app.metadataCache.getFileCache(file)
+                        const finalRaw = finalCache?.frontmatter?.tags
+                        const newTags: string[] = Array.isArray(finalRaw)
+                            ? finalRaw.filter((t): t is string => typeof t === "string")
+                            : typeof finalRaw === "string"
+                              ? [finalRaw]
+                              : []
+
+                        const changed =
+                            previousTags.length !== newTags.length ||
+                            previousTags.some((t, i) => t !== newTags[i])
+
+                        if (changed) {
+                            this.undoManager.beginTransaction("Edit tags")
+                            this.undoManager.pushOperation({
+                                type: "EditTags",
+                                file,
+                                previousTags,
+                                newTags,
+                            })
+                            this.undoManager.endTransaction()
+                        }
+
+                        this.editingTagsPath = null
+                        this.editingTagsCardEl = null
+                        this.rebuildBoard()
+                    },
+                    (tag: string) => this.plugin.tagColorResolver.resolve(tag),
+                )
+            },
         }
 
         for (const groupKey of orderedKeys) {
@@ -944,9 +1044,23 @@ export class SwimlaneView extends BasesView {
             for (const entry of group?.entries ?? []) {
                 const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
                 const currentGroupKey = groupKey
+                let entryTags: string[] | undefined
+                if (showTags) {
+                    const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter
+                        ?.tags
+                    entryTags = Array.isArray(tagsRaw)
+                        ? tagsRaw.filter((t): t is string => typeof t === "string")
+                        : typeof tagsRaw === "string"
+                          ? [tagsRaw]
+                          : undefined
+                    if (entryTags && entryTags.length === 0) {
+                        entryTags = undefined
+                    }
+                }
                 const card = renderCard(cardList, entry, this.app, {
                     ...cardOptions,
                     rank,
+                    tags: entryTags,
                     getSwimlaneContext: () => ({
                         columns: this.swimlaneOrder as string[],
                         currentSwimlane: currentGroupKey,
@@ -963,6 +1077,21 @@ export class SwimlaneView extends BasesView {
                     )
                 }
                 this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+            }
+
+            // Reattach editing card if it belongs in this column
+            if (this.editingTagsPath && this.editingTagsCardEl) {
+                const editingCard = cardList.querySelector(
+                    `[data-path="${CSS.escape(this.editingTagsPath)}"]`,
+                )
+                if (editingCard) {
+                    editingCard.replaceWith(this.editingTagsCardEl)
+                    // Restore focus to the tag input after reattach
+                    const tagInput = this.editingTagsCardEl.querySelector(
+                        ".swimlane-tag-input",
+                    ) as HTMLInputElement | null
+                    tagInput?.focus()
+                }
             }
 
             if (this.showAddCard) {
@@ -2201,8 +2330,9 @@ export class SwimlaneView extends BasesView {
         const insertIdx = Math.min(position.dropIndex, paths.length)
         paths.splice(insertIdx, 0, dragState.path)
 
-        const step = Math.floor(26 / (paths.length + 1))
-        const base = "a".charCodeAt(0)
+        // Generate evenly-spaced ranks for all cards using midRank.
+        // Distribute across the full a–z space by bisecting recursively.
+        const ranks = generateSpacedRanks(paths.length)
         const isCrossColumn = context.groupKey !== dragState.groupKey
 
         // Build all operations BEFORE processFrontMatter calls — the callbacks
@@ -2247,8 +2377,7 @@ export class SwimlaneView extends BasesView {
             if (!cardFile) {
                 continue
             }
-            const charCode = base + step * (i + 1)
-            const rank = String.fromCharCode(Math.min(charCode, "z".charCodeAt(0)))
+            const rank = ranks[i]!
             const fromRank = getFrontmatter<string>(this.app, cardFile, this.rankProp) ?? ""
 
             if (path === dragState.path && isCrossColumn) {

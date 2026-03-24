@@ -170,6 +170,22 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             })
             break
         }
+
+        case "EditTags": {
+            const file = app.vault.getFileByPath(op.file.path)
+            if (!file) {
+                new Notice("Cannot undo: file no longer exists.")
+                return
+            }
+            await app.fileManager.processFrontMatter(file, fm => {
+                if (op.previousTags.length === 0) {
+                    delete fm.tags
+                } else {
+                    fm.tags = [...op.previousTags]
+                }
+            })
+            break
+        }
     }
 }
 
@@ -310,6 +326,22 @@ async function redoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             }
             await app.fileManager.processFrontMatter(file, fm => {
                 applyMutations(fm, op.mutations)
+            })
+            break
+        }
+
+        case "EditTags": {
+            const file = app.vault.getFileByPath(op.file.path)
+            if (!file) {
+                new Notice("Cannot redo: file no longer exists.")
+                return
+            }
+            await app.fileManager.processFrontMatter(file, fm => {
+                if (op.newTags.length === 0) {
+                    delete fm.tags
+                } else {
+                    fm.tags = [...op.newTags]
+                }
             })
             break
         }
