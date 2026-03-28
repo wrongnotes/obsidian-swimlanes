@@ -598,3 +598,101 @@ describe("undo/redo", () => {
         container.parentElement?.remove()
     })
 })
+
+describe("batch operations", () => {
+    it("selectionManager is initialized and starts inactive", () => {
+        const { view } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        expect(view.selectionManager).toBeDefined()
+        expect(view.selectionManager.active).toBe(false)
+        expect(view.selectionManager.selected.size).toBe(0)
+    })
+
+    it("toolbar Select button enters selection mode", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
+        const selBtn = basesToolbar?.querySelector<HTMLElement>(".swimlane-select-btn")
+        expect(selBtn).not.toBeNull()
+        expect(view.selectionManager.active).toBe(false)
+        selBtn!.click()
+        expect(view.selectionManager.active).toBe(true)
+    })
+
+    it("toolbar Select button exits selection mode when already active", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
+        const selBtn = basesToolbar?.querySelector<HTMLElement>(".swimlane-select-btn")
+        view.selectionManager.enter()
+        selBtn!.click()
+        expect(view.selectionManager.active).toBe(false)
+    })
+
+    it("cards get click-to-select handlers when selection mode is active", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("Note A"), makeEntry("Note B")]),
+        ])
+        view.selectionManager.enter()
+        view.onDataUpdated()
+        const cards = container.querySelectorAll(".swimlane-card")
+        expect(cards).toHaveLength(2)
+        // Cards should have selected class logic — clicking should toggle selection
+        cards[0].dispatchEvent(new MouseEvent("click", { bubbles: true }))
+        expect(view.selectionManager.selected.has("Note A.md")).toBe(true)
+    })
+
+    it("selected cards get swimlane-card--selected class after re-render", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("Note A"), makeEntry("Note B")]),
+        ])
+        view.selectionManager.enter()
+        view.selectionManager.toggle("Note A.md")
+        view.onDataUpdated()
+        const cards = Array.from(container.querySelectorAll(".swimlane-card"))
+        const selectedCard = cards.find(c =>
+            c.querySelector(".swimlane-card-title")?.textContent === "Note A",
+        )
+        expect(selectedCard?.classList.contains("swimlane-card--selected")).toBe(true)
+    })
+
+    it("action bar renders when selection mode is active", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("A"), makeEntry("B")]),
+        ])
+        view.selectionManager.enter()
+        view.onDataUpdated()
+        expect(container.querySelector(".swimlane-action-bar")).not.toBeNull()
+    })
+
+    it("action bar is absent when selection mode is inactive", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        view.onDataUpdated()
+        expect(container.querySelector(".swimlane-action-bar")).toBeNull()
+    })
+
+    it("Escape key exits selection mode via board keydown handler", () => {
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
+        document.body.appendChild(container.parentElement!)
+        view.onDataUpdated()
+        view.selectionManager.enter()
+        expect(view.selectionManager.active).toBe(true)
+        const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+        container.dispatchEvent(event)
+        expect(view.selectionManager.active).toBe(false)
+        container.parentElement?.remove()
+    })
+
+    it("exiting selection mode purges SelectionChange ops from undo stack", () => {
+        const { view } = makeView([makeGroup("Backlog", [makeEntry("A"), makeEntry("B")])])
+        view.onDataUpdated()
+        view.selectionManager.enter()
+        view.selectionManager.toggle("A.md")
+        view.selectionManager.toggle("B.md")
+        // Undo stack should have selection entries
+        const undoManager = (view as any).undoManager
+        expect(undoManager.canUndo).toBe(true)
+        view.selectionManager.exit()
+        // All selection-only transactions should be purged
+        expect(undoManager.canUndo).toBe(false)
+    })
+})
