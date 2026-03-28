@@ -47,6 +47,8 @@ import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 import { SelectionManager } from "./selection-manager"
 import { renderActionBar } from "./selection-action-bar"
+import { batchMove } from "./batch-actions"
+import type { BatchMoveCard } from "./batch-actions"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -2606,8 +2608,86 @@ export class SwimlaneView extends BasesView {
         modal.open()
     }
 
-    private showBatchMoveMenu(_e: MouseEvent): void {
-        // TODO: Task 10
+    private showBatchMoveMenu(e: MouseEvent): void {
+        const menu = new Menu()
+        const columns = this.swimlaneOrder as string[]
+
+        for (const col of columns) {
+            menu.addItem(item => {
+                item.setTitle(col).onClick(() => {
+                    // Save scroll state before the operation
+                    this.savedScrollState = {
+                        column: this.getVisibleColumnKey(),
+                        cardListScrollTops: this.getCardListScrollTops(),
+                        boardScrollTop: this.currentBoard?.scrollTop ?? 0,
+                        boardScrollLeft: this.boardEl.scrollLeft,
+                    }
+
+                    // Collect selected cards with their current swimlane and rank
+                    const cards: BatchMoveCard[] = []
+                    for (const group of this.data.groupedData) {
+                        const groupKey = group.hasKey() ? (group.key?.toString() ?? "") : ""
+                        for (const entry of group.entries) {
+                            if (this.selectionManager.selected.has(entry.file.path)) {
+                                cards.push({
+                                    file: entry.file,
+                                    currentSwimlane: groupKey,
+                                    currentRank: getFrontmatter<string>(this.app, entry.file, this.rankProp) ?? "",
+                                })
+                            }
+                        }
+                    }
+
+                    if (cards.length === 0) return
+
+                    // Find the last rank in the target column
+                    const targetGroup = this.data.groupedData.find(
+                        g => g.hasKey() && (g.key?.toString() ?? "") === col,
+                    )
+                    let lastRankInTarget: string | null = null
+                    if (targetGroup) {
+                        for (const entry of targetGroup.entries) {
+                            const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
+                            if (r && (lastRankInTarget === null || r > lastRankInTarget)) {
+                                lastRankInTarget = r
+                            }
+                        }
+                    }
+
+                    batchMove({
+                        app: this.app,
+                        cards,
+                        targetSwimlane: col,
+                        swimlaneProp: this.swimlaneProp,
+                        rankProp: this.rankProp,
+                        lastRankInTarget,
+                        undoManager: this.undoManager,
+                        getAutomationMutations: (fromSwimlane, toSwimlane, file) => {
+                            const allMutations = [
+                                ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                                ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
+                            ]
+                            const scheduled = this.scheduleDelayedMutations(
+                                allMutations,
+                                file.path,
+                                toSwimlane,
+                                fromSwimlane,
+                            )
+                            const mutations = scheduled.instant
+                            const cache = this.app.metadataCache.getFileCache(file)
+                            const fm = cache?.frontmatter ?? {}
+                            const previousValues: Record<string, unknown> = {}
+                            for (const m of mutations) {
+                                previousValues[m.property] = fm[m.property]
+                            }
+                            return { mutations, previousValues }
+                        },
+                    })
+                })
+            })
+        }
+
+        menu.showAtMouseEvent(e)
     }
 
     private showBatchTagPopover(_e: MouseEvent): void {
