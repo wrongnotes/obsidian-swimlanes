@@ -46,6 +46,7 @@ import type {
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 import { SelectionManager } from "./selection-manager"
+import { renderActionBar } from "./selection-action-bar"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -1165,6 +1166,25 @@ export class SwimlaneView extends BasesView {
                 }
             }
             this.selectionManager.pruneDeleted(allPaths)
+
+            const actionBar = renderActionBar({
+                selectedCount: this.selectionManager.selected.size,
+                onSelectAll: () => {
+                    const allFilePaths: string[] = []
+                    for (const group of this.data.groupedData) {
+                        for (const entry of group.entries) {
+                            allFilePaths.push(entry.file.path)
+                        }
+                    }
+                    this.selectionManager.selectAll(allFilePaths)
+                },
+                onDeselectAll: () => this.selectionManager.deselectAll(),
+                onMove: (e) => this.showBatchMoveMenu(e),
+                onTag: (e) => this.showBatchTagPopover(e),
+                onDelete: () => this.confirmBatchDelete(),
+                onClose: () => this.selectionManager.exit(),
+            })
+            board.appendChild(actionBar)
         }
 
         if (this.showAddColumn) {
@@ -1552,6 +1572,25 @@ export class SwimlaneView extends BasesView {
                 item.setTitle("Remove")
                     .setIcon("trash-2")
                     .onClick(() => this.removeColumn(board, groupKey, entryCount))
+            })
+        }
+
+        const columnEntries = this.data.groupedData.find(g => g.key === groupKey)?.entries ?? []
+        const columnPaths = columnEntries.map(e => e.file.path)
+
+        menu.addSeparator()
+
+        menu.addItem(item => {
+            item.setTitle("Select all in column")
+                .setIcon("check-square")
+                .onClick(() => this.selectionManager.selectColumn(columnPaths))
+        })
+
+        if (this.selectionManager.active) {
+            menu.addItem(item => {
+                item.setTitle("Deselect all in column")
+                    .setIcon("square")
+                    .onClick(() => this.selectionManager.deselectColumn(columnPaths))
             })
         }
 
@@ -2565,6 +2604,18 @@ export class SwimlaneView extends BasesView {
         }
 
         modal.open()
+    }
+
+    private showBatchMoveMenu(_e: MouseEvent): void {
+        // TODO: Task 10
+    }
+
+    private showBatchTagPopover(_e: MouseEvent): void {
+        // TODO: Task 12
+    }
+
+    private confirmBatchDelete(): void {
+        // TODO: Task 11
     }
 
     private handleSwimlaneDrop(dragState: SwimlaneDragState, position: GroupKey | null): void {
