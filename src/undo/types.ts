@@ -80,6 +80,12 @@ export type UndoOperation =
           previousTags: string[]
           newTags: string[]
       }
+    | {
+          type: "SelectionChange"
+          previousSelection: Set<string>
+          newSelection: Set<string>
+          applySelection: (selection: Set<string>) => void
+      }
 
 export interface UndoTransaction {
     label: string

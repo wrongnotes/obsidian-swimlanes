@@ -77,6 +77,11 @@ export class UndoManager {
         return this.activeTransaction !== null
     }
 
+    purge(predicate: (tx: UndoTransaction) => boolean): void {
+        this.undoStack = this.undoStack.filter(tx => !predicate(tx))
+        this.redoStack = this.redoStack.filter(tx => !predicate(tx))
+    }
+
     clear(): void {
         this.undoStack = []
         this.redoStack = []

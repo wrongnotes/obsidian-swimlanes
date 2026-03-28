@@ -239,6 +239,50 @@ describe("UndoManager", () => {
         })
     })
 
+    describe("purge", () => {
+        it("removes matching transactions from undo stack", () => {
+            const mgr = new UndoManager()
+
+            mgr.beginTransaction("Select")
+            mgr.pushOperation({ type: "SelectionChange", previousSelection: new Set(), newSelection: new Set(["a.md"]), applySelection: () => {} })
+            mgr.endTransaction()
+
+            mgr.beginTransaction("Move")
+            mgr.pushOperation({ type: "MoveCard", file: {} as any, fromSwimlane: "a", toSwimlane: "b", fromRank: "m", toRank: "n", resolvedAutomationMutations: [], automationPreviousValues: {} })
+            mgr.endTransaction()
+
+            mgr.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))
+            expect(mgr.canUndo).toBe(true)
+            expect(mgr.undoLabel).toBe("Move")
+        })
+
+        it("removes matching transactions from redo stack", () => {
+            const mgr = new UndoManager()
+
+            mgr.beginTransaction("Select")
+            mgr.pushOperation({ type: "SelectionChange", previousSelection: new Set(), newSelection: new Set(["a.md"]), applySelection: () => {} })
+            mgr.endTransaction()
+
+            mgr.undo()
+            expect(mgr.canRedo).toBe(true)
+
+            mgr.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))
+            expect(mgr.canRedo).toBe(false)
+        })
+
+        it("leaves non-matching transactions intact", () => {
+            const mgr = new UndoManager()
+
+            mgr.beginTransaction("Move")
+            mgr.pushOperation({ type: "MoveCard", file: {} as any, fromSwimlane: "a", toSwimlane: "b", fromRank: "m", toRank: "n", resolvedAutomationMutations: [], automationPreviousValues: {} })
+            mgr.endTransaction()
+
+            mgr.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))
+            expect(mgr.canUndo).toBe(true)
+            expect(mgr.undoLabel).toBe("Move")
+        })
+    })
+
     describe("clear()", () => {
         it("empties both stacks and resets active transaction", () => {
             mgr.beginTransaction("Op")
