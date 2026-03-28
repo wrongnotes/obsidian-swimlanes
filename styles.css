@@ -1558,3 +1558,32 @@
     font-size: var(--font-ui-small);
     color: var(--text-faint);
 }
+
+/* Mobile: action bar above carousel indicator */
+.swimlane-mobile .swimlane-action-bar {
+    bottom: 40px; /* above the 30px carousel dot indicator */
+}
+
+/* Mobile: tag popover as bottom sheet */
+.swimlane-mobile .swimlane-batch-tag-popover {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    transform: none;
+    border-radius: 12px 12px 0 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 16px;
+    z-index: 20;
+}
+
+.swimlane-batch-tag-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: var(--font-semibold);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}

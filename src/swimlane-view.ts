@@ -2842,6 +2842,16 @@ export class SwimlaneView extends BasesView {
             }
         }
 
+        // Mobile: prepend a bottom-sheet header with a close button
+        if (this.isMobileLayout) {
+            const header = popover.createDiv({ cls: "swimlane-batch-tag-header" })
+            header.createSpan({ text: "Edit tags" })
+            const closeBtn = header.createEl("button", { cls: "swimlane-action-bar-close" })
+            setIcon(closeBtn, "x")
+            closeBtn.addEventListener("click", dismiss)
+            popover.prepend(header)
+        }
+
         // Dismiss on outside click
         let listenAfter = performance.now()
         requestAnimationFrame(() => { listenAfter = 0 })
