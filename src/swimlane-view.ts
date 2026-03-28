@@ -3,10 +3,12 @@ import {
     BasesEntryGroup,
     BasesView,
     Menu,
+    Modal,
     Notice,
     parseYaml,
     Platform,
     QueryController,
+    Setting,
     setIcon,
     stringifyYaml,
 } from "obsidian"
@@ -47,7 +49,7 @@ import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 import { SelectionManager } from "./selection-manager"
 import { renderActionBar } from "./selection-action-bar"
-import { batchMove } from "./batch-actions"
+import { batchMove, batchDelete } from "./batch-actions"
 import type { BatchMoveCard } from "./batch-actions"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
@@ -2695,7 +2697,22 @@ export class SwimlaneView extends BasesView {
     }
 
     private confirmBatchDelete(): void {
-        // TODO: Task 11
+        const selected = this.selectionManager.selected
+        if (selected.size === 0) return
+
+        const files: TFile[] = []
+        for (const path of selected) {
+            const file = this.app.vault.getFileByPath(path)
+            if (file) files.push(file)
+        }
+        if (files.length === 0) return
+
+        const n = files.length
+        const modal = new ConfirmBatchDeleteModal(this.app, n, () => {
+            batchDelete({ app: this.app, files })
+            this.selectionManager.exit()
+        })
+        modal.open()
     }
 
     private handleSwimlaneDrop(dragState: SwimlaneDragState, position: GroupKey | null): void {
@@ -2709,5 +2726,42 @@ export class SwimlaneView extends BasesView {
         })
         this.config.set(CONFIG_KEYS.swimlaneOrder, newOrder)
         this.undoManager.endTransaction()
+    }
+}
+
+class ConfirmBatchDeleteModal extends Modal {
+    private count: number
+    private onConfirm: () => void
+
+    constructor(app: import("obsidian").App, count: number, onConfirm: () => void) {
+        super(app)
+        this.count = count
+        this.onConfirm = onConfirm
+    }
+
+    onOpen(): void {
+        const { contentEl } = this
+        this.setTitle("Delete cards")
+
+        contentEl.createEl("p", {
+            text: `Delete ${this.count} card${this.count === 1 ? "" : "s"}? This will trash ${this.count} note${this.count === 1 ? "" : "s"}. This cannot be undone.`,
+        })
+
+        new Setting(contentEl)
+            .addButton(btn => {
+                btn.setButtonText("Cancel").onClick(() => this.close())
+            })
+            .addButton(btn => {
+                btn.setButtonText("Delete")
+                    .setWarning()
+                    .onClick(() => {
+                        this.onConfirm()
+                        this.close()
+                    })
+            })
+    }
+
+    onClose(): void {
+        this.contentEl.empty()
     }
 }
