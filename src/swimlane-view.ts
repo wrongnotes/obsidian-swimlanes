@@ -49,8 +49,9 @@ import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
 import { SelectionManager } from "./selection-manager"
 import { renderActionBar } from "./selection-action-bar"
-import { batchMove, batchDelete } from "./batch-actions"
+import { batchMove, batchDelete, batchAddTag, batchRemoveTag } from "./batch-actions"
 import type { BatchMoveCard } from "./batch-actions"
+import { TagSuggest } from "./inputs/tag-suggest"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -2693,7 +2694,168 @@ export class SwimlaneView extends BasesView {
     }
 
     private showBatchTagPopover(_e: MouseEvent): void {
-        // TODO: Task 12
+        // Dismiss any existing popover
+        const existing = this.boardEl.querySelector(".swimlane-batch-tag-popover")
+        if (existing) {
+            existing.remove()
+            return
+        }
+
+        const selected = this.selectionManager.selected
+        if (selected.size === 0) return
+
+        // Snapshot previous tags per file for undo
+        const previousTagsMap = new Map<string, string[]>()
+        const selectedFiles: TFile[] = []
+        for (const path of selected) {
+            const file = this.app.vault.getFileByPath(path)
+            if (!file) continue
+            selectedFiles.push(file)
+            const cache = this.app.metadataCache.getFileCache(file)
+            const rawTags = cache?.frontmatter?.tags
+            const tags: string[] = Array.isArray(rawTags)
+                ? rawTags.filter((t): t is string => typeof t === "string")
+                : typeof rawTags === "string"
+                  ? [rawTags]
+                  : []
+            previousTagsMap.set(path, tags)
+        }
+
+        // Build union of all tags across selected cards
+        const allTags = new Set<string>()
+        for (const tags of previousTagsMap.values()) {
+            for (const t of tags) allTags.add(t)
+        }
+
+        const popover = document.createElement("div")
+        popover.className = "swimlane-batch-tag-popover"
+
+        // ── Add tag section ──
+        const addSection = popover.createDiv({ cls: "swimlane-batch-tag-section" })
+        addSection.createDiv({ cls: "swimlane-batch-tag-label", text: "Add tag" })
+
+        const input = document.createElement("input")
+        input.type = "text"
+        input.placeholder = "Add tag\u2026"
+        input.className = "swimlane-batch-tag-input"
+        addSection.appendChild(input)
+
+        // ── Remove tags section ──
+        const removeSection = popover.createDiv({ cls: "swimlane-batch-tag-section" })
+        removeSection.createDiv({ cls: "swimlane-batch-tag-label", text: "Remove tags" })
+        const chipsContainer = removeSection.createDiv({ cls: "swimlane-batch-tag-chips" })
+
+        const renderChips = () => {
+            chipsContainer.empty()
+            if (allTags.size === 0) {
+                chipsContainer.createDiv({ cls: "swimlane-batch-tag-empty", text: "No tags" })
+                return
+            }
+            for (const tag of allTags) {
+                const chip = chipsContainer.createEl("span", {
+                    cls: "swimlane-card-tag swimlane-card-tag--editable",
+                })
+                chip.createEl("span", {
+                    cls: "swimlane-card-tag-text",
+                    text: tag,
+                })
+                const resolved = this.plugin.tagColorResolver.resolve(tag)
+                if (resolved) {
+                    chip.style.backgroundColor = resolved.bg
+                    chip.style.color = resolved.fg
+                }
+                const removeBtn = chip.createEl("span", { cls: "swimlane-card-tag-remove" })
+                setIcon(removeBtn, "x")
+                removeBtn.addEventListener("click", (e) => {
+                    e.stopPropagation()
+                    batchRemoveTag({ app: this.app, files: selectedFiles, tag })
+                    allTags.delete(tag)
+                    renderChips()
+                })
+            }
+        }
+        renderChips()
+
+        const addTag = (raw: string) => {
+            const tag = raw.trim().replace(/^#/, "")
+            if (!tag) return
+            batchAddTag({ app: this.app, files: selectedFiles, tag })
+            allTags.add(tag)
+            renderChips()
+        }
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault()
+                addTag(input.value)
+                input.value = ""
+            } else if (e.key === "Escape") {
+                e.preventDefault()
+                dismiss()
+            }
+        })
+
+        // Attach TagSuggest autocomplete
+        new TagSuggest(
+            this.app,
+            input,
+            (tag) => {
+                addTag(tag)
+                input.value = ""
+            },
+            () => [...allTags],
+        )
+
+        const dismiss = () => {
+            popover.remove()
+            document.removeEventListener("pointerdown", onOutsidePointerDown, true)
+
+            // Build one undo transaction with EditTags operations for each affected card
+            const ops: { file: TFile; previousTags: string[]; newTags: string[] }[] = []
+            for (const file of selectedFiles) {
+                const prev = previousTagsMap.get(file.path) ?? []
+                const cache = this.app.metadataCache.getFileCache(file)
+                const rawTags = cache?.frontmatter?.tags
+                const newTags: string[] = Array.isArray(rawTags)
+                    ? rawTags.filter((t): t is string => typeof t === "string")
+                    : typeof rawTags === "string"
+                      ? [rawTags]
+                      : []
+                const changed =
+                    prev.length !== newTags.length ||
+                    prev.some((t, i) => t !== newTags[i])
+                if (changed) {
+                    ops.push({ file, previousTags: prev, newTags })
+                }
+            }
+            if (ops.length > 0) {
+                this.undoManager.beginTransaction(`Edit tags on ${ops.length} card${ops.length === 1 ? "" : "s"}`)
+                for (const op of ops) {
+                    this.undoManager.pushOperation({
+                        type: "EditTags",
+                        file: op.file,
+                        previousTags: op.previousTags,
+                        newTags: op.newTags,
+                    })
+                }
+                this.undoManager.endTransaction()
+            }
+        }
+
+        // Dismiss on outside click
+        let listenAfter = performance.now()
+        requestAnimationFrame(() => { listenAfter = 0 })
+        const onOutsidePointerDown = (e: PointerEvent) => {
+            if (listenAfter > 0) return
+            const target = e.target as HTMLElement
+            if (popover.contains(target)) return
+            if (target.closest(".suggestion-container")) return
+            dismiss()
+        }
+        document.addEventListener("pointerdown", onOutsidePointerDown, true)
+
+        this.boardEl.appendChild(popover)
+        input.focus()
     }
 
     private confirmBatchDelete(): void {
