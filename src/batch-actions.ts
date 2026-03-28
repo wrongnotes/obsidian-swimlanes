@@ -69,3 +69,37 @@ export async function batchDelete(opts: BatchDeleteOptions): Promise<void> {
         await opts.app.fileManager.trashFile(file)
     }
 }
+
+export interface BatchTagOptions {
+    app: App
+    files: TFile[]
+    tag: string
+}
+
+export function batchAddTag(opts: BatchTagOptions): void {
+    const { app, files, tag } = opts
+    for (const file of files) {
+        app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+            const tags = Array.isArray(fm.tags) ? fm.tags as string[] : []
+            if (!tags.includes(tag)) {
+                tags.push(tag)
+                fm.tags = tags
+            }
+        })
+    }
+}
+
+export function batchRemoveTag(opts: BatchTagOptions): void {
+    const { app, files, tag } = opts
+    for (const file of files) {
+        app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+            if (!Array.isArray(fm.tags)) return
+            const tags = fm.tags as string[]
+            const idx = tags.indexOf(tag)
+            if (idx !== -1) {
+                tags.splice(idx, 1)
+                fm.tags = tags
+            }
+        })
+    }
+}
