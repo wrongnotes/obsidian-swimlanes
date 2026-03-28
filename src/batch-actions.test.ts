@@ -57,3 +57,17 @@ describe("batchMove", () => {
         expect(undoManager.canUndo).toBe(false)
     })
 })
+
+import { batchDelete } from "./batch-actions"
+
+describe("batchDelete", () => {
+    it("trashes all provided files", async () => {
+        const trashFile = jest.fn()
+        const app = { fileManager: { trashFile } } as any
+        const files = [{ path: "a.md" } as any, { path: "b.md" } as any]
+        await batchDelete({ app, files })
+        expect(trashFile).toHaveBeenCalledTimes(2)
+        expect(trashFile).toHaveBeenCalledWith(files[0])
+        expect(trashFile).toHaveBeenCalledWith(files[1])
+    })
+})

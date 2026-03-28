@@ -58,3 +58,14 @@ export async function batchMove(opts: BatchMoveOptions): Promise<void> {
 
     undoManager.endTransaction()
 }
+
+export interface BatchDeleteOptions {
+    app: App
+    files: TFile[]
+}
+
+export async function batchDelete(opts: BatchDeleteOptions): Promise<void> {
+    for (const file of opts.files) {
+        await opts.app.fileManager.trashFile(file)
+    }
+}
