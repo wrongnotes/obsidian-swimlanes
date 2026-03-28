@@ -1432,3 +1432,78 @@
     opacity: 0.3;
     pointer-events: none;
 }
+
+/* ── Selection Action Bar ── */
+.swimlane-action-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-s);
+    z-index: 10;
+    white-space: nowrap;
+}
+
+.swimlane-action-bar-count {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    padding: 0 4px;
+}
+
+.swimlane-action-bar-group {
+    display: flex;
+    gap: 4px;
+}
+
+.swimlane-action-bar-btn {
+    padding: 4px 10px;
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-small);
+    background: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+.swimlane-action-bar-btn:hover:not(:disabled) {
+    background: var(--interactive-hover);
+}
+
+.swimlane-action-bar-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.swimlane-action-bar-btn--danger {
+    color: var(--text-error);
+}
+
+.swimlane-action-bar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: var(--radius-s);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.swimlane-action-bar-close:hover {
+    background: var(--interactive-hover);
+    color: var(--text-normal);
+}
+
+/* Selected card highlight */
+.swimlane-card--selected {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
