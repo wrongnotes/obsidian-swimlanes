@@ -45,6 +45,7 @@ import type {
 } from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
+import { SelectionManager } from "./selection-manager"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -137,6 +138,7 @@ export class SwimlaneView extends BasesView {
     private editingTagsPath: string | null = null
     private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
+    selectionManager: SelectionManager
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
     private settingsDirty = false
 
@@ -144,6 +146,7 @@ export class SwimlaneView extends BasesView {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
+        this.selectionManager = new SelectionManager(this.undoManager, () => this.onSelectionChanged())
         this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
             if (this.boardEl.isConnected) {
                 this.rebuildBoard()
@@ -262,6 +265,13 @@ export class SwimlaneView extends BasesView {
             }
             const tag = (document.activeElement as HTMLElement)?.tagName
             if (tag === "INPUT" || tag === "TEXTAREA") {
+                return
+            }
+            if (e.key === "Escape" && this.selectionManager.active) {
+                if (!this.boardEl.querySelector(".swimlane-batch-tag-popover")) {
+                    this.selectionManager.exit()
+                    e.preventDefault()
+                }
                 return
             }
             const mod = Platform.isMacOS ? e.metaKey : e.ctrlKey
@@ -539,6 +549,10 @@ export class SwimlaneView extends BasesView {
      * up from containerEl to find `.bases-toolbar` and insert before the
      * "New" button. Replaces any previously injected button on rebuild.
      */
+    private onSelectionChanged(): void {
+        this.rebuildBoard()
+    }
+
     private injectBasesToolbarButton(): void {
         const basesToolbar = this.boardEl.parentElement?.querySelector(".bases-toolbar")
         if (!basesToolbar) {
@@ -577,6 +591,34 @@ export class SwimlaneView extends BasesView {
             basesToolbar.insertBefore(btn, sortBtn)
         } else {
             basesToolbar.appendChild(btn)
+        }
+
+        // Select / Cancel button for batch selection mode.
+        basesToolbar.querySelector(".swimlane-select-btn")?.remove()
+        const selBtn = document.createElement("div")
+        selBtn.className = "bases-toolbar-item swimlane-select-btn"
+        const selActive = this.selectionManager.active
+        const selInner = selBtn.createDiv({
+            cls: `text-icon-button${selActive ? " is-active" : ""}`,
+            attr: { tabindex: "0" },
+        })
+        const selIconSpan = selInner.createSpan({ cls: "text-button-icon" })
+        setIcon(selIconSpan, "check-square")
+        selInner.createSpan({
+            cls: "text-button-label",
+            text: selActive ? "Cancel" : "Select",
+        })
+        selBtn.addEventListener("click", () => {
+            if (this.selectionManager.active) {
+                this.selectionManager.exit()
+            } else {
+                this.selectionManager.enter()
+            }
+        })
+        if (sortBtn) {
+            basesToolbar.insertBefore(selBtn, sortBtn)
+        } else {
+            basesToolbar.appendChild(selBtn)
         }
 
         // Clean up any previously injected undo/redo buttons (from old versions).
@@ -861,15 +903,18 @@ export class SwimlaneView extends BasesView {
 
         // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
         // so touch scrolling on the outer container works normally.
-        this.cardDnd.registerContainer(board)
-        this.cardDnd.initDropIndicator(board)
-        this.cardDnd.clearDropAreas()
+        // Skip DnD registration entirely in selection mode.
+        if (!this.selectionManager.active) {
+            this.cardDnd.registerContainer(board)
+            this.cardDnd.initDropIndicator(board)
+            this.cardDnd.clearDropAreas()
 
-        if (!mobile) {
-            this.swimlaneDnd.registerContainer(board)
-            this.swimlaneDnd.initDropIndicator(board)
-            this.swimlaneDnd.clearDropAreas()
-            this.swimlaneDnd.registerDropArea(board, null)
+            if (!mobile) {
+                this.swimlaneDnd.registerContainer(board)
+                this.swimlaneDnd.initDropIndicator(board)
+                this.swimlaneDnd.clearDropAreas()
+                this.swimlaneDnd.registerDropArea(board, null)
+            }
         }
 
         // Build a map of groupKey → group for quick lookup.
@@ -1036,8 +1081,10 @@ export class SwimlaneView extends BasesView {
             })
 
             const cardList = col.createDiv({ cls: "swimlane-card-list" })
-            this.cardDnd.registerDropArea(cardList, { groupKey })
-            if (!mobile) {
+            if (!this.selectionManager.active) {
+                this.cardDnd.registerDropArea(cardList, { groupKey })
+            }
+            if (!mobile && !this.selectionManager.active) {
                 this.swimlaneDnd.registerDraggable(col, { groupKey })
             }
 
@@ -1076,7 +1123,17 @@ export class SwimlaneView extends BasesView {
                         { once: true },
                     )
                 }
-                this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+                if (this.selectionManager.active) {
+                    card.addEventListener("click", (e) => {
+                        e.stopPropagation()
+                        this.selectionManager.toggle(entry.file.path)
+                    })
+                    if (this.selectionManager.selected.has(entry.file.path)) {
+                        card.classList.add("swimlane-card--selected")
+                    }
+                } else {
+                    this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+                }
             }
 
             // Reattach editing card if it belongs in this column
@@ -1098,6 +1155,16 @@ export class SwimlaneView extends BasesView {
                 // On mobile, render inside the card list so it scrolls with cards.
                 this.renderAddCardButton(mobile ? cardList : col, groupKey)
             }
+        }
+
+        if (this.selectionManager.active) {
+            const allPaths = new Set<string>()
+            for (const group of this.data.groupedData) {
+                for (const entry of group.entries) {
+                    allPaths.add(entry.file.path)
+                }
+            }
+            this.selectionManager.pruneDeleted(allPaths)
         }
 
         if (this.showAddColumn) {
