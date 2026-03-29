@@ -3,10 +3,12 @@ import {
     BasesEntryGroup,
     BasesView,
     Menu,
+    Modal,
     Notice,
     parseYaml,
     Platform,
     QueryController,
+    Setting,
     setIcon,
     stringifyYaml,
 } from "obsidian"
@@ -45,6 +47,11 @@ import type {
 } from "./automations"
 import { UndoManager, applyUndo, applyRedo } from "./undo"
 import type { UndoOperation, UndoRedoContext } from "./undo"
+import { SelectionManager } from "./selection-manager"
+import { renderActionBar } from "./selection-action-bar"
+import { batchMove, batchDelete, batchAddTag, batchRemoveTag } from "./batch-actions"
+import type { BatchMoveCard } from "./batch-actions"
+import { TagSuggest } from "./inputs/tag-suggest"
 
 /** Nominal type for swimlane column keys (the value of the swimlane property). */
 declare const _groupKey: unique symbol
@@ -137,6 +144,7 @@ export class SwimlaneView extends BasesView {
     private editingTagsPath: string | null = null
     private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
+    private selectionManager: SelectionManager
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
     private settingsDirty = false
 
@@ -144,6 +152,9 @@ export class SwimlaneView extends BasesView {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
+        this.selectionManager = new SelectionManager(this.undoManager, () =>
+            this.onSelectionChanged(),
+        )
         this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
             if (this.boardEl.isConnected) {
                 this.rebuildBoard()
@@ -262,6 +273,13 @@ export class SwimlaneView extends BasesView {
             }
             const tag = (document.activeElement as HTMLElement)?.tagName
             if (tag === "INPUT" || tag === "TEXTAREA") {
+                return
+            }
+            if (e.key === "Escape" && this.selectionManager.active) {
+                if (!this.boardEl.querySelector(".swimlane-batch-tag-popover")) {
+                    this.selectionManager.exit()
+                    e.preventDefault()
+                }
                 return
             }
             const mod = Platform.isMacOS ? e.metaKey : e.ctrlKey
@@ -539,6 +557,10 @@ export class SwimlaneView extends BasesView {
      * up from containerEl to find `.bases-toolbar` and insert before the
      * "New" button. Replaces any previously injected button on rebuild.
      */
+    private onSelectionChanged(): void {
+        this.rebuildBoard()
+    }
+
     private injectBasesToolbarButton(): void {
         const basesToolbar = this.boardEl.parentElement?.querySelector(".bases-toolbar")
         if (!basesToolbar) {
@@ -578,6 +600,30 @@ export class SwimlaneView extends BasesView {
         } else {
             basesToolbar.appendChild(btn)
         }
+
+        // Select / Cancel button for batch selection mode.
+        basesToolbar.querySelector(".swimlane-select-btn")?.remove()
+        const selBtn = document.createElement("div")
+        selBtn.className = "bases-toolbar-item swimlane-select-btn"
+        const selActive = this.selectionManager.active
+        const selInner = selBtn.createDiv({
+            cls: `text-icon-button${selActive ? " is-active" : ""}`,
+            attr: { tabindex: "0" },
+        })
+        const selIconSpan = selInner.createSpan({ cls: "text-button-icon" })
+        setIcon(selIconSpan, "check-square")
+        selInner.createSpan({
+            cls: "text-button-label",
+            text: selActive ? "Cancel" : "Select",
+        })
+        selBtn.addEventListener("click", () => {
+            if (this.selectionManager.active) {
+                this.selectionManager.exit()
+            } else {
+                this.selectionManager.enter()
+            }
+        })
+        basesToolbar.appendChild(selBtn)
 
         // Clean up any previously injected undo/redo buttons (from old versions).
         basesToolbar.querySelector(".swimlane-undo-btn")?.remove()
@@ -855,21 +901,25 @@ export class SwimlaneView extends BasesView {
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
         board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
+        board.toggleClass("swimlane-selecting", this.selectionManager.active)
         board.style.setProperty("--swimlane-image-width", `${this.imageWidth}px`)
         this.currentBoard = board
         this.columnDropTarget = null
 
         // Register DnD on the board div, NOT on Obsidian's scroll container (containerEl),
         // so touch scrolling on the outer container works normally.
-        this.cardDnd.registerContainer(board)
-        this.cardDnd.initDropIndicator(board)
-        this.cardDnd.clearDropAreas()
+        // Skip DnD registration entirely in selection mode.
+        if (!this.selectionManager.active) {
+            this.cardDnd.registerContainer(board)
+            this.cardDnd.initDropIndicator(board)
+            this.cardDnd.clearDropAreas()
 
-        if (!mobile) {
-            this.swimlaneDnd.registerContainer(board)
-            this.swimlaneDnd.initDropIndicator(board)
-            this.swimlaneDnd.clearDropAreas()
-            this.swimlaneDnd.registerDropArea(board, null)
+            if (!mobile) {
+                this.swimlaneDnd.registerContainer(board)
+                this.swimlaneDnd.initDropIndicator(board)
+                this.swimlaneDnd.clearDropAreas()
+                this.swimlaneDnd.registerDropArea(board, null)
+            }
         }
 
         // Build a map of groupKey → group for quick lookup.
@@ -1036,8 +1086,10 @@ export class SwimlaneView extends BasesView {
             })
 
             const cardList = col.createDiv({ cls: "swimlane-card-list" })
-            this.cardDnd.registerDropArea(cardList, { groupKey })
-            if (!mobile) {
+            if (!this.selectionManager.active) {
+                this.cardDnd.registerDropArea(cardList, { groupKey })
+            }
+            if (!mobile && !this.selectionManager.active) {
                 this.swimlaneDnd.registerDraggable(col, { groupKey })
             }
 
@@ -1076,7 +1128,17 @@ export class SwimlaneView extends BasesView {
                         { once: true },
                     )
                 }
-                this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+                if (this.selectionManager.active) {
+                    card.addEventListener("click", e => {
+                        e.stopPropagation()
+                        this.selectionManager.toggle(entry.file.path)
+                    })
+                    if (this.selectionManager.selected.has(entry.file.path)) {
+                        card.classList.add("swimlane-card--selected")
+                    }
+                } else {
+                    this.cardDnd.registerDraggable(card, { path: entry.file.path, groupKey })
+                }
             }
 
             // Reattach editing card if it belongs in this column
@@ -1098,6 +1160,35 @@ export class SwimlaneView extends BasesView {
                 // On mobile, render inside the card list so it scrolls with cards.
                 this.renderAddCardButton(mobile ? cardList : col, groupKey)
             }
+        }
+
+        if (this.selectionManager.active) {
+            const allPaths = new Set<string>()
+            for (const group of this.data.groupedData) {
+                for (const entry of group.entries) {
+                    allPaths.add(entry.file.path)
+                }
+            }
+            this.selectionManager.pruneDeleted(allPaths)
+
+            const actionBar = renderActionBar({
+                selectedCount: this.selectionManager.selected.size,
+                onSelectAll: () => {
+                    const allFilePaths: string[] = []
+                    for (const group of this.data.groupedData) {
+                        for (const entry of group.entries) {
+                            allFilePaths.push(entry.file.path)
+                        }
+                    }
+                    this.selectionManager.selectAll(allFilePaths)
+                },
+                onDeselectAll: () => this.selectionManager.deselectAll(),
+                onMove: e => this.showBatchMoveMenu(e),
+                onTag: e => this.showBatchTagPopover(e),
+                onDelete: () => this.confirmBatchDelete(),
+                onClose: () => this.selectionManager.exit(),
+            })
+            board.appendChild(actionBar)
         }
 
         if (this.showAddColumn) {
@@ -1485,6 +1576,26 @@ export class SwimlaneView extends BasesView {
                 item.setTitle("Remove")
                     .setIcon("trash-2")
                     .onClick(() => this.removeColumn(board, groupKey, entryCount))
+            })
+        }
+
+        const columnEntries =
+            this.data.groupedData.find(g => String(g.key) === groupKey)?.entries ?? []
+        const columnPaths = columnEntries.map(e => e.file.path)
+
+        menu.addSeparator()
+
+        menu.addItem(item => {
+            item.setTitle("Select all in column")
+                .setIcon("check-square")
+                .onClick(() => this.selectionManager.selectColumn(columnPaths))
+        })
+
+        if (this.selectionManager.active) {
+            menu.addItem(item => {
+                item.setTitle("Deselect all in column")
+                    .setIcon("square")
+                    .onClick(() => this.selectionManager.deselectColumn(columnPaths))
             })
         }
 
@@ -2500,6 +2611,312 @@ export class SwimlaneView extends BasesView {
         modal.open()
     }
 
+    private showBatchMoveMenu(e: MouseEvent): void {
+        const menu = new Menu()
+        const columns = this.swimlaneOrder as string[]
+
+        for (const col of columns) {
+            menu.addItem(item => {
+                item.setTitle(col).onClick(() => {
+                    // Save scroll state before the operation
+                    this.savedScrollState = {
+                        column: this.getVisibleColumnKey(),
+                        cardListScrollTops: this.getCardListScrollTops(),
+                        boardScrollTop: this.currentBoard?.scrollTop ?? 0,
+                        boardScrollLeft: this.boardEl.scrollLeft,
+                    }
+
+                    // Collect selected cards with their current swimlane and rank
+                    const cards: BatchMoveCard[] = []
+                    for (const group of this.data.groupedData) {
+                        const groupKey = group.hasKey() ? (group.key?.toString() ?? "") : ""
+                        for (const entry of group.entries) {
+                            if (this.selectionManager.selected.has(entry.file.path)) {
+                                cards.push({
+                                    file: entry.file,
+                                    currentSwimlane: groupKey,
+                                    currentRank:
+                                        getFrontmatter<string>(
+                                            this.app,
+                                            entry.file,
+                                            this.rankProp,
+                                        ) ?? "",
+                                })
+                            }
+                        }
+                    }
+
+                    if (cards.length === 0) {
+                        return
+                    }
+
+                    // Find the last rank in the target column
+                    const targetGroup = this.data.groupedData.find(
+                        g => g.hasKey() && (g.key?.toString() ?? "") === col,
+                    )
+                    let lastRankInTarget: string | null = null
+                    if (targetGroup) {
+                        for (const entry of targetGroup.entries) {
+                            const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
+                            if (r && (lastRankInTarget === null || r > lastRankInTarget)) {
+                                lastRankInTarget = r
+                            }
+                        }
+                    }
+
+                    batchMove({
+                        app: this.app,
+                        cards,
+                        targetSwimlane: col,
+                        swimlaneProp: this.swimlaneProp,
+                        rankProp: this.rankProp,
+                        lastRankInTarget,
+                        undoManager: this.undoManager,
+                        getAutomationMutations: (fromSwimlane, toSwimlane, file) => {
+                            const allMutations = [
+                                ...this.getAutomationMutations(fromSwimlane, null, "leaves"),
+                                ...this.getAutomationMutations(fromSwimlane, toSwimlane, "enters"),
+                            ]
+                            const scheduled = this.scheduleDelayedMutations(
+                                allMutations,
+                                file.path,
+                                toSwimlane,
+                                fromSwimlane,
+                            )
+                            const mutations = scheduled.instant
+                            const cache = this.app.metadataCache.getFileCache(file)
+                            const fm = cache?.frontmatter ?? {}
+                            const previousValues: Record<string, unknown> = {}
+                            for (const m of mutations) {
+                                previousValues[m.property] = fm[m.property]
+                            }
+                            return { mutations, previousValues }
+                        },
+                    })
+                })
+            })
+        }
+
+        menu.showAtMouseEvent(e)
+    }
+
+    private showBatchTagPopover(_e: MouseEvent): void {
+        // Dismiss any existing popover
+        const existing = this.boardEl.querySelector(".swimlane-batch-tag-popover")
+        if (existing) {
+            existing.remove()
+            return
+        }
+
+        const selected = this.selectionManager.selected
+        if (selected.size === 0) {
+            return
+        }
+
+        // Snapshot previous tags per file for undo
+        const previousTagsMap = new Map<string, string[]>()
+        const selectedFiles: TFile[] = []
+        for (const path of selected) {
+            const file = this.app.vault.getFileByPath(path)
+            if (!file) {
+                continue
+            }
+            selectedFiles.push(file)
+            const cache = this.app.metadataCache.getFileCache(file)
+            const rawTags = cache?.frontmatter?.tags
+            const tags: string[] = Array.isArray(rawTags)
+                ? rawTags.filter((t): t is string => typeof t === "string")
+                : typeof rawTags === "string"
+                  ? [rawTags]
+                  : []
+            previousTagsMap.set(path, tags)
+        }
+
+        // Build union of all tags across selected cards
+        const allTags = new Set<string>()
+        for (const tags of previousTagsMap.values()) {
+            for (const t of tags) {
+                allTags.add(t)
+            }
+        }
+
+        const popover = document.createElement("div")
+        popover.className = "swimlane-batch-tag-popover"
+
+        // ── Add tag section ──
+        const addSection = popover.createDiv({ cls: "swimlane-batch-tag-section" })
+        addSection.createDiv({ cls: "swimlane-batch-tag-label", text: "Add tag" })
+
+        const input = document.createElement("input")
+        input.type = "text"
+        input.placeholder = "Add tag\u2026"
+        input.className = "swimlane-batch-tag-input"
+        addSection.appendChild(input)
+
+        // ── Remove tags section ──
+        const removeSection = popover.createDiv({ cls: "swimlane-batch-tag-section" })
+        removeSection.createDiv({ cls: "swimlane-batch-tag-label", text: "Remove tags" })
+        const chipsContainer = removeSection.createDiv({ cls: "swimlane-batch-tag-chips" })
+
+        const renderChips = () => {
+            chipsContainer.empty()
+            if (allTags.size === 0) {
+                chipsContainer.createDiv({ cls: "swimlane-batch-tag-empty", text: "No tags" })
+                return
+            }
+            for (const tag of allTags) {
+                const chip = chipsContainer.createEl("span", {
+                    cls: "swimlane-card-tag swimlane-card-tag--editable",
+                })
+                chip.createEl("span", {
+                    cls: "swimlane-card-tag-text",
+                    text: tag,
+                })
+                const resolved = this.plugin.tagColorResolver.resolve(tag)
+                if (resolved) {
+                    chip.style.backgroundColor = resolved.bg
+                    chip.style.color = resolved.fg
+                }
+                const removeBtn = chip.createEl("span", { cls: "swimlane-card-tag-remove" })
+                setIcon(removeBtn, "x")
+                removeBtn.addEventListener("click", e => {
+                    e.stopPropagation()
+                    batchRemoveTag({ app: this.app, files: selectedFiles, tag })
+                    allTags.delete(tag)
+                    renderChips()
+                })
+            }
+        }
+        renderChips()
+
+        const addTag = (raw: string) => {
+            const tag = raw.trim().replace(/^#/, "")
+            if (!tag) {
+                return
+            }
+            batchAddTag({ app: this.app, files: selectedFiles, tag })
+            allTags.add(tag)
+            renderChips()
+        }
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                e.preventDefault()
+                addTag(input.value)
+                input.value = ""
+            } else if (e.key === "Escape") {
+                e.preventDefault()
+                dismiss()
+            }
+        })
+
+        // Attach TagSuggest autocomplete
+        new TagSuggest(
+            this.app,
+            input,
+            tag => {
+                addTag(tag)
+                input.value = ""
+            },
+            () => [...allTags],
+        )
+
+        const dismiss = () => {
+            popover.remove()
+            document.removeEventListener("pointerdown", onOutsidePointerDown, true)
+
+            // Build one undo transaction with EditTags operations for each affected card
+            const ops: { file: TFile; previousTags: string[]; newTags: string[] }[] = []
+            for (const file of selectedFiles) {
+                const prev = previousTagsMap.get(file.path) ?? []
+                const cache = this.app.metadataCache.getFileCache(file)
+                const rawTags = cache?.frontmatter?.tags
+                const newTags: string[] = Array.isArray(rawTags)
+                    ? rawTags.filter((t): t is string => typeof t === "string")
+                    : typeof rawTags === "string"
+                      ? [rawTags]
+                      : []
+                const changed =
+                    prev.length !== newTags.length || prev.some((t, i) => t !== newTags[i])
+                if (changed) {
+                    ops.push({ file, previousTags: prev, newTags })
+                }
+            }
+            if (ops.length > 0) {
+                this.undoManager.beginTransaction(
+                    `Edit tags on ${ops.length} card${ops.length === 1 ? "" : "s"}`,
+                )
+                for (const op of ops) {
+                    this.undoManager.pushOperation({
+                        type: "EditTags",
+                        file: op.file,
+                        previousTags: op.previousTags,
+                        newTags: op.newTags,
+                    })
+                }
+                this.undoManager.endTransaction()
+            }
+        }
+
+        // Mobile: prepend a bottom-sheet header with a close button
+        if (this.isMobileLayout) {
+            const header = popover.createDiv({ cls: "swimlane-batch-tag-header" })
+            header.createSpan({ text: "Edit tags" })
+            const closeBtn = header.createEl("button", { cls: "swimlane-action-bar-close" })
+            setIcon(closeBtn, "x")
+            closeBtn.addEventListener("click", dismiss)
+            popover.prepend(header)
+        }
+
+        // Dismiss on outside click
+        let listenAfter = performance.now()
+        requestAnimationFrame(() => {
+            listenAfter = 0
+        })
+        const onOutsidePointerDown = (e: PointerEvent) => {
+            if (listenAfter > 0) {
+                return
+            }
+            const target = e.target as HTMLElement
+            if (popover.contains(target)) {
+                return
+            }
+            if (target.closest(".suggestion-container")) {
+                return
+            }
+            dismiss()
+        }
+        document.addEventListener("pointerdown", onOutsidePointerDown, true)
+
+        this.boardEl.appendChild(popover)
+        input.focus()
+    }
+
+    private confirmBatchDelete(): void {
+        const selected = this.selectionManager.selected
+        if (selected.size === 0) {
+            return
+        }
+
+        const files: TFile[] = []
+        for (const path of selected) {
+            const file = this.app.vault.getFileByPath(path)
+            if (file) {
+                files.push(file)
+            }
+        }
+        if (files.length === 0) {
+            return
+        }
+
+        const n = files.length
+        const modal = new ConfirmBatchDeleteModal(this.app, n, () => {
+            batchDelete({ app: this.app, files })
+            this.selectionManager.exit()
+        })
+        modal.open()
+    }
+
     private handleSwimlaneDrop(dragState: SwimlaneDragState, position: GroupKey | null): void {
         const previousOrder = [...this.swimlaneOrder] as string[]
         const newOrder = reorderKeys(this.swimlaneOrder, dragState.groupKey, position)
@@ -2511,5 +2928,42 @@ export class SwimlaneView extends BasesView {
         })
         this.config.set(CONFIG_KEYS.swimlaneOrder, newOrder)
         this.undoManager.endTransaction()
+    }
+}
+
+class ConfirmBatchDeleteModal extends Modal {
+    private count: number
+    private onConfirm: () => void
+
+    constructor(app: import("obsidian").App, count: number, onConfirm: () => void) {
+        super(app)
+        this.count = count
+        this.onConfirm = onConfirm
+    }
+
+    onOpen(): void {
+        const { contentEl } = this
+        this.setTitle("Delete cards")
+
+        contentEl.createEl("p", {
+            text: `Delete ${this.count} card${this.count === 1 ? "" : "s"}? This will trash ${this.count} note${this.count === 1 ? "" : "s"}. This cannot be undone.`,
+        })
+
+        new Setting(contentEl)
+            .addButton(btn => {
+                btn.setButtonText("Cancel").onClick(() => this.close())
+            })
+            .addButton(btn => {
+                btn.setButtonText("Delete")
+                    .setWarning()
+                    .onClick(() => {
+                        this.onConfirm()
+                        this.close()
+                    })
+            })
+    }
+
+    onClose(): void {
+        this.contentEl.empty()
     }
 }

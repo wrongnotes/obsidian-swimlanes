@@ -266,7 +266,11 @@
     padding-bottom: var(--size-4-2);
 }
 
-.swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-title {
+.swimlane-card:not(:has(.swimlane-card-props)):not(:has(.swimlane-card-tags)) .swimlane-card-title {
+    padding-bottom: 0;
+}
+
+.swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-tags {
     padding-bottom: 0;
 }
 
@@ -1431,4 +1435,168 @@
 .swimlane-toolbar-disabled {
     opacity: 0.3;
     pointer-events: none;
+}
+
+/* ── Selection Action Bar ── */
+.swimlane-action-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-s);
+    z-index: 10;
+    white-space: nowrap;
+}
+
+.swimlane-action-bar-count {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    padding: 0 4px;
+}
+
+.swimlane-action-bar-group {
+    display: flex;
+    gap: 4px;
+}
+
+.swimlane-action-bar-btn {
+    padding: 4px 10px;
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-small);
+    background: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+.swimlane-action-bar-btn:hover:not(:disabled) {
+    background: var(--interactive-hover);
+}
+
+.swimlane-action-bar-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.swimlane-action-bar-btn--danger {
+    color: var(--text-error);
+}
+
+.swimlane-action-bar-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: var(--radius-s);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.swimlane-action-bar-close:hover {
+    background: var(--interactive-hover);
+    color: var(--text-normal);
+}
+
+/* Selected card highlight */
+.swimlane-card--selected {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
+
+/* Override grab cursor in selection mode */
+.swimlane-selecting .swimlane-card {
+    cursor: pointer;
+}
+
+.swimlane-selecting .swimlane-column {
+    cursor: default;
+}
+
+/* ── Batch Tag Popover ── */
+.swimlane-batch-tag-popover {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    padding: 12px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-s);
+    z-index: 11;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.swimlane-batch-tag-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.swimlane-batch-tag-label {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    font-weight: var(--font-semibold);
+}
+
+.swimlane-batch-tag-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+}
+
+.swimlane-batch-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.swimlane-batch-tag-empty {
+    font-size: var(--font-ui-small);
+    color: var(--text-faint);
+}
+
+/* Mobile: action bar above carousel indicator */
+.swimlane-mobile .swimlane-action-bar {
+    bottom: 40px; /* above the 30px carousel dot indicator */
+}
+
+/* Mobile: tag popover as bottom sheet */
+.swimlane-mobile .swimlane-batch-tag-popover {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    transform: none;
+    border-radius: 12px 12px 0 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 16px;
+    z-index: 20;
+}
+
+.swimlane-batch-tag-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: var(--font-semibold);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
 }

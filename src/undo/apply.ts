@@ -186,6 +186,10 @@ async function undoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             })
             break
         }
+
+        case "SelectionChange":
+            op.applySelection(new Set(op.previousSelection))
+            break
     }
 }
 
@@ -345,6 +349,10 @@ async function redoOne(op: UndoOperation, ctx: UndoRedoContext): Promise<void> {
             })
             break
         }
+
+        case "SelectionChange":
+            op.applySelection(new Set(op.newSelection))
+            break
     }
 }
 
