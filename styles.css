@@ -266,7 +266,7 @@
     padding-bottom: var(--size-4-2);
 }
 
-.swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-title {
+.swimlane-card:not(:has(.swimlane-card-props)):not(:has(.swimlane-card-tags)) .swimlane-card-title {
     padding-bottom: 0;
 }
 

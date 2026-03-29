@@ -621,11 +621,7 @@ export class SwimlaneView extends BasesView {
                 this.selectionManager.enter()
             }
         })
-        if (sortBtn) {
-            basesToolbar.insertBefore(selBtn, sortBtn)
-        } else {
-            basesToolbar.appendChild(selBtn)
-        }
+        basesToolbar.appendChild(selBtn)
 
         // Clean up any previously injected undo/redo buttons (from old versions).
         basesToolbar.querySelector(".swimlane-undo-btn")?.remove()
