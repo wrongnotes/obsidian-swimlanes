@@ -270,6 +270,10 @@
     padding-bottom: 0;
 }
 
+.swimlane-card:not(:has(.swimlane-card-props)) .swimlane-card-tags {
+    padding-bottom: 0;
+}
+
 /* Tag chips */
 .swimlane-card-tags {
     display: flex;
