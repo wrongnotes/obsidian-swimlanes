@@ -108,6 +108,7 @@ private toggleCollapsed(groupKey: GroupKey): void {
         collapsed.add(groupKey)
     }
     this.setCollapsedSwimlanes(collapsed)
+    this.rebuildBoard()
 }
 
 private expandColumn(groupKey: GroupKey): void {
@@ -115,6 +116,7 @@ private expandColumn(groupKey: GroupKey): void {
     if (collapsed.has(groupKey)) {
         collapsed.delete(groupKey)
         this.setCollapsedSwimlanes(collapsed)
+        this.rebuildBoard()
     }
 }
 ```
@@ -151,6 +153,7 @@ if (collapsed.has(groupKey) && !this.isMobileLayout) {
     const strip = board.createDiv({ cls: "swimlane-column-collapsed" })
     strip.dataset.groupKey = groupKey
     strip.setAttribute("aria-label", groupKey)
+    strip.setAttribute("title", groupKey)
 
     const label = strip.createDiv({ cls: "swimlane-column-collapsed-label" })
     label.textContent = groupKey
@@ -335,8 +338,10 @@ Add to the class properties:
 
 ```typescript
 private dwellExpandTimer: ReturnType<typeof setTimeout> | null = null
+private dwellTimerGroupKey: GroupKey | null = null
 private dwellExpandedGroupKey: GroupKey | null = null
 private dwellExpandedColumnEl: HTMLElement | null = null
+private recollapseTimer: ReturnType<typeof setTimeout> | null = null
 ```
 
 - [ ] **Step 2: Add dwell detection in onDragMove callback**
@@ -351,30 +356,31 @@ Then implement the method:
 
 ```typescript
 private checkDwellExpand(clientX: number, clientY: number): void {
+    const elementUnderPointer = document.elementFromPoint(clientX, clientY)
+
     // Find if pointer is over a collapsed strip
-    const strip = document.elementFromPoint(clientX, clientY)?.closest(".swimlane-column-collapsed") as HTMLElement | null
+    const strip = elementUnderPointer?.closest(".swimlane-column-collapsed") as HTMLElement | null
     const groupKey = strip?.dataset.groupKey as GroupKey | undefined
 
-    // If hovering a different target (or no target), clear timer and maybe recollapse
-    if (groupKey !== (this.dwellExpandTimer ? strip?.dataset.groupKey : undefined)) {
+    // If hovering a different collapsed strip than the timer target, clear timer
+    if (groupKey !== this.dwellTimerGroupKey) {
         this.clearDwellTimer()
     }
 
     // If hovering a collapsed strip and no timer running, start one
     if (strip && groupKey && !this.dwellExpandTimer && groupKey !== this.dwellExpandedGroupKey) {
         strip.classList.add("swimlane-column-collapsed--hover")
+        this.dwellTimerGroupKey = groupKey
         this.dwellExpandTimer = setTimeout(() => {
             this.dwellExpandTimer = null
+            this.dwellTimerGroupKey = null
             this.dwellExpandColumn(groupKey, strip)
         }, 500)
     }
 
-    // If we moved away from a dwell-expanded column, start recollapse timer
-    if (this.dwellExpandedGroupKey && this.dwellExpandedGroupKey !== groupKey) {
-        // Check if we're over the expanded column's card list
-        const overExpanded = this.dwellExpandedColumnEl?.contains(
-            document.elementFromPoint(clientX, clientY)
-        )
+    // If we have a dwell-expanded column, check if pointer is still over it
+    if (this.dwellExpandedGroupKey) {
+        const overExpanded = this.dwellExpandedColumnEl?.contains(elementUnderPointer as Node)
         if (!overExpanded) {
             this.startRecollapseTimer()
         } else {
@@ -428,13 +434,13 @@ private dwellExpandColumn(groupKey: GroupKey, strip: HTMLElement): void {
 }
 ```
 
-Note: The card rendering in the dwell-expand needs to match what `rebuildBoard()` does. Read how cards are rendered in the main loop (lines 1096-1142) and extract or replicate the relevant logic. You may need to extract a helper method like `buildCardOptions()` and `getCardTags()` from the existing inline code, or just inline the same logic.
+**Important:** The dwell-expanded column is temporary and only needs to support card dropping. It intentionally omits: chevron/collapse button, column menu button, column DnD reorder, add-card button, and card-expanding animation. These are not needed during an active drag. However, the card rendering and drop area registration MUST match what `rebuildBoard()` does so that drop targeting works correctly.
+
+Read how cards are rendered in the main loop (lines 1096-1142) and how `cardOptions` is built (lines 988-1055). Extract the card options construction into a helper method or replicate the relevant logic inline. The key properties needed: `rankPropId`, `rank`, `properties`, `showIcons`, `imagePropId`, `imageWidth`, `swimlaneProp`, `getSwimlaneContext`, `highlightColumn`, `openNoteBehavior`, `mobile`, `tags`, `resolveTagColor`.
 
 - [ ] **Step 4: Implement recollapse**
 
 ```typescript
-private recollapseTimer: ReturnType<typeof setTimeout> | null = null
-
 private startRecollapseTimer(): void {
     if (this.recollapseTimer) return
     this.recollapseTimer = setTimeout(() => {
@@ -465,12 +471,17 @@ private recollapseDwellExpanded(): void {
     strip.className = "swimlane-column-collapsed"
     strip.dataset.groupKey = groupKey
     strip.setAttribute("aria-label", groupKey)
+    strip.setAttribute("title", groupKey)
 
     const label = strip.createDiv({ cls: "swimlane-column-collapsed-label" })
     label.textContent = groupKey
 
     const count = strip.createDiv({ cls: "swimlane-column-collapsed-count" })
     count.textContent = String(entries.length)
+
+    strip.addEventListener("click", () => {
+        this.expandColumn(groupKey)
+    })
 
     // Register strip as drop area for future dwell-expand
     this.cardDnd.registerDropArea(strip, { groupKey, collapsed: true } as any)
@@ -517,7 +528,7 @@ this.clearDwellTimer()
 this.clearRecollapseTimer()
 ```
 
-Also add cleanup in any drag cancellation path (Escape key handler, `flushDrag`, or wherever drag cleanup happens).
+Also add cleanup in any drag cancellation path (Escape key handler, `flushDrag`, or wherever drag cleanup happens). Additionally, add `this.clearDwellTimer()` and `this.clearRecollapseTimer()` to the view's `onClose()` / destroy path (near where `cardDnd.destroy()` is called) to prevent timer leaks.
 
 - [ ] **Step 6: Add hover highlight CSS for collapsed strip during drag**
 
@@ -550,26 +561,11 @@ git commit -m "feat: dwell-to-expand collapsed columns during drag"
 **Files:**
 - Modify: `src/swimlane-view.ts`
 
-- [ ] **Step 1: Update "Select all in column" to expand collapsed columns**
+- [ ] **Step 1: No extra wiring needed**
 
-Find where "Select all in column" is wired in the column menu (Task 9 from batch operations added this). The `selectColumn` method on `SelectionManager` auto-enters selection mode. Before calling `selectColumn`, expand the column if collapsed:
+Collapsed columns don't have a column menu (the strip has no menu button). To "select all in column" on a collapsed column, the user clicks the strip to expand it, then uses the column menu on the now-visible column. The `expandColumn()` method already calls `rebuildBoard()`, which will render the full column with its menu. No special handling needed.
 
-```typescript
-menu.addItem(item => {
-    item.setTitle("Select all in column")
-        .setIcon("check-square")
-        .onClick(() => {
-            this.expandColumn(groupKey)
-            this.selectionManager.selectColumn(columnPaths)
-        })
-})
-```
-
-Since `expandColumn` updates the config and `selectColumn` triggers `onChanged` which calls `rebuildBoard()`, the expand will take effect on the next rebuild.
-
-Note: For collapsed columns, the column menu is not shown (the strip doesn't have a menu button). "Select all in column" for collapsed columns would need to come from a context menu on the strip, or the strip itself could be right-clickable. However, the simplest approach: the strip's click handler already expands the column. If the user wants to select all cards, they expand first then use the column menu. No special handling needed beyond what the spec says.
-
-Actually, re-reading the spec: "Select all in column on a collapsed column: auto-expands the column, then selects all cards." This implies the action is available from the column menu — but collapsed columns don't have a column menu. The spec likely means: if a collapsed column is expanded via any means during selection mode, the "Select all in column" in the newly visible column menu will work normally. No extra code needed beyond ensuring `expandColumn` works during selection mode.
+The existing "Select all in column" menu item already calls `this.expandColumn(groupKey)` before `selectColumn()` (from the batch operations work), so if a future enhancement adds a context menu to the collapsed strip, it will work automatically.
 
 - [ ] **Step 2: Run tests**
 
