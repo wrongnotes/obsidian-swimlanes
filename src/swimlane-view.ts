@@ -899,6 +899,7 @@ export class SwimlaneView extends BasesView {
 
         const board = this.boardEl.createDiv({ cls: "swimlane-board" })
         board.toggleClass("swimlane-column-drop-mode", !sortedByRank)
+        board.toggleClass("swimlane-selecting", this.selectionManager.active)
         board.style.setProperty("--swimlane-image-width", `${this.imageWidth}px`)
         this.currentBoard = board
         this.columnDropTarget = null

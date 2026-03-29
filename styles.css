@@ -1508,6 +1508,12 @@
     outline-offset: -2px;
 }
 
+/* Override grab cursor in selection mode */
+.swimlane-selecting .swimlane-card,
+.swimlane-selecting .swimlane-column {
+    cursor: default;
+}
+
 /* ── Batch Tag Popover ── */
 .swimlane-batch-tag-popover {
     position: absolute;
