@@ -1509,7 +1509,10 @@
 }
 
 /* Override grab cursor in selection mode */
-.swimlane-selecting .swimlane-card,
+.swimlane-selecting .swimlane-card {
+    cursor: pointer;
+}
+
 .swimlane-selecting .swimlane-column {
     cursor: default;
 }
