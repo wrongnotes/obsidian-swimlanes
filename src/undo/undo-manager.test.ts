@@ -244,11 +244,25 @@ describe("UndoManager", () => {
             const mgr = new UndoManager()
 
             mgr.beginTransaction("Select")
-            mgr.pushOperation({ type: "SelectionChange", previousSelection: new Set(), newSelection: new Set(["a.md"]), applySelection: () => {} })
+            mgr.pushOperation({
+                type: "SelectionChange",
+                previousSelection: new Set(),
+                newSelection: new Set(["a.md"]),
+                applySelection: () => {},
+            })
             mgr.endTransaction()
 
             mgr.beginTransaction("Move")
-            mgr.pushOperation({ type: "MoveCard", file: {} as any, fromSwimlane: "a", toSwimlane: "b", fromRank: "m", toRank: "n", resolvedAutomationMutations: [], automationPreviousValues: {} })
+            mgr.pushOperation({
+                type: "MoveCard",
+                file: {} as any,
+                fromSwimlane: "a",
+                toSwimlane: "b",
+                fromRank: "m",
+                toRank: "n",
+                resolvedAutomationMutations: [],
+                automationPreviousValues: {},
+            })
             mgr.endTransaction()
 
             mgr.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))
@@ -260,7 +274,12 @@ describe("UndoManager", () => {
             const mgr = new UndoManager()
 
             mgr.beginTransaction("Select")
-            mgr.pushOperation({ type: "SelectionChange", previousSelection: new Set(), newSelection: new Set(["a.md"]), applySelection: () => {} })
+            mgr.pushOperation({
+                type: "SelectionChange",
+                previousSelection: new Set(),
+                newSelection: new Set(["a.md"]),
+                applySelection: () => {},
+            })
             mgr.endTransaction()
 
             mgr.undo()
@@ -274,7 +293,16 @@ describe("UndoManager", () => {
             const mgr = new UndoManager()
 
             mgr.beginTransaction("Move")
-            mgr.pushOperation({ type: "MoveCard", file: {} as any, fromSwimlane: "a", toSwimlane: "b", fromRank: "m", toRank: "n", resolvedAutomationMutations: [], automationPreviousValues: {} })
+            mgr.pushOperation({
+                type: "MoveCard",
+                file: {} as any,
+                fromSwimlane: "a",
+                toSwimlane: "b",
+                fromRank: "m",
+                toRank: "n",
+                resolvedAutomationMutations: [],
+                automationPreviousValues: {},
+            })
             mgr.endTransaction()
 
             mgr.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))

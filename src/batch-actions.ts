@@ -18,14 +18,27 @@ export interface BatchMoveOptions {
     lastRankInTarget: string | null
     undoManager: UndoManager
     getAutomationMutations: (
-        fromSwimlane: string, toSwimlane: string, file: TFile,
+        fromSwimlane: string,
+        toSwimlane: string,
+        file: TFile,
     ) => { mutations: FrontmatterMutation[]; previousValues: Record<string, unknown> }
 }
 
 export async function batchMove(opts: BatchMoveOptions): Promise<void> {
-    const { app, cards, targetSwimlane, swimlaneProp, rankProp, lastRankInTarget, undoManager, getAutomationMutations } = opts
+    const {
+        app,
+        cards,
+        targetSwimlane,
+        swimlaneProp,
+        rankProp,
+        lastRankInTarget,
+        undoManager,
+        getAutomationMutations,
+    } = opts
     const toMove = cards.filter(c => c.currentSwimlane !== targetSwimlane)
-    if (toMove.length === 0) return
+    if (toMove.length === 0) {
+        return
+    }
 
     let prevRank = lastRankInTarget
     const ranks: string[] = []
@@ -40,19 +53,29 @@ export async function batchMove(opts: BatchMoveOptions): Promise<void> {
     for (let i = 0; i < toMove.length; i++) {
         const card = toMove[i]!
         const newRank = ranks[i]!
-        const { mutations, previousValues } = getAutomationMutations(card.currentSwimlane, targetSwimlane, card.file)
+        const { mutations, previousValues } = getAutomationMutations(
+            card.currentSwimlane,
+            targetSwimlane,
+            card.file,
+        )
 
         undoManager.pushOperation({
-            type: "MoveCard", file: card.file,
-            fromSwimlane: card.currentSwimlane, toSwimlane: targetSwimlane,
-            fromRank: card.currentRank, toRank: newRank,
-            resolvedAutomationMutations: mutations, automationPreviousValues: previousValues,
+            type: "MoveCard",
+            file: card.file,
+            fromSwimlane: card.currentSwimlane,
+            toSwimlane: targetSwimlane,
+            fromRank: card.currentRank,
+            toRank: newRank,
+            resolvedAutomationMutations: mutations,
+            automationPreviousValues: previousValues,
         })
 
         await app.fileManager.processFrontMatter(card.file, (fm: Record<string, unknown>) => {
             fm[swimlaneProp] = targetSwimlane
             fm[rankProp] = newRank
-            for (const m of mutations) { fm[m.property] = m.value }
+            for (const m of mutations) {
+                fm[m.property] = m.value
+            }
         })
     }
 
@@ -80,7 +103,7 @@ export function batchAddTag(opts: BatchTagOptions): void {
     const { app, files, tag } = opts
     for (const file of files) {
         app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-            const tags = Array.isArray(fm.tags) ? fm.tags as string[] : []
+            const tags = Array.isArray(fm.tags) ? (fm.tags as string[]) : []
             if (!tags.includes(tag)) {
                 tags.push(tag)
                 fm.tags = tags
@@ -93,7 +116,9 @@ export function batchRemoveTag(opts: BatchTagOptions): void {
     const { app, files, tag } = opts
     for (const file of files) {
         app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-            if (!Array.isArray(fm.tags)) return
+            if (!Array.isArray(fm.tags)) {
+                return
+            }
             const tags = fm.tags as string[]
             const idx = tags.indexOf(tag)
             if (idx !== -1) {

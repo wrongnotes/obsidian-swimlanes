@@ -10,23 +10,27 @@ export class SelectionManager {
     ) {}
 
     enter(): void {
-        if (this.active) return
+        if (this.active) {
+            return
+        }
         this.active = true
         this.onChanged()
     }
 
     exit(): void {
-        if (!this.active) return
+        if (!this.active) {
+            return
+        }
         this.active = false
         this.selected.clear()
-        this.undoManager.purge(tx =>
-            tx.operations.every(op => op.type === "SelectionChange"),
-        )
+        this.undoManager.purge(tx => tx.operations.every(op => op.type === "SelectionChange"))
         this.onChanged()
     }
 
     toggle(path: string): void {
-        if (!this.active) return
+        if (!this.active) {
+            return
+        }
         const prev = new Set(this.selected)
         if (this.selected.has(path)) {
             this.selected.delete(path)
@@ -42,7 +46,9 @@ export class SelectionManager {
     }
 
     selectAll(allPaths: string[]): void {
-        if (!this.active) return
+        if (!this.active) {
+            return
+        }
         const prev = new Set(this.selected)
         this.selected = new Set(allPaths)
         this.pushSelectionChange(prev, new Set(this.selected), "Select all")
@@ -50,7 +56,9 @@ export class SelectionManager {
     }
 
     deselectAll(): void {
-        if (!this.active) return
+        if (!this.active) {
+            return
+        }
         const prev = new Set(this.selected)
         this.selected.clear()
         this.pushSelectionChange(prev, new Set(this.selected), "Deselect all")
@@ -58,17 +66,25 @@ export class SelectionManager {
     }
 
     selectColumn(columnPaths: string[]): void {
-        if (!this.active) this.enter()
+        if (!this.active) {
+            this.enter()
+        }
         const prev = new Set(this.selected)
-        for (const p of columnPaths) this.selected.add(p)
+        for (const p of columnPaths) {
+            this.selected.add(p)
+        }
         this.pushSelectionChange(prev, new Set(this.selected), "Select column")
         this.onChanged()
     }
 
     deselectColumn(columnPaths: string[]): void {
-        if (!this.active) return
+        if (!this.active) {
+            return
+        }
         const prev = new Set(this.selected)
-        for (const p of columnPaths) this.selected.delete(p)
+        for (const p of columnPaths) {
+            this.selected.delete(p)
+        }
         this.pushSelectionChange(prev, new Set(this.selected), "Deselect column")
         this.onChanged()
     }
@@ -81,14 +97,12 @@ export class SelectionManager {
                 changed = true
             }
         }
-        if (changed) this.onChanged()
+        if (changed) {
+            this.onChanged()
+        }
     }
 
-    private pushSelectionChange(
-        prev: Set<string>,
-        next: Set<string>,
-        label: string,
-    ): void {
+    private pushSelectionChange(prev: Set<string>, next: Set<string>, label: string): void {
         const applySelection = (s: Set<string>) => {
             this.selected = new Set(s)
             this.onChanged()

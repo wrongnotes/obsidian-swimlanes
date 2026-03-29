@@ -678,12 +678,16 @@ describe("applyRedo", () => {
             const selectionState = { current: new Set(["b.md", "c.md"]) }
             const tx: UndoTransaction = {
                 label: "Select cards",
-                operations: [{
-                    type: "SelectionChange",
-                    previousSelection: new Set(["a.md"]),
-                    newSelection: new Set(["b.md", "c.md"]),
-                    applySelection: (s: Set<string>) => { selectionState.current = s },
-                }],
+                operations: [
+                    {
+                        type: "SelectionChange",
+                        previousSelection: new Set(["a.md"]),
+                        newSelection: new Set(["b.md", "c.md"]),
+                        applySelection: (s: Set<string>) => {
+                            selectionState.current = s
+                        },
+                    },
+                ],
             }
             await applyUndo(tx, ctx)
             expect(selectionState.current).toEqual(new Set(["a.md"]))
@@ -695,12 +699,16 @@ describe("applyRedo", () => {
             const selectionState = { current: new Set(["a.md"]) }
             const tx: UndoTransaction = {
                 label: "Select cards",
-                operations: [{
-                    type: "SelectionChange",
-                    previousSelection: new Set(["a.md"]),
-                    newSelection: new Set(["b.md", "c.md"]),
-                    applySelection: (s: Set<string>) => { selectionState.current = s },
-                }],
+                operations: [
+                    {
+                        type: "SelectionChange",
+                        previousSelection: new Set(["a.md"]),
+                        newSelection: new Set(["b.md", "c.md"]),
+                        applySelection: (s: Set<string>) => {
+                            selectionState.current = s
+                        },
+                    },
+                ],
             }
             await applyRedo(tx, ctx)
             expect(selectionState.current).toEqual(new Set(["b.md", "c.md"]))

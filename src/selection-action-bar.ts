@@ -46,7 +46,7 @@ export function renderActionBar(callbacks: ActionBarCallbacks): HTMLElement {
         attr: { "data-action": "move" },
     })
     moveBtn.disabled = disabled
-    moveBtn.addEventListener("click", (e) => callbacks.onMove(e))
+    moveBtn.addEventListener("click", e => callbacks.onMove(e))
 
     const tagBtn = actionGroup.createEl("button", {
         cls: "swimlane-action-bar-btn",
@@ -54,7 +54,7 @@ export function renderActionBar(callbacks: ActionBarCallbacks): HTMLElement {
         attr: { "data-action": "tag" },
     })
     tagBtn.disabled = disabled
-    tagBtn.addEventListener("click", (e) => callbacks.onTag(e))
+    tagBtn.addEventListener("click", e => callbacks.onTag(e))
 
     const deleteBtn = actionGroup.createEl("button", {
         cls: "swimlane-action-bar-btn swimlane-action-bar-btn--danger",

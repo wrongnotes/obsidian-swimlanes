@@ -23,9 +23,14 @@ describe("batchMove", () => {
             { file: { path: "b.md" } as any, currentSwimlane: "doing", currentRank: "n" },
         ]
         await batchMove({
-            app: mockApp, cards, targetSwimlane: "done",
-            swimlaneProp: "status", rankProp: "rank", lastRankInTarget: "p",
-            undoManager, getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
+            app: mockApp,
+            cards,
+            targetSwimlane: "done",
+            swimlaneProp: "status",
+            rankProp: "rank",
+            lastRankInTarget: "p",
+            undoManager,
+            getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
         })
         expect(mockProcessFrontMatter).toHaveBeenCalledTimes(2)
         expect(undoManager.canUndo).toBe(true)
@@ -38,21 +43,29 @@ describe("batchMove", () => {
             { file: { path: "b.md" } as any, currentSwimlane: "todo", currentRank: "n" },
         ]
         await batchMove({
-            app: mockApp, cards, targetSwimlane: "done",
-            swimlaneProp: "status", rankProp: "rank", lastRankInTarget: "p",
-            undoManager, getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
+            app: mockApp,
+            cards,
+            targetSwimlane: "done",
+            swimlaneProp: "status",
+            rankProp: "rank",
+            lastRankInTarget: "p",
+            undoManager,
+            getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
         })
         expect(mockProcessFrontMatter).toHaveBeenCalledTimes(1)
     })
 
     it("does not create transaction when all cards are already in target", async () => {
-        const cards = [
-            { file: { path: "a.md" } as any, currentSwimlane: "done", currentRank: "m" },
-        ]
+        const cards = [{ file: { path: "a.md" } as any, currentSwimlane: "done", currentRank: "m" }]
         await batchMove({
-            app: mockApp, cards, targetSwimlane: "done",
-            swimlaneProp: "status", rankProp: "rank", lastRankInTarget: "p",
-            undoManager, getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
+            app: mockApp,
+            cards,
+            targetSwimlane: "done",
+            swimlaneProp: "status",
+            rankProp: "rank",
+            lastRankInTarget: "p",
+            undoManager,
+            getAutomationMutations: () => ({ mutations: [], previousValues: {} }),
         })
         expect(undoManager.canUndo).toBe(false)
     })
@@ -82,7 +95,9 @@ describe("batchAddTag", () => {
         }
         const app = {
             fileManager: {
-                processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }),
+                processFrontMatter: jest.fn((file: any, cb: any) => {
+                    cb(fmState[file.path]!)
+                }),
             },
         } as any
         batchAddTag({ app, files: [{ path: "a.md" } as any, { path: "b.md" } as any], tag: "new" })
@@ -93,7 +108,11 @@ describe("batchAddTag", () => {
     it("skips files that already have the tag", () => {
         const fmState: Record<string, { tags?: string[] }> = { "a.md": { tags: ["urgent"] } }
         const app = {
-            fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
+            fileManager: {
+                processFrontMatter: jest.fn((file: any, cb: any) => {
+                    cb(fmState[file.path]!)
+                }),
+            },
         } as any
         batchAddTag({ app, files: [{ path: "a.md" } as any], tag: "urgent" })
         expect(fmState["a.md"]!.tags).toEqual(["urgent"])
@@ -107,9 +126,17 @@ describe("batchRemoveTag", () => {
             "b.md": { tags: ["remove"] },
         }
         const app = {
-            fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
+            fileManager: {
+                processFrontMatter: jest.fn((file: any, cb: any) => {
+                    cb(fmState[file.path]!)
+                }),
+            },
         } as any
-        batchRemoveTag({ app, files: [{ path: "a.md" } as any, { path: "b.md" } as any], tag: "remove" })
+        batchRemoveTag({
+            app,
+            files: [{ path: "a.md" } as any, { path: "b.md" } as any],
+            tag: "remove",
+        })
         expect(fmState["a.md"]!.tags).toEqual(["keep"])
         expect(fmState["b.md"]!.tags).toEqual([])
     })
@@ -117,7 +144,11 @@ describe("batchRemoveTag", () => {
     it("is a no-op for files without the tag", () => {
         const fmState: Record<string, { tags?: string[] }> = { "a.md": { tags: ["other"] } }
         const app = {
-            fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
+            fileManager: {
+                processFrontMatter: jest.fn((file: any, cb: any) => {
+                    cb(fmState[file.path]!)
+                }),
+            },
         } as any
         batchRemoveTag({ app, files: [{ path: "a.md" } as any], tag: "missing" })
         expect(fmState["a.md"]!.tags).toEqual(["other"])

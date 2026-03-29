@@ -11,7 +11,9 @@ describe("renderActionBar", () => {
             onDelete: jest.fn(),
             onClose: jest.fn(),
         })
-        expect(bar.querySelector(".swimlane-action-bar-count")!.textContent).toBe("3 cards selected")
+        expect(bar.querySelector(".swimlane-action-bar-count")!.textContent).toBe(
+            "3 cards selected",
+        )
         expect(bar.querySelector("[data-action='select-all']")).toBeTruthy()
         expect(bar.querySelector("[data-action='deselect-all']")).toBeTruthy()
         expect(bar.querySelector("[data-action='move']")).toBeTruthy()
@@ -45,7 +47,9 @@ describe("renderActionBar", () => {
         })
         expect((bar.querySelector("[data-action='move']") as HTMLButtonElement).disabled).toBe(true)
         expect((bar.querySelector("[data-action='tag']") as HTMLButtonElement).disabled).toBe(true)
-        expect((bar.querySelector("[data-action='delete']") as HTMLButtonElement).disabled).toBe(true)
+        expect((bar.querySelector("[data-action='delete']") as HTMLButtonElement).disabled).toBe(
+            true,
+        )
     })
 
     it("calls callbacks when buttons are clicked", () => {

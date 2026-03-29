@@ -622,8 +622,8 @@ describe("batch operations", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         view.onDataUpdated()
         const basesToolbar = container.parentElement?.querySelector(".bases-toolbar")
-        const selBtn = basesToolbar?.querySelector<HTMLElement>(".swimlane-select-btn");
-        (view as any).selectionManager.enter()
+        const selBtn = basesToolbar?.querySelector<HTMLElement>(".swimlane-select-btn")
+        ;(view as any).selectionManager.enter()
         selBtn!.click()
         expect((view as any).selectionManager.active).toBe(false)
     })
@@ -631,8 +631,8 @@ describe("batch operations", () => {
     it("cards get click-to-select handlers when selection mode is active", () => {
         const { view, container } = makeView([
             makeGroup("Backlog", [makeEntry("Note A"), makeEntry("Note B")]),
-        ]);
-        (view as any).selectionManager.enter()
+        ])
+        ;(view as any).selectionManager.enter()
         view.onDataUpdated()
         const cards = container.querySelectorAll(".swimlane-card")
         expect(cards).toHaveLength(2)
@@ -644,13 +644,13 @@ describe("batch operations", () => {
     it("selected cards get swimlane-card--selected class after re-render", () => {
         const { view, container } = makeView([
             makeGroup("Backlog", [makeEntry("Note A"), makeEntry("Note B")]),
-        ]);
-        (view as any).selectionManager.enter();
-        (view as any).selectionManager.toggle("Note A.md")
+        ])
+        ;(view as any).selectionManager.enter()
+        ;(view as any).selectionManager.toggle("Note A.md")
         view.onDataUpdated()
         const cards = Array.from(container.querySelectorAll<HTMLElement>(".swimlane-card"))
-        const selectedCard = cards.find((c: HTMLElement) =>
-            c.querySelector(".swimlane-card-title")?.textContent === "Note A",
+        const selectedCard = cards.find(
+            (c: HTMLElement) => c.querySelector(".swimlane-card-title")?.textContent === "Note A",
         )
         expect(selectedCard?.classList.contains("swimlane-card--selected")).toBe(true)
     })
@@ -658,8 +658,8 @@ describe("batch operations", () => {
     it("action bar renders when selection mode is active", () => {
         const { view, container } = makeView([
             makeGroup("Backlog", [makeEntry("A"), makeEntry("B")]),
-        ]);
-        (view as any).selectionManager.enter()
+        ])
+        ;(view as any).selectionManager.enter()
         view.onDataUpdated()
         expect(container.querySelector(".swimlane-action-bar")).not.toBeNull()
     })
@@ -673,8 +673,8 @@ describe("batch operations", () => {
     it("Escape key exits selection mode via board keydown handler", () => {
         const { view, container } = makeView([makeGroup("Backlog", [makeEntry("A")])])
         document.body.appendChild(container.parentElement!)
-        view.onDataUpdated();
-        (view as any).selectionManager.enter()
+        view.onDataUpdated()
+        ;(view as any).selectionManager.enter()
         expect((view as any).selectionManager.active).toBe(true)
         const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
         container.dispatchEvent(event)

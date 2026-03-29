@@ -152,7 +152,9 @@ export class SwimlaneView extends BasesView {
         super(controller)
         this.boardEl = containerEl
         this.plugin = plugin
-        this.selectionManager = new SelectionManager(this.undoManager, () => this.onSelectionChanged())
+        this.selectionManager = new SelectionManager(this.undoManager, () =>
+            this.onSelectionChanged(),
+        )
         this.unregisterSettingsListener = plugin.onSettingsChanged(() => {
             if (this.boardEl.isConnected) {
                 this.rebuildBoard()
@@ -1127,7 +1129,7 @@ export class SwimlaneView extends BasesView {
                     )
                 }
                 if (this.selectionManager.active) {
-                    card.addEventListener("click", (e) => {
+                    card.addEventListener("click", e => {
                         e.stopPropagation()
                         this.selectionManager.toggle(entry.file.path)
                     })
@@ -1181,8 +1183,8 @@ export class SwimlaneView extends BasesView {
                     this.selectionManager.selectAll(allFilePaths)
                 },
                 onDeselectAll: () => this.selectionManager.deselectAll(),
-                onMove: (e) => this.showBatchMoveMenu(e),
-                onTag: (e) => this.showBatchTagPopover(e),
+                onMove: e => this.showBatchMoveMenu(e),
+                onTag: e => this.showBatchTagPopover(e),
                 onDelete: () => this.confirmBatchDelete(),
                 onClose: () => this.selectionManager.exit(),
             })
@@ -1577,7 +1579,8 @@ export class SwimlaneView extends BasesView {
             })
         }
 
-        const columnEntries = this.data.groupedData.find(g => String(g.key) === groupKey)?.entries ?? []
+        const columnEntries =
+            this.data.groupedData.find(g => String(g.key) === groupKey)?.entries ?? []
         const columnPaths = columnEntries.map(e => e.file.path)
 
         menu.addSeparator()
@@ -2632,13 +2635,20 @@ export class SwimlaneView extends BasesView {
                                 cards.push({
                                     file: entry.file,
                                     currentSwimlane: groupKey,
-                                    currentRank: getFrontmatter<string>(this.app, entry.file, this.rankProp) ?? "",
+                                    currentRank:
+                                        getFrontmatter<string>(
+                                            this.app,
+                                            entry.file,
+                                            this.rankProp,
+                                        ) ?? "",
                                 })
                             }
                         }
                     }
 
-                    if (cards.length === 0) return
+                    if (cards.length === 0) {
+                        return
+                    }
 
                     // Find the last rank in the target column
                     const targetGroup = this.data.groupedData.find(
@@ -2699,14 +2709,18 @@ export class SwimlaneView extends BasesView {
         }
 
         const selected = this.selectionManager.selected
-        if (selected.size === 0) return
+        if (selected.size === 0) {
+            return
+        }
 
         // Snapshot previous tags per file for undo
         const previousTagsMap = new Map<string, string[]>()
         const selectedFiles: TFile[] = []
         for (const path of selected) {
             const file = this.app.vault.getFileByPath(path)
-            if (!file) continue
+            if (!file) {
+                continue
+            }
             selectedFiles.push(file)
             const cache = this.app.metadataCache.getFileCache(file)
             const rawTags = cache?.frontmatter?.tags
@@ -2721,7 +2735,9 @@ export class SwimlaneView extends BasesView {
         // Build union of all tags across selected cards
         const allTags = new Set<string>()
         for (const tags of previousTagsMap.values()) {
-            for (const t of tags) allTags.add(t)
+            for (const t of tags) {
+                allTags.add(t)
+            }
         }
 
         const popover = document.createElement("div")
@@ -2763,7 +2779,7 @@ export class SwimlaneView extends BasesView {
                 }
                 const removeBtn = chip.createEl("span", { cls: "swimlane-card-tag-remove" })
                 setIcon(removeBtn, "x")
-                removeBtn.addEventListener("click", (e) => {
+                removeBtn.addEventListener("click", e => {
                     e.stopPropagation()
                     batchRemoveTag({ app: this.app, files: selectedFiles, tag })
                     allTags.delete(tag)
@@ -2775,13 +2791,15 @@ export class SwimlaneView extends BasesView {
 
         const addTag = (raw: string) => {
             const tag = raw.trim().replace(/^#/, "")
-            if (!tag) return
+            if (!tag) {
+                return
+            }
             batchAddTag({ app: this.app, files: selectedFiles, tag })
             allTags.add(tag)
             renderChips()
         }
 
-        input.addEventListener("keydown", (e) => {
+        input.addEventListener("keydown", e => {
             if (e.key === "Enter") {
                 e.preventDefault()
                 addTag(input.value)
@@ -2796,7 +2814,7 @@ export class SwimlaneView extends BasesView {
         new TagSuggest(
             this.app,
             input,
-            (tag) => {
+            tag => {
                 addTag(tag)
                 input.value = ""
             },
@@ -2819,14 +2837,15 @@ export class SwimlaneView extends BasesView {
                       ? [rawTags]
                       : []
                 const changed =
-                    prev.length !== newTags.length ||
-                    prev.some((t, i) => t !== newTags[i])
+                    prev.length !== newTags.length || prev.some((t, i) => t !== newTags[i])
                 if (changed) {
                     ops.push({ file, previousTags: prev, newTags })
                 }
             }
             if (ops.length > 0) {
-                this.undoManager.beginTransaction(`Edit tags on ${ops.length} card${ops.length === 1 ? "" : "s"}`)
+                this.undoManager.beginTransaction(
+                    `Edit tags on ${ops.length} card${ops.length === 1 ? "" : "s"}`,
+                )
                 for (const op of ops) {
                     this.undoManager.pushOperation({
                         type: "EditTags",
@@ -2851,12 +2870,20 @@ export class SwimlaneView extends BasesView {
 
         // Dismiss on outside click
         let listenAfter = performance.now()
-        requestAnimationFrame(() => { listenAfter = 0 })
+        requestAnimationFrame(() => {
+            listenAfter = 0
+        })
         const onOutsidePointerDown = (e: PointerEvent) => {
-            if (listenAfter > 0) return
+            if (listenAfter > 0) {
+                return
+            }
             const target = e.target as HTMLElement
-            if (popover.contains(target)) return
-            if (target.closest(".suggestion-container")) return
+            if (popover.contains(target)) {
+                return
+            }
+            if (target.closest(".suggestion-container")) {
+                return
+            }
             dismiss()
         }
         document.addEventListener("pointerdown", onOutsidePointerDown, true)
@@ -2867,14 +2894,20 @@ export class SwimlaneView extends BasesView {
 
     private confirmBatchDelete(): void {
         const selected = this.selectionManager.selected
-        if (selected.size === 0) return
+        if (selected.size === 0) {
+            return
+        }
 
         const files: TFile[] = []
         for (const path of selected) {
             const file = this.app.vault.getFileByPath(path)
-            if (file) files.push(file)
+            if (file) {
+                files.push(file)
+            }
         }
-        if (files.length === 0) return
+        if (files.length === 0) {
+            return
+        }
 
         const n = files.length
         const modal = new ConfirmBatchDeleteModal(this.app, n, () => {
