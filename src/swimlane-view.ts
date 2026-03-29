@@ -144,7 +144,7 @@ export class SwimlaneView extends BasesView {
     private editingTagsPath: string | null = null
     private editingTagsCardEl: HTMLElement | null = null
     private undoManager = new UndoManager()
-    selectionManager: SelectionManager
+    private selectionManager: SelectionManager
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
     private settingsDirty = false
 
@@ -1580,7 +1580,7 @@ export class SwimlaneView extends BasesView {
             })
         }
 
-        const columnEntries = this.data.groupedData.find(g => g.key === groupKey)?.entries ?? []
+        const columnEntries = this.data.groupedData.find(g => String(g.key) === groupKey)?.entries ?? []
         const columnPaths = columnEntries.map(e => e.file.path)
 
         menu.addSeparator()

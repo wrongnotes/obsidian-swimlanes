@@ -86,8 +86,8 @@ describe("batchAddTag", () => {
             },
         } as any
         batchAddTag({ app, files: [{ path: "a.md" } as any, { path: "b.md" } as any], tag: "new" })
-        expect(fmState["a.md"].tags).toEqual(["existing", "new"])
-        expect(fmState["b.md"].tags).toEqual(["new"])
+        expect(fmState["a.md"]!.tags).toEqual(["existing", "new"])
+        expect(fmState["b.md"]!.tags).toEqual(["new"])
     })
 
     it("skips files that already have the tag", () => {
@@ -96,7 +96,7 @@ describe("batchAddTag", () => {
             fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
         } as any
         batchAddTag({ app, files: [{ path: "a.md" } as any], tag: "urgent" })
-        expect(fmState["a.md"].tags).toEqual(["urgent"])
+        expect(fmState["a.md"]!.tags).toEqual(["urgent"])
     })
 })
 
@@ -110,8 +110,8 @@ describe("batchRemoveTag", () => {
             fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
         } as any
         batchRemoveTag({ app, files: [{ path: "a.md" } as any, { path: "b.md" } as any], tag: "remove" })
-        expect(fmState["a.md"].tags).toEqual(["keep"])
-        expect(fmState["b.md"].tags).toEqual([])
+        expect(fmState["a.md"]!.tags).toEqual(["keep"])
+        expect(fmState["b.md"]!.tags).toEqual([])
     })
 
     it("is a no-op for files without the tag", () => {
@@ -120,6 +120,6 @@ describe("batchRemoveTag", () => {
             fileManager: { processFrontMatter: jest.fn((file: any, cb: any) => { cb(fmState[file.path]!) }) },
         } as any
         batchRemoveTag({ app, files: [{ path: "a.md" } as any], tag: "missing" })
-        expect(fmState["a.md"].tags).toEqual(["other"])
+        expect(fmState["a.md"]!.tags).toEqual(["other"])
     })
 })

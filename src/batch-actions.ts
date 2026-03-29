@@ -38,8 +38,8 @@ export async function batchMove(opts: BatchMoveOptions): Promise<void> {
     undoManager.beginTransaction(`Move ${toMove.length} card${toMove.length === 1 ? "" : "s"}`)
 
     for (let i = 0; i < toMove.length; i++) {
-        const card = toMove[i]
-        const newRank = ranks[i]
+        const card = toMove[i]!
+        const newRank = ranks[i]!
         const { mutations, previousValues } = getAutomationMutations(card.currentSwimlane, targetSwimlane, card.file)
 
         undoManager.pushOperation({
