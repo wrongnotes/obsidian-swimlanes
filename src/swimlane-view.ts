@@ -799,10 +799,9 @@ export class SwimlaneView extends BasesView {
         if (!collapsed.has(groupKey)) return
 
         collapsed.delete(groupKey)
-        this.setCollapsedSwimlanes(collapsed)
-        // Rebuild immediately, then animate cards expanding in
+        // Set before config write — config.set may trigger onDataUpdated → rebuildBoard synchronously
         this.expandingColumnKey = groupKey
-        this.rebuildBoard()
+        this.setCollapsedSwimlanes(collapsed)
     }
 
     private openNote(file: TFile): void {
