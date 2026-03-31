@@ -731,10 +731,7 @@ export class SwimlaneView extends BasesView {
     private toggleCollapsed(groupKey: GroupKey): void {
         const collapsed = this.collapsedSwimlanes
         if (collapsed.has(groupKey)) {
-            // Expanding — just update config and rebuild
-            collapsed.delete(groupKey)
-            this.setCollapsedSwimlanes(collapsed)
-            this.rebuildBoard()
+            this.expandColumn(groupKey)
             return
         }
 
