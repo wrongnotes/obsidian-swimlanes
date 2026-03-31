@@ -1368,23 +1368,44 @@ export class SwimlaneView extends BasesView {
             const expandedCol = board.querySelector(
                 `.swimlane-column[data-group-key="${CSS.escape(expandKey)}"]`,
             ) as HTMLElement | null
+            const expandedHeader = expandedCol?.querySelector(".swimlane-column-header") as HTMLElement | null
             const expandedCardList = expandedCol?.querySelector(".swimlane-card-list") as HTMLElement | null
+
+            // Phase 1: Fade in the header
+            if (expandedHeader) {
+                expandedHeader.style.opacity = "0"
+                expandedHeader.style.transition = "opacity 150ms ease-out"
+                void expandedHeader.offsetHeight
+                expandedHeader.style.opacity = "1"
+            }
+
+            // Phase 2: Expand the card list (delayed to start after header fades in)
             if (expandedCardList) {
                 const targetHeight = expandedCardList.scrollHeight
                 expandedCardList.style.maxHeight = "0"
                 expandedCardList.style.opacity = "0"
                 expandedCardList.style.overflow = "hidden"
-                expandedCardList.style.transition = "max-height 200ms ease-out, opacity 200ms ease-out"
-                void expandedCardList.offsetHeight // force reflow
-                expandedCardList.style.maxHeight = `${targetHeight}px`
-                expandedCardList.style.opacity = "1"
-                expandedCardList.addEventListener("transitionend", function handler(e) {
-                    if (e.target === expandedCardList && e.propertyName === "max-height") {
-                        expandedCardList.removeEventListener("transitionend", handler)
-                        expandedCardList.style.maxHeight = ""
-                        expandedCardList.style.opacity = ""
-                        expandedCardList.style.overflow = ""
-                        expandedCardList.style.transition = ""
+                void expandedCardList.offsetHeight
+                setTimeout(() => {
+                    expandedCardList.style.transition = "max-height 200ms ease-out, opacity 200ms ease-out"
+                    expandedCardList.style.maxHeight = `${targetHeight}px`
+                    expandedCardList.style.opacity = "1"
+                    expandedCardList.addEventListener("transitionend", function handler(e) {
+                        if (e.target === expandedCardList && e.propertyName === "max-height") {
+                            expandedCardList.removeEventListener("transitionend", handler)
+                            expandedCardList.style.maxHeight = ""
+                            expandedCardList.style.opacity = ""
+                            expandedCardList.style.overflow = ""
+                            expandedCardList.style.transition = ""
+                        }
+                    })
+                }, 100) // Start after header begins fading in
+            }
+            if (expandedHeader) {
+                expandedHeader.addEventListener("transitionend", function handler(e) {
+                    if (e.target === expandedHeader && e.propertyName === "opacity") {
+                        expandedHeader.removeEventListener("transitionend", handler)
+                        expandedHeader.style.transition = ""
                     }
                 })
             }
