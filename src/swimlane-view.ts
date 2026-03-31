@@ -148,6 +148,7 @@ export class SwimlaneView extends BasesView {
     private selectionManager: SelectionManager
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
     private settingsDirty = false
+    private splitLeaf: import("obsidian").WorkspaceLeaf | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -804,6 +805,25 @@ export class SwimlaneView extends BasesView {
         this.rebuildBoard()
     }
 
+    private openNote(file: TFile): void {
+        const behavior = this.plugin.settings.openNoteBehavior
+        if (behavior === "new-pane") {
+            // Reuse the existing split leaf if it's still attached to the workspace
+            if (this.splitLeaf && (this.splitLeaf as any).containerEl?.isConnected) {
+                this.splitLeaf.openFile(file)
+                return
+            }
+            this.splitLeaf = this.app.workspace.getLeaf("split")
+            this.splitLeaf.openFile(file)
+        } else {
+            const leaf =
+                behavior === "new-tab"
+                    ? this.app.workspace.getLeaf("tab")
+                    : this.app.workspace.getLeaf(false)
+            leaf.openFile(file)
+        }
+    }
+
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
         const excluded = new Set([
@@ -1085,6 +1105,7 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             openNoteBehavior: this.plugin.settings.openNoteBehavior,
+            openNote: (file) => this.openNote(file),
             mobile,
             resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
             onEditTags: (cardEl: HTMLElement) => {
