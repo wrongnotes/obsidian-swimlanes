@@ -108,6 +108,9 @@
     opacity: 0.9;
     box-shadow: var(--shadow-l);
     cursor: grabbing;
+    /* Override min/max-width so the clone uses its inline width exactly */
+    min-width: unset !important;
+    max-width: unset !important;
 }
 
 .swimlane-drag-clone--dropping {

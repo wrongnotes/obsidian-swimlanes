@@ -1382,6 +1382,10 @@ export class SwimlaneView extends BasesView {
                 if (!this.selectionManager.active) {
                     this.cardDnd.registerDropArea(strip, { groupKey, collapsed: true } as any)
                 }
+                // Register for column reordering
+                if (!mobile && !this.selectionManager.active) {
+                    this.swimlaneDnd.registerDraggable(strip, { groupKey })
+                }
 
                 continue
             }
