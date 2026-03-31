@@ -736,7 +736,9 @@ export class SwimlaneView extends BasesView {
 
     private get collapsedSwimlanes(): Set<GroupKey> {
         const val = this.config.get(CONFIG_KEYS.collapsedSwimlanes)
-        if (!Array.isArray(val)) return new Set()
+        if (!Array.isArray(val)) {
+            return new Set()
+        }
         return new Set(val.filter((v): v is GroupKey => typeof v === "string"))
     }
 
@@ -770,7 +772,9 @@ export class SwimlaneView extends BasesView {
         const elementUnderPointer = document.elementFromPoint(clientX, clientY)
 
         // Find if pointer is over a collapsed strip
-        const strip = elementUnderPointer?.closest(".swimlane-column-collapsed") as HTMLElement | null
+        const strip = elementUnderPointer?.closest(
+            ".swimlane-column-collapsed",
+        ) as HTMLElement | null
         const groupKey = strip?.dataset.groupKey as GroupKey | undefined
 
         // If hovering a different collapsed strip than the timer target, clear timer
@@ -779,7 +783,12 @@ export class SwimlaneView extends BasesView {
         }
 
         // If hovering a collapsed strip and no timer running, start one
-        if (strip && groupKey && !this.dwellExpandTimer && groupKey !== this.dwellExpandedGroupKey) {
+        if (
+            strip &&
+            groupKey &&
+            !this.dwellExpandTimer &&
+            groupKey !== this.dwellExpandedGroupKey
+        ) {
             strip.classList.add("swimlane-column-collapsed--hover")
             this.dwellTimerGroupKey = groupKey
             this.dwellExpandTimer = setTimeout(() => {
@@ -802,11 +811,15 @@ export class SwimlaneView extends BasesView {
 
     private dwellExpandColumn(groupKey: GroupKey, strip: HTMLElement): void {
         const board = strip.parentElement
-        if (!board) return
+        if (!board) {
+            return
+        }
 
         const groupByKey = new Map(this.data.groupedData.map(g => [String(g.key) as GroupKey, g]))
         const group = groupByKey.get(groupKey)
-        if (!group) return
+        if (!group) {
+            return
+        }
 
         // Create full column element
         const col = document.createElement("div")
@@ -844,8 +857,7 @@ export class SwimlaneView extends BasesView {
             const rank = getFrontmatter<string>(this.app, entry.file, rankProp) ?? ""
             let entryTags: string[] | undefined
             if (showTags) {
-                const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter
-                    ?.tags
+                const tagsRaw = this.app.metadataCache.getFileCache(entry.file)?.frontmatter?.tags
                 entryTags = Array.isArray(tagsRaw)
                     ? tagsRaw.filter((t): t is string => typeof t === "string")
                     : typeof tagsRaw === "string"
@@ -875,7 +887,9 @@ export class SwimlaneView extends BasesView {
     }
 
     private startRecollapseTimer(): void {
-        if (this.recollapseTimer) return
+        if (this.recollapseTimer) {
+            return
+        }
         this.recollapseTimer = setTimeout(() => {
             this.recollapseTimer = null
             this.recollapseDwellExpanded()
@@ -890,12 +904,16 @@ export class SwimlaneView extends BasesView {
     }
 
     private recollapseDwellExpanded(): void {
-        if (!this.dwellExpandedGroupKey || !this.dwellExpandedColumnEl) return
+        if (!this.dwellExpandedGroupKey || !this.dwellExpandedColumnEl) {
+            return
+        }
 
         const groupKey = this.dwellExpandedGroupKey
         const col = this.dwellExpandedColumnEl
         const board = col.parentElement
-        if (!board) return
+        if (!board) {
+            return
+        }
 
         const entries = this.data.groupedData.find(g => String(g.key) === groupKey)?.entries ?? []
 
@@ -933,9 +951,9 @@ export class SwimlaneView extends BasesView {
             this.dwellTimerGroupKey = null
         }
         // Clear hover highlight on any collapsed strips
-        document.querySelectorAll(".swimlane-column-collapsed--hover").forEach(el =>
-            el.classList.remove("swimlane-column-collapsed--hover"),
-        )
+        document
+            .querySelectorAll(".swimlane-column-collapsed--hover")
+            .forEach(el => el.classList.remove("swimlane-column-collapsed--hover"))
     }
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
@@ -1323,15 +1341,6 @@ export class SwimlaneView extends BasesView {
                 cls: "swimlane-column-count",
                 text: String(group?.entries.length ?? 0),
             })
-            if (!this.isMobileLayout) {
-                const chevron = headerRight.createDiv({ cls: "swimlane-column-collapse-btn" })
-                setIcon(chevron, "chevron-left")
-                chevron.setAttribute("aria-label", "Collapse column")
-                chevron.addEventListener("click", (e) => {
-                    e.stopPropagation()
-                    this.toggleCollapsed(groupKey)
-                })
-            }
             const menuBtn = headerRight.createSpan({
                 cls: "swimlane-column-menu-btn",
                 attr: { "data-no-drag": "" },

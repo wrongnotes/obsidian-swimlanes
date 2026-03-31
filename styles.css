@@ -1615,8 +1615,9 @@
     gap: 8px;
     width: 40px;
     flex-shrink: 0;
+    padding: var(--size-4-4) var(--size-4-1);
     background: var(--background-secondary);
-    border-radius: var(--radius-s);
+    border-radius: var(--radius-m);
     cursor: pointer;
     overflow: hidden;
     position: relative;
@@ -1648,26 +1649,6 @@
     text-align: center;
 }
 
-.swimlane-column-collapse-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    border-radius: var(--radius-s);
-    color: var(--text-faint);
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 100ms ease;
-}
-
-.swimlane-column-header:hover .swimlane-column-collapse-btn {
-    opacity: 1;
-}
-
-.swimlane-column-collapse-btn:hover {
-    color: var(--text-muted);
-    background: var(--background-modifier-hover);
-}
 
 .swimlane-column-collapsed--hover {
     background: var(--background-modifier-hover);
