@@ -82,6 +82,7 @@ const CONFIG_KEYS = {
     showAddCard: "showAddCard",
     showAddColumn: "showAddColumn",
     hiddenSwimlanes: "hiddenSwimlanes",
+    collapsedSwimlanes: "collapsedSwimlanes",
     forceMobileLayout: "forceMobileLayout",
     imageWidth: "imageWidth",
 } as const
@@ -710,6 +711,36 @@ export class SwimlaneView extends BasesView {
 
     private setHiddenSwimlanes(hidden: Set<GroupKey>): void {
         this.config.set(CONFIG_KEYS.hiddenSwimlanes, [...hidden])
+    }
+
+    private get collapsedSwimlanes(): Set<GroupKey> {
+        const val = this.config.get(CONFIG_KEYS.collapsedSwimlanes)
+        if (!Array.isArray(val)) return new Set()
+        return new Set(val.filter((v): v is GroupKey => typeof v === "string"))
+    }
+
+    private setCollapsedSwimlanes(collapsed: Set<GroupKey>): void {
+        this.config.set(CONFIG_KEYS.collapsedSwimlanes, [...collapsed])
+    }
+
+    private toggleCollapsed(groupKey: GroupKey): void {
+        const collapsed = this.collapsedSwimlanes
+        if (collapsed.has(groupKey)) {
+            collapsed.delete(groupKey)
+        } else {
+            collapsed.add(groupKey)
+        }
+        this.setCollapsedSwimlanes(collapsed)
+        this.rebuildBoard()
+    }
+
+    private expandColumn(groupKey: GroupKey): void {
+        const collapsed = this.collapsedSwimlanes
+        if (collapsed.has(groupKey)) {
+            collapsed.delete(groupKey)
+            this.setCollapsedSwimlanes(collapsed)
+            this.rebuildBoard()
+        }
     }
 
     private get cardPropertyAliases(): CardPropertyAlias[] {
