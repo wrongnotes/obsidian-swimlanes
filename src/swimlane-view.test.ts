@@ -724,7 +724,9 @@ describe("column collapsing", () => {
         const strip = container.querySelector('.swimlane-column-collapsed[data-group-key="Done"]')
         expect(strip).not.toBeNull()
         // No full (non-collapsed) .swimlane-column should exist for "Done"
-        const cols = Array.from(container.querySelectorAll(".swimlane-column:not(.swimlane-column-collapsed)"))
+        const cols = Array.from(
+            container.querySelectorAll(".swimlane-column:not(.swimlane-column-collapsed)"),
+        )
         const doneCol = cols.find(c => c.getAttribute("data-group-key") === "Done")
         expect(doneCol).toBeUndefined()
         // The "Backlog" column renders normally

@@ -1630,7 +1630,9 @@
 
 /* ── Collapse animation (two-phase on the full column) ── */
 .swimlane-column--collapsing .swimlane-card-list {
-    transition: max-height 200ms ease-in, opacity 150ms ease-in;
+    transition:
+        max-height 200ms ease-in,
+        opacity 150ms ease-in;
     max-height: 0 !important;
     opacity: 0;
     overflow: hidden;
@@ -1643,7 +1645,10 @@
 }
 
 .swimlane-column--shrinking {
-    transition: min-width 250ms ease-in-out, max-width 250ms ease-in-out, opacity 200ms ease-in;
+    transition:
+        min-width 250ms ease-in-out,
+        max-width 250ms ease-in-out,
+        opacity 200ms ease-in;
     min-width: 40px !important;
     max-width: 40px !important;
     opacity: 0;
@@ -1660,7 +1665,9 @@
     max-height: 0;
     opacity: 0;
     overflow: hidden;
-    transition: max-height 200ms 100ms ease-out, opacity 200ms 100ms ease-out;
+    transition:
+        max-height 200ms 100ms ease-out,
+        opacity 200ms 100ms ease-out;
 }
 
 .swimlane-column--expanding-active .swimlane-column-header {
@@ -1671,7 +1678,6 @@
     max-height: var(--expand-height);
     opacity: 1;
 }
-
 
 .swimlane-column-collapsed-menu-btn {
     display: inline-flex;

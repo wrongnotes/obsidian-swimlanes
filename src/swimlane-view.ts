@@ -793,7 +793,9 @@ export class SwimlaneView extends BasesView {
 
     private expandColumn(groupKey: GroupKey): void {
         const collapsed = this.collapsedSwimlanes
-        if (!collapsed.has(groupKey)) {return}
+        if (!collapsed.has(groupKey)) {
+            return
+        }
 
         collapsed.delete(groupKey)
         // Set before config write — config.set may trigger onDataUpdated → rebuildBoard synchronously
@@ -1101,7 +1103,7 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             openNoteBehavior: this.plugin.settings.openNoteBehavior,
-            openNote: (file) => this.openNote(file),
+            openNote: file => this.openNote(file),
             mobile,
             resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
             onEditTags: (cardEl: HTMLElement) => {
@@ -1180,13 +1182,15 @@ export class SwimlaneView extends BasesView {
                     attr: { "data-no-drag": "", "aria-label": "Column menu" },
                 })
                 setIcon(menuBtn, "more-vertical")
-                menuBtn.addEventListener("click", (e) => {
+                menuBtn.addEventListener("click", e => {
                     e.stopPropagation()
                     this.showColumnMenu(menuBtn, board, groupKey, entries.length, orderedKeys)
                 })
 
                 // Inner wrapper acts as drag handle (swimlaneDnd requires .swimlane-column-header)
-                const inner = strip.createDiv({ cls: "swimlane-column-header swimlane-column-collapsed-inner" })
+                const inner = strip.createDiv({
+                    cls: "swimlane-column-header swimlane-column-collapsed-inner",
+                })
 
                 const label = inner.createDiv({ cls: "swimlane-column-collapsed-label" })
                 label.textContent = groupKey
@@ -1369,7 +1373,9 @@ export class SwimlaneView extends BasesView {
                 `.swimlane-column[data-group-key="${CSS.escape(expandKey)}"]`,
             ) as HTMLElement | null
             if (expandedCol) {
-                const expandedCardList = expandedCol.querySelector(".swimlane-card-list") as HTMLElement | null
+                const expandedCardList = expandedCol.querySelector(
+                    ".swimlane-card-list",
+                ) as HTMLElement | null
                 const targetHeight = expandedCardList?.scrollHeight ?? 0
                 expandedCol.style.setProperty("--expand-height", `${targetHeight}px`)
                 expandedCol.classList.add("swimlane-column--expanding")
@@ -1378,7 +1384,10 @@ export class SwimlaneView extends BasesView {
 
                 // Clean up classes after animation completes
                 const cleanup = () => {
-                    expandedCol.classList.remove("swimlane-column--expanding", "swimlane-column--expanding-active")
+                    expandedCol.classList.remove(
+                        "swimlane-column--expanding",
+                        "swimlane-column--expanding-active",
+                    )
                     expandedCol.style.removeProperty("--expand-height")
                 }
                 expandedCardList?.addEventListener("transitionend", function handler(e) {
@@ -2487,23 +2496,27 @@ export class SwimlaneView extends BasesView {
 
         // Drop onto a collapsed column — insert at top
         if ((context as any).collapsed) {
-            const targetGroup = this.data.groupedData.find(
-                g => String(g.key) === context.groupKey,
-            )
+            const targetGroup = this.data.groupedData.find(g => String(g.key) === context.groupKey)
             // Find the first rank in the target column to insert before it
             let firstRank: string | null = null
             if (targetGroup) {
                 for (const entry of targetGroup.entries) {
                     const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
-                    if (r && (firstRank === null || r < firstRank)) {firstRank = r}
+                    if (r && (firstRank === null || r < firstRank)) {
+                        firstRank = r
+                    }
                 }
             }
             const newRank = midRank(null, firstRank)
             const file = this.app.vault.getFileByPath(dragState.path)
-            if (!file) {return}
+            if (!file) {
+                return
+            }
 
             const automationMuts = this.getAutomationMutations(
-                dragState.groupKey, context.groupKey, "enters",
+                dragState.groupKey,
+                context.groupKey,
+                "enters",
             )
             const previousValues: Record<string, unknown> = {}
             for (const m of automationMuts) {
