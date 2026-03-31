@@ -696,4 +696,72 @@ describe("batch operations", () => {
         // All selection-only transactions should be purged
         expect(undoManager.canUndo).toBe(false)
     })
+
+    it("suppresses card context menu when selection mode is active", () => {
+        const { view, container } = makeView([
+            makeGroup("Backlog", [makeEntry("Note A")]),
+        ])
+        ;(view as any).selectionManager.enter()
+        view.onDataUpdated()
+        const card = container.querySelector(".swimlane-card")!
+        const evt = new MouseEvent("contextmenu", { bubbles: true })
+        const preventSpy = jest.spyOn(evt, "preventDefault")
+        card.dispatchEvent(evt)
+        // preventDefault is always called (existing behaviour)
+        expect(preventSpy).toHaveBeenCalled()
+        // The board has the swimlane-selecting class, so no menu opens
+        const board = container.querySelector(".swimlane-board")!
+        expect(board.classList.contains("swimlane-selecting")).toBe(true)
+    })
+})
+
+describe("column collapsing", () => {
+    it("collapsed column renders as strip", () => {
+        const { view, container } = makeView(
+            [
+                makeGroup("Backlog", [makeEntry("A")]),
+                makeGroup("Done", [makeEntry("B")]),
+            ],
+            { collapsedSwimlanes: ["Done"] },
+        )
+        view.onDataUpdated()
+        // The collapsed strip should exist with the correct data-group-key
+        const strip = container.querySelector('.swimlane-column-collapsed[data-group-key="Done"]')
+        expect(strip).not.toBeNull()
+        // No full .swimlane-column should exist for "Done"
+        const cols = Array.from(container.querySelectorAll(".swimlane-column"))
+        const doneCol = cols.find(c => c.getAttribute("data-group-key") === "Done")
+        expect(doneCol).toBeUndefined()
+        // The "Backlog" column renders normally
+        const backlogCol = cols.find(c => c.getAttribute("data-group-key") === "Backlog")
+        expect(backlogCol).not.toBeUndefined()
+    })
+
+    it("collapsed strip shows card count", () => {
+        const { view, container } = makeView(
+            [makeGroup("Backlog", [makeEntry("A"), makeEntry("B"), makeEntry("C")])],
+            { collapsedSwimlanes: ["Backlog"] },
+        )
+        view.onDataUpdated()
+        const count = container.querySelector(
+            '.swimlane-column-collapsed[data-group-key="Backlog"] .swimlane-column-collapsed-count',
+        )
+        expect(count?.textContent).toBe("3")
+    })
+
+    it("clicking collapsed strip expands the column", () => {
+        const { view, container, configStore } = makeView(
+            [makeGroup("Backlog", [makeEntry("A")])],
+            { collapsedSwimlanes: ["Backlog"] },
+        )
+        view.onDataUpdated()
+        const strip = container.querySelector(
+            '.swimlane-column-collapsed[data-group-key="Backlog"]',
+        ) as HTMLElement
+        expect(strip).not.toBeNull()
+        strip.click()
+        // Config should no longer list "Backlog" as collapsed
+        const collapsed: string[] = configStore.collapsedSwimlanes ?? []
+        expect(collapsed).not.toContain("Backlog")
+    })
 })
