@@ -810,13 +810,42 @@ export class SwimlaneView extends BasesView {
         }
     }
 
+    private expandingColumnKey: GroupKey | null = null
+
     private expandColumn(groupKey: GroupKey): void {
         const collapsed = this.collapsedSwimlanes
-        if (collapsed.has(groupKey)) {
+        if (!collapsed.has(groupKey)) return
+
+        const strip = this.boardEl.querySelector(
+            `.swimlane-column-collapsed[data-group-key="${CSS.escape(groupKey)}"]`,
+        ) as HTMLElement | null
+
+        if (!strip) {
             collapsed.delete(groupKey)
             this.setCollapsedSwimlanes(collapsed)
             this.rebuildBoard()
+            return
         }
+
+        // Phase 1: Grow strip to full column width, fade out content
+        strip.classList.add("swimlane-column-collapsed--expanding")
+
+        const afterPhase1 = () => {
+            collapsed.delete(groupKey)
+            this.setCollapsedSwimlanes(collapsed)
+            // Mark so rebuildBoard knows to animate cards in
+            this.expandingColumnKey = groupKey
+            this.rebuildBoard()
+        }
+
+        strip.addEventListener("transitionend", function handler(e) {
+            if (e.target === strip && e.propertyName === "min-width") {
+                strip.removeEventListener("transitionend", handler)
+                afterPhase1()
+            }
+        })
+        // Fallback
+        setTimeout(afterPhase1, 300)
     }
 
     // ── Dwell-to-expand collapsed columns during drag ──────────────────
@@ -1536,6 +1565,35 @@ export class SwimlaneView extends BasesView {
 
         this.applyPendingHighlight()
         this.expandingCardPath = null
+
+        // Phase 2 of expand animation: card list grows in
+        if (this.expandingColumnKey) {
+            const expandKey = this.expandingColumnKey
+            this.expandingColumnKey = null
+            const expandedCol = board.querySelector(
+                `.swimlane-column[data-group-key="${CSS.escape(expandKey)}"]`,
+            ) as HTMLElement | null
+            const expandedCardList = expandedCol?.querySelector(".swimlane-card-list") as HTMLElement | null
+            if (expandedCardList) {
+                const targetHeight = expandedCardList.scrollHeight
+                expandedCardList.style.maxHeight = "0"
+                expandedCardList.style.opacity = "0"
+                expandedCardList.style.overflow = "hidden"
+                expandedCardList.style.transition = "max-height 200ms ease-out, opacity 200ms ease-out"
+                void expandedCardList.offsetHeight // force reflow
+                expandedCardList.style.maxHeight = `${targetHeight}px`
+                expandedCardList.style.opacity = "1"
+                expandedCardList.addEventListener("transitionend", function handler(e) {
+                    if (e.target === expandedCardList && e.propertyName === "max-height") {
+                        expandedCardList.removeEventListener("transitionend", handler)
+                        expandedCardList.style.maxHeight = ""
+                        expandedCardList.style.opacity = ""
+                        expandedCardList.style.overflow = ""
+                        expandedCardList.style.transition = ""
+                    }
+                })
+            }
+        }
     }
 
     private renderAddCardButton(columnEl: HTMLElement, groupKey: GroupKey): void {

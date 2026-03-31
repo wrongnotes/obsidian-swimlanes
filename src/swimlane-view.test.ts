@@ -698,9 +698,7 @@ describe("batch operations", () => {
     })
 
     it("suppresses card context menu when selection mode is active", () => {
-        const { view, container } = makeView([
-            makeGroup("Backlog", [makeEntry("Note A")]),
-        ])
+        const { view, container } = makeView([makeGroup("Backlog", [makeEntry("Note A")])])
         ;(view as any).selectionManager.enter()
         view.onDataUpdated()
         const card = container.querySelector(".swimlane-card")!
@@ -718,10 +716,7 @@ describe("batch operations", () => {
 describe("column collapsing", () => {
     it("collapsed column renders as strip", () => {
         const { view, container } = makeView(
-            [
-                makeGroup("Backlog", [makeEntry("A")]),
-                makeGroup("Done", [makeEntry("B")]),
-            ],
+            [makeGroup("Backlog", [makeEntry("A")]), makeGroup("Done", [makeEntry("B")])],
             { collapsedSwimlanes: ["Done"] },
         )
         view.onDataUpdated()
@@ -759,7 +754,11 @@ describe("column collapsing", () => {
             '.swimlane-column-collapsed[data-group-key="Backlog"]',
         ) as HTMLElement
         expect(strip).not.toBeNull()
+        jest.useFakeTimers()
         strip.click()
+        // Expand animation uses a setTimeout fallback since jsdom doesn't fire transitionend
+        jest.runAllTimers()
+        jest.useRealTimers()
         // Config should no longer list "Backlog" as collapsed
         const collapsed: string[] = configStore.collapsedSwimlanes ?? []
         expect(collapsed).not.toContain("Backlog")
