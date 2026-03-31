@@ -238,6 +238,7 @@ export function renderCard(
 
     card.addEventListener("contextmenu", e => {
         e.preventDefault()
+        if (card.closest(".swimlane-selecting")) return
         showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options, card)
     })
 

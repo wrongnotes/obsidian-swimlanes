@@ -1521,6 +1521,11 @@
     cursor: default;
 }
 
+/* Hide mobile card menu button in selection mode */
+.swimlane-selecting .swimlane-card-menu-btn {
+    display: none;
+}
+
 /* ── Batch Tag Popover ── */
 .swimlane-batch-tag-popover {
     position: absolute;
