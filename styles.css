@@ -817,7 +817,7 @@
 }
 
 .swimlane-drag-and-drop--hidden {
-    display: none;
+    display: none !important;
 }
 
 /* Create base modal */
