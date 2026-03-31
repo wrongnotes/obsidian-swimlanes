@@ -1615,7 +1615,7 @@
     gap: 8px;
     width: 40px;
     flex-shrink: 0;
-    padding: var(--size-4-4) var(--size-4-1);
+    padding: var(--size-4-4) var(--size-4-1) var(--size-4-2);
     background: var(--background-secondary);
     border-radius: var(--radius-m);
     cursor: pointer;
