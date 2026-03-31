@@ -1368,6 +1368,17 @@ export class SwimlaneView extends BasesView {
                 strip.setAttribute("aria-label", groupKey)
                 strip.setAttribute("title", groupKey)
 
+                // Menu button at the top
+                const menuBtn = strip.createSpan({
+                    cls: "swimlane-column-collapsed-menu-btn",
+                    attr: { "data-no-drag": "", "aria-label": "Column menu" },
+                })
+                setIcon(menuBtn, "more-vertical")
+                menuBtn.addEventListener("click", (e) => {
+                    e.stopPropagation()
+                    this.showColumnMenu(menuBtn, board, groupKey, entries.length, orderedKeys)
+                })
+
                 // Inner wrapper acts as drag handle (swimlaneDnd requires .swimlane-column-header)
                 const inner = strip.createDiv({ cls: "swimlane-column-header swimlane-column-collapsed-inner" })
 
@@ -1376,10 +1387,6 @@ export class SwimlaneView extends BasesView {
 
                 const count = inner.createDiv({ cls: "swimlane-column-collapsed-count" })
                 count.textContent = String(entries.length)
-
-                strip.addEventListener("click", () => {
-                    this.expandColumn(groupKey)
-                })
 
                 // Register as drop area for dwell-to-expand during drag
                 if (!this.selectionManager.active) {
@@ -1937,9 +1944,10 @@ export class SwimlaneView extends BasesView {
         })
 
         if (!this.isMobileLayout) {
+            const isCollapsed = this.collapsedSwimlanes.has(groupKey)
             menu.addItem(item => {
-                item.setTitle("Collapse")
-                    .setIcon("columns-2")
+                item.setTitle(isCollapsed ? "Expand" : "Collapse")
+                    .setIcon(isCollapsed ? "columns-2" : "columns-2")
                     .onClick(() => this.toggleCollapsed(groupKey))
             })
         }

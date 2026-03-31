@@ -754,7 +754,11 @@ describe("column collapsing", () => {
             '.swimlane-column-collapsed[data-group-key="Backlog"]',
         ) as HTMLElement
         expect(strip).not.toBeNull()
-        strip.click()
+        // Menu button should be present on collapsed strip
+        const menuBtn = strip.querySelector(".swimlane-column-collapsed-menu-btn") as HTMLElement
+        expect(menuBtn).not.toBeNull()
+        // Expand via toggleCollapsed (called by the menu's Expand item)
+        ;(view as any).toggleCollapsed("Backlog")
         // Config should no longer list "Backlog" as collapsed
         const collapsed: string[] = configStore.collapsedSwimlanes ?? []
         expect(collapsed).not.toContain("Backlog")

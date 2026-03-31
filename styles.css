@@ -1651,6 +1651,22 @@
 }
 
 
+.swimlane-column-collapsed-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.swimlane-column-collapsed-menu-btn:hover {
+    color: var(--text-muted);
+    background: var(--background-modifier-hover);
+}
+
 /* Override .swimlane-column-header styles inside collapsed strip */
 .swimlane-column-collapsed-inner {
     display: flex;
