@@ -1645,12 +1645,6 @@
     overflow: hidden;
 }
 
-.swimlane-column-collapsed--expanding {
-    transition: min-width 250ms ease-in-out, max-width 250ms ease-in-out, opacity 150ms ease-in;
-    min-width: max(var(--col-base, 240px), calc(var(--swimlane-image-width, 64px) + 180px)) !important;
-    max-width: max(300px, calc(var(--swimlane-image-width, 64px) + 200px)) !important;
-    opacity: 0;
-}
 
 .swimlane-column-collapsed:hover {
     background: var(--background-modifier-hover);

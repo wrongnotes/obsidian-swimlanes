@@ -816,36 +816,11 @@ export class SwimlaneView extends BasesView {
         const collapsed = this.collapsedSwimlanes
         if (!collapsed.has(groupKey)) return
 
-        const strip = this.boardEl.querySelector(
-            `.swimlane-column-collapsed[data-group-key="${CSS.escape(groupKey)}"]`,
-        ) as HTMLElement | null
-
-        if (!strip) {
-            collapsed.delete(groupKey)
-            this.setCollapsedSwimlanes(collapsed)
-            this.rebuildBoard()
-            return
-        }
-
-        // Phase 1: Grow strip to full column width, fade out content
-        strip.classList.add("swimlane-column-collapsed--expanding")
-
-        const afterPhase1 = () => {
-            collapsed.delete(groupKey)
-            this.setCollapsedSwimlanes(collapsed)
-            // Mark so rebuildBoard knows to animate cards in
-            this.expandingColumnKey = groupKey
-            this.rebuildBoard()
-        }
-
-        strip.addEventListener("transitionend", function handler(e) {
-            if (e.target === strip && e.propertyName === "min-width") {
-                strip.removeEventListener("transitionend", handler)
-                afterPhase1()
-            }
-        })
-        // Fallback
-        setTimeout(afterPhase1, 300)
+        collapsed.delete(groupKey)
+        this.setCollapsedSwimlanes(collapsed)
+        // Rebuild immediately, then animate cards expanding in
+        this.expandingColumnKey = groupKey
+        this.rebuildBoard()
     }
 
     // ── Dwell-to-expand collapsed columns during drag ──────────────────

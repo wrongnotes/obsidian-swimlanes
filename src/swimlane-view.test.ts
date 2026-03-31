@@ -754,11 +754,7 @@ describe("column collapsing", () => {
             '.swimlane-column-collapsed[data-group-key="Backlog"]',
         ) as HTMLElement
         expect(strip).not.toBeNull()
-        jest.useFakeTimers()
         strip.click()
-        // Expand animation uses a setTimeout fallback since jsdom doesn't fire transitionend
-        jest.runAllTimers()
-        jest.useRealTimers()
         // Config should no longer list "Backlog" as collapsed
         const collapsed: string[] = configStore.collapsedSwimlanes ?? []
         expect(collapsed).not.toContain("Backlog")
