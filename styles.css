@@ -1607,21 +1607,6 @@
 }
 
 /* ── Collapsed Column Strip ── */
-@keyframes swimlane-column-collapse-in {
-    from {
-        width: 0;
-        padding-left: 0;
-        padding-right: 0;
-        opacity: 0;
-    }
-    to {
-        width: 40px;
-        padding-left: var(--size-4-1);
-        padding-right: var(--size-4-1);
-        opacity: 1;
-    }
-}
-
 .swimlane-column-collapsed {
     display: flex;
     flex-direction: column;
@@ -1636,7 +1621,28 @@
     cursor: pointer;
     overflow: hidden;
     position: relative;
-    animation: swimlane-column-collapse-in 250ms ease-out;
+}
+
+/* ── Collapse animation (two-phase on the full column) ── */
+.swimlane-column--collapsing .swimlane-card-list {
+    transition: max-height 200ms ease-in, opacity 150ms ease-in;
+    max-height: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.swimlane-column--collapsing .swimlane-add-card-btn,
+.swimlane-column--collapsing .swimlane-add-card-wrapper {
+    transition: opacity 150ms ease-in;
+    opacity: 0;
+}
+
+.swimlane-column--shrinking {
+    transition: min-width 250ms ease-in-out, max-width 250ms ease-in-out, opacity 200ms ease-in;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    opacity: 0;
+    overflow: hidden;
 }
 
 .swimlane-column-collapsed:hover {

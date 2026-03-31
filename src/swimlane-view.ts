@@ -749,12 +749,65 @@ export class SwimlaneView extends BasesView {
     private toggleCollapsed(groupKey: GroupKey): void {
         const collapsed = this.collapsedSwimlanes
         if (collapsed.has(groupKey)) {
+            // Expanding — just update config and rebuild
             collapsed.delete(groupKey)
-        } else {
-            collapsed.add(groupKey)
+            this.setCollapsedSwimlanes(collapsed)
+            this.rebuildBoard()
+            return
         }
-        this.setCollapsedSwimlanes(collapsed)
-        this.rebuildBoard()
+
+        // Collapsing — animate first, then update config
+        const col = this.boardEl.querySelector(
+            `.swimlane-column[data-group-key="${CSS.escape(groupKey)}"]`,
+        ) as HTMLElement | null
+        if (!col) {
+            collapsed.add(groupKey)
+            this.setCollapsedSwimlanes(collapsed)
+            this.rebuildBoard()
+            return
+        }
+
+        // Phase 1: Shrink cards into header
+        const cardList = col.querySelector(".swimlane-card-list") as HTMLElement | null
+        if (cardList) {
+            cardList.style.maxHeight = `${cardList.scrollHeight}px`
+            // Force reflow so the transition starts from the current height
+            void cardList.offsetHeight
+        }
+        col.classList.add("swimlane-column--collapsing")
+
+        const afterPhase1 = () => {
+            // Phase 2: Shrink column width
+            col.classList.add("swimlane-column--shrinking")
+
+            const afterPhase2 = () => {
+                collapsed.add(groupKey)
+                this.setCollapsedSwimlanes(collapsed)
+                this.rebuildBoard()
+            }
+
+            col.addEventListener("transitionend", function handler(e) {
+                if (e.target === col && e.propertyName === "min-width") {
+                    col.removeEventListener("transitionend", handler)
+                    afterPhase2()
+                }
+            })
+            // Fallback in case transitionend doesn't fire
+            setTimeout(afterPhase2, 300)
+        }
+
+        if (cardList) {
+            cardList.addEventListener("transitionend", function handler(e) {
+                if (e.target === cardList && e.propertyName === "max-height") {
+                    cardList.removeEventListener("transitionend", handler)
+                    afterPhase1()
+                }
+            })
+            // Fallback
+            setTimeout(afterPhase1, 250)
+        } else {
+            afterPhase1()
+        }
     }
 
     private expandColumn(groupKey: GroupKey): void {
