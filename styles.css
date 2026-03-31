@@ -1605,3 +1605,45 @@
     padding-bottom: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
 }
+
+/* ── Collapsed Column Strip ── */
+.swimlane-column-collapsed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 40px;
+    flex-shrink: 0;
+    background: var(--background-secondary);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+}
+
+.swimlane-column-collapsed:hover {
+    background: var(--background-modifier-hover);
+}
+
+.swimlane-column-collapsed-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    font-weight: var(--font-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: calc(100% - 40px);
+}
+
+.swimlane-column-collapsed-count {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    background: var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 2px 6px;
+    min-width: 20px;
+    text-align: center;
+}

@@ -965,6 +965,7 @@ export class SwimlaneView extends BasesView {
         // groups from data that aren't in the configured order. Skip hidden columns.
         const order = this.swimlaneOrder
         const hidden = this.hiddenSwimlanes
+        const collapsed = this.collapsedSwimlanes
         const orderedKeys = (
             order.length > 0
                 ? [...order, ...[...groupByKey.keys()].filter(k => !order.includes(k))]
@@ -1088,6 +1089,31 @@ export class SwimlaneView extends BasesView {
         }
 
         for (const groupKey of orderedKeys) {
+            if (collapsed.has(groupKey) && !this.isMobileLayout) {
+                const entries = groupByKey.get(groupKey)?.entries ?? []
+                const strip = board.createDiv({ cls: "swimlane-column-collapsed" })
+                strip.dataset.groupKey = groupKey
+                strip.setAttribute("aria-label", groupKey)
+                strip.setAttribute("title", groupKey)
+
+                const label = strip.createDiv({ cls: "swimlane-column-collapsed-label" })
+                label.textContent = groupKey
+
+                const count = strip.createDiv({ cls: "swimlane-column-collapsed-count" })
+                count.textContent = String(entries.length)
+
+                strip.addEventListener("click", () => {
+                    this.expandColumn(groupKey)
+                })
+
+                // Register as drop area for dwell-to-expand during drag
+                if (!this.selectionManager.active) {
+                    this.cardDnd.registerDropArea(strip, { groupKey, collapsed: true } as any)
+                }
+
+                continue
+            }
+
             const group = groupByKey.get(groupKey) ?? null
             const label = groupKey || "(No value)"
             const col = board.createDiv({ cls: "swimlane-column" })
