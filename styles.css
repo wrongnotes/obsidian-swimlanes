@@ -1607,6 +1607,21 @@
 }
 
 /* ── Collapsed Column Strip ── */
+@keyframes swimlane-column-collapse-in {
+    from {
+        width: 0;
+        padding-left: 0;
+        padding-right: 0;
+        opacity: 0;
+    }
+    to {
+        width: 40px;
+        padding-left: var(--size-4-1);
+        padding-right: var(--size-4-1);
+        opacity: 1;
+    }
+}
+
 .swimlane-column-collapsed {
     display: flex;
     flex-direction: column;
@@ -1621,6 +1636,7 @@
     cursor: pointer;
     overflow: hidden;
     position: relative;
+    animation: swimlane-column-collapse-in 250ms ease-out;
 }
 
 .swimlane-column-collapsed:hover {
