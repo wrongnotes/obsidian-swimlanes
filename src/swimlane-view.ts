@@ -1363,15 +1363,18 @@ export class SwimlaneView extends BasesView {
         for (const groupKey of orderedKeys) {
             if (collapsed.has(groupKey) && !this.isMobileLayout) {
                 const entries = groupByKey.get(groupKey)?.entries ?? []
-                const strip = board.createDiv({ cls: "swimlane-column-collapsed" })
+                const strip = board.createDiv({ cls: "swimlane-column swimlane-column-collapsed" })
                 strip.dataset.groupKey = groupKey
                 strip.setAttribute("aria-label", groupKey)
                 strip.setAttribute("title", groupKey)
 
-                const label = strip.createDiv({ cls: "swimlane-column-collapsed-label" })
+                // Inner wrapper acts as drag handle (swimlaneDnd requires .swimlane-column-header)
+                const inner = strip.createDiv({ cls: "swimlane-column-header swimlane-column-collapsed-inner" })
+
+                const label = inner.createDiv({ cls: "swimlane-column-collapsed-label" })
                 label.textContent = groupKey
 
-                const count = strip.createDiv({ cls: "swimlane-column-collapsed-count" })
+                const count = inner.createDiv({ cls: "swimlane-column-collapsed-count" })
                 count.textContent = String(entries.length)
 
                 strip.addEventListener("click", () => {
