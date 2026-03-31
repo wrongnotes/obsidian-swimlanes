@@ -1650,6 +1650,28 @@
     overflow: hidden;
 }
 
+/* ── Expand animation (header fade-in, then card list grows) ── */
+.swimlane-column--expanding .swimlane-column-header {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+}
+
+.swimlane-column--expanding .swimlane-card-list {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 200ms 100ms ease-out, opacity 200ms 100ms ease-out;
+}
+
+.swimlane-column--expanding-active .swimlane-column-header {
+    opacity: 1;
+}
+
+.swimlane-column--expanding-active .swimlane-card-list {
+    max-height: var(--expand-height);
+    opacity: 1;
+}
+
 
 .swimlane-column-collapsed-menu-btn {
     display: inline-flex;

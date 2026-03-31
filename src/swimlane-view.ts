@@ -749,7 +749,7 @@ export class SwimlaneView extends BasesView {
         // Phase 1: Shrink cards into header
         const cardList = col.querySelector(".swimlane-card-list") as HTMLElement | null
         if (cardList) {
-            cardList.style.maxHeight = `${cardList.scrollHeight}px`
+            col.style.setProperty("--collapse-height", `${cardList.scrollHeight}px`)
             // Force reflow so the transition starts from the current height
             void cardList.offsetHeight
         }
@@ -793,7 +793,7 @@ export class SwimlaneView extends BasesView {
 
     private expandColumn(groupKey: GroupKey): void {
         const collapsed = this.collapsedSwimlanes
-        if (!collapsed.has(groupKey)) return
+        if (!collapsed.has(groupKey)) {return}
 
         collapsed.delete(groupKey)
         // Set before config write — config.set may trigger onDataUpdated → rebuildBoard synchronously
@@ -1368,46 +1368,26 @@ export class SwimlaneView extends BasesView {
             const expandedCol = board.querySelector(
                 `.swimlane-column[data-group-key="${CSS.escape(expandKey)}"]`,
             ) as HTMLElement | null
-            const expandedHeader = expandedCol?.querySelector(".swimlane-column-header") as HTMLElement | null
-            const expandedCardList = expandedCol?.querySelector(".swimlane-card-list") as HTMLElement | null
+            if (expandedCol) {
+                const expandedCardList = expandedCol.querySelector(".swimlane-card-list") as HTMLElement | null
+                const targetHeight = expandedCardList?.scrollHeight ?? 0
+                expandedCol.style.setProperty("--expand-height", `${targetHeight}px`)
+                expandedCol.classList.add("swimlane-column--expanding")
+                void expandedCol.offsetHeight
+                expandedCol.classList.add("swimlane-column--expanding-active")
 
-            // Phase 1: Fade in the header
-            if (expandedHeader) {
-                expandedHeader.style.opacity = "0"
-                expandedHeader.style.transition = "opacity 150ms ease-out"
-                void expandedHeader.offsetHeight
-                expandedHeader.style.opacity = "1"
-            }
-
-            // Phase 2: Expand the card list (delayed to start after header fades in)
-            if (expandedCardList) {
-                const targetHeight = expandedCardList.scrollHeight
-                expandedCardList.style.maxHeight = "0"
-                expandedCardList.style.opacity = "0"
-                expandedCardList.style.overflow = "hidden"
-                void expandedCardList.offsetHeight
-                setTimeout(() => {
-                    expandedCardList.style.transition = "max-height 200ms ease-out, opacity 200ms ease-out"
-                    expandedCardList.style.maxHeight = `${targetHeight}px`
-                    expandedCardList.style.opacity = "1"
-                    expandedCardList.addEventListener("transitionend", function handler(e) {
-                        if (e.target === expandedCardList && e.propertyName === "max-height") {
-                            expandedCardList.removeEventListener("transitionend", handler)
-                            expandedCardList.style.maxHeight = ""
-                            expandedCardList.style.opacity = ""
-                            expandedCardList.style.overflow = ""
-                            expandedCardList.style.transition = ""
-                        }
-                    })
-                }, 100) // Start after header begins fading in
-            }
-            if (expandedHeader) {
-                expandedHeader.addEventListener("transitionend", function handler(e) {
-                    if (e.target === expandedHeader && e.propertyName === "opacity") {
-                        expandedHeader.removeEventListener("transitionend", handler)
-                        expandedHeader.style.transition = ""
+                // Clean up classes after animation completes
+                const cleanup = () => {
+                    expandedCol.classList.remove("swimlane-column--expanding", "swimlane-column--expanding-active")
+                    expandedCol.style.removeProperty("--expand-height")
+                }
+                expandedCardList?.addEventListener("transitionend", function handler(e) {
+                    if (e.target === expandedCardList && e.propertyName === "max-height") {
+                        expandedCardList.removeEventListener("transitionend", handler)
+                        cleanup()
                     }
                 })
+                setTimeout(cleanup, 400) // fallback
             }
         }
     }
@@ -2515,12 +2495,12 @@ export class SwimlaneView extends BasesView {
             if (targetGroup) {
                 for (const entry of targetGroup.entries) {
                     const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
-                    if (r && (firstRank === null || r < firstRank)) firstRank = r
+                    if (r && (firstRank === null || r < firstRank)) {firstRank = r}
                 }
             }
             const newRank = midRank(null, firstRank)
             const file = this.app.vault.getFileByPath(dragState.path)
-            if (!file) return
+            if (!file) {return}
 
             const automationMuts = this.getAutomationMutations(
                 dragState.groupKey, context.groupKey, "enters",
