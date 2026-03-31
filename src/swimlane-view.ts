@@ -1126,6 +1126,15 @@ export class SwimlaneView extends BasesView {
                 cls: "swimlane-column-count",
                 text: String(group?.entries.length ?? 0),
             })
+            if (!this.isMobileLayout) {
+                const chevron = headerRight.createDiv({ cls: "swimlane-column-collapse-btn" })
+                setIcon(chevron, "chevron-left")
+                chevron.setAttribute("aria-label", "Collapse column")
+                chevron.addEventListener("click", (e) => {
+                    e.stopPropagation()
+                    this.toggleCollapsed(groupKey)
+                })
+            }
             const menuBtn = headerRight.createSpan({
                 cls: "swimlane-column-menu-btn",
                 attr: { "data-no-drag": "" },
@@ -1627,6 +1636,14 @@ export class SwimlaneView extends BasesView {
                 .setIcon("eye-off")
                 .onClick(() => this.hideColumn(groupKey))
         })
+
+        if (!this.isMobileLayout) {
+            menu.addItem(item => {
+                item.setTitle("Collapse")
+                    .setIcon("columns-2")
+                    .onClick(() => this.toggleCollapsed(groupKey))
+            })
+        }
 
         if (this.showAddColumn) {
             menu.addItem(item => {
