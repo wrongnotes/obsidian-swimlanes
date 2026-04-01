@@ -108,6 +108,9 @@
     opacity: 0.9;
     box-shadow: var(--shadow-l);
     cursor: grabbing;
+    /* Override min/max-width so the clone uses its inline width exactly */
+    min-width: unset !important;
+    max-width: unset !important;
 }
 
 .swimlane-drag-clone--dropping {
@@ -814,7 +817,7 @@
 }
 
 .swimlane-drag-and-drop--hidden {
-    display: none;
+    display: none !important;
 }
 
 /* Create base modal */
@@ -1521,6 +1524,11 @@
     cursor: default;
 }
 
+/* Hide mobile card menu button in selection mode */
+.swimlane-selecting .swimlane-card-menu-btn {
+    display: none;
+}
+
 /* ── Batch Tag Popover ── */
 .swimlane-batch-tag-popover {
     position: absolute;
@@ -1599,4 +1607,134 @@
     font-weight: var(--font-semibold);
     padding-bottom: 8px;
     border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* ── Collapsed Column Strip ── */
+.swimlane-column-collapsed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    flex-shrink: 0;
+    padding: var(--size-4-2) var(--size-4-1) var(--size-4-2);
+    background: var(--background-secondary);
+    border-radius: var(--radius-m);
+    cursor: grab;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── Collapse animation (two-phase on the full column) ── */
+.swimlane-column--collapsing .swimlane-card-list {
+    transition:
+        max-height 200ms ease-in,
+        opacity 150ms ease-in;
+    max-height: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.swimlane-column--collapsing .swimlane-add-card-btn,
+.swimlane-column--collapsing .swimlane-add-card-wrapper {
+    transition: opacity 150ms ease-in;
+    opacity: 0;
+}
+
+.swimlane-column--shrinking {
+    transition:
+        min-width 250ms ease-in-out,
+        max-width 250ms ease-in-out,
+        opacity 200ms ease-in;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    opacity: 0;
+    overflow: hidden;
+}
+
+/* ── Expand animation (header fade-in, then card list grows) ── */
+.swimlane-column--expanding .swimlane-column-header {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+}
+
+.swimlane-column--expanding .swimlane-card-list {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition:
+        max-height 200ms 100ms ease-out,
+        opacity 200ms 100ms ease-out;
+}
+
+.swimlane-column--expanding-active .swimlane-column-header {
+    opacity: 1;
+}
+
+.swimlane-column--expanding-active .swimlane-card-list {
+    max-height: var(--expand-height);
+    opacity: 1;
+}
+
+.swimlane-column-collapsed-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--size-2-1);
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.swimlane-column-collapsed-menu-btn svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+}
+
+.swimlane-column-collapsed-menu-btn:hover {
+    color: var(--text-muted);
+    background: var(--background-modifier-hover);
+}
+
+/* Override .swimlane-column-header styles inside collapsed strip */
+.swimlane-column-collapsed-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border-bottom: none;
+}
+
+.swimlane-column-collapsed:hover {
+    background: var(--background-modifier-hover);
+}
+
+.swimlane-column-collapsed-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    font-weight: var(--font-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: calc(100% - 40px);
+}
+
+.swimlane-column-collapsed-count {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    background: var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 2px 6px;
+    min-width: 20px;
+    text-align: center;
 }

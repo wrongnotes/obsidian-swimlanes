@@ -41,6 +41,8 @@ export interface CardRenderOptions {
     highlightColumn: (column: string) => void
     /** How to open a note: same-tab, new-tab, or new-pane. */
     openNoteBehavior: "same-tab" | "new-tab" | "new-pane"
+    /** Open a note file. If provided, overrides openNoteBehavior. */
+    openNote?: (file: TFile) => void
     /** When true, renders an inline menu button instead of relying on contextmenu. */
     mobile?: boolean
     /** Tags to render as chips below the title. Empty array or undefined = no tag row. */
@@ -238,6 +240,9 @@ export function renderCard(
 
     card.addEventListener("contextmenu", e => {
         e.preventDefault()
+        if (card.closest(".swimlane-selecting")) {
+            return
+        }
         showCardMenu({ x: e.clientX, y: e.clientY }, entry, app, options, card)
     })
 
@@ -473,14 +478,18 @@ function showCardMenu(
         item.setTitle("Open note")
             .setIcon("lucide-file-text")
             .onClick(() => {
-                const behavior = options.openNoteBehavior
-                const leaf =
-                    behavior === "new-pane"
-                        ? app.workspace.getLeaf("split")
-                        : behavior === "new-tab"
-                          ? app.workspace.getLeaf("tab")
-                          : app.workspace.getLeaf(false)
-                leaf.openFile(entry.file)
+                if (options.openNote) {
+                    options.openNote(entry.file)
+                } else {
+                    const behavior = options.openNoteBehavior
+                    const leaf =
+                        behavior === "new-pane"
+                            ? app.workspace.getLeaf("split")
+                            : behavior === "new-tab"
+                              ? app.workspace.getLeaf("tab")
+                              : app.workspace.getLeaf(false)
+                    leaf.openFile(entry.file)
+                }
             })
     })
 

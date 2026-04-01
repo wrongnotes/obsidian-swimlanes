@@ -82,6 +82,7 @@ const CONFIG_KEYS = {
     showAddCard: "showAddCard",
     showAddColumn: "showAddColumn",
     hiddenSwimlanes: "hiddenSwimlanes",
+    collapsedSwimlanes: "collapsedSwimlanes",
     forceMobileLayout: "forceMobileLayout",
     imageWidth: "imageWidth",
 } as const
@@ -147,6 +148,7 @@ export class SwimlaneView extends BasesView {
     private selectionManager: SelectionManager
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null
     private settingsDirty = false
+    private splitLeaf: import("obsidian").WorkspaceLeaf | null = null
 
     constructor(controller: QueryController, containerEl: HTMLElement, plugin: SwimlanePlugin) {
         super(controller)
@@ -187,7 +189,9 @@ export class SwimlaneView extends BasesView {
                 a.beforeRank === b.beforeRank &&
                 a.afterRank === b.afterRank,
             getDropTarget: (el, x, y, d) => this.getCardDropTarget(el, x, y, d),
-            onDrop: (state, context, position) => this.handleCardDrop(state, context, position),
+            onDrop: (state, context, position) => {
+                this.handleCardDrop(state, context, position)
+            },
             onDropSettle: () => {
                 if (this.boardEl.isConnected) {
                     this.rebuildBoard()
@@ -712,6 +716,112 @@ export class SwimlaneView extends BasesView {
         this.config.set(CONFIG_KEYS.hiddenSwimlanes, [...hidden])
     }
 
+    private get collapsedSwimlanes(): Set<GroupKey> {
+        const val = this.config.get(CONFIG_KEYS.collapsedSwimlanes)
+        if (!Array.isArray(val)) {
+            return new Set()
+        }
+        return new Set(val.filter((v): v is GroupKey => typeof v === "string"))
+    }
+
+    private setCollapsedSwimlanes(collapsed: Set<GroupKey>): void {
+        this.config.set(CONFIG_KEYS.collapsedSwimlanes, [...collapsed])
+    }
+
+    private toggleCollapsed(groupKey: GroupKey): void {
+        const collapsed = this.collapsedSwimlanes
+        if (collapsed.has(groupKey)) {
+            this.expandColumn(groupKey)
+            return
+        }
+
+        // Collapsing — animate first, then update config
+        const col = this.boardEl.querySelector(
+            `.swimlane-column[data-group-key="${CSS.escape(groupKey)}"]`,
+        ) as HTMLElement | null
+        if (!col) {
+            collapsed.add(groupKey)
+            this.setCollapsedSwimlanes(collapsed)
+            this.rebuildBoard()
+            return
+        }
+
+        // Phase 1: Shrink cards into header
+        const cardList = col.querySelector(".swimlane-card-list") as HTMLElement | null
+        if (cardList) {
+            col.style.setProperty("--collapse-height", `${cardList.scrollHeight}px`)
+            // Force reflow so the transition starts from the current height
+            void cardList.offsetHeight
+        }
+        col.classList.add("swimlane-column--collapsing")
+
+        const afterPhase1 = () => {
+            // Phase 2: Shrink column width
+            col.classList.add("swimlane-column--shrinking")
+
+            const afterPhase2 = () => {
+                collapsed.add(groupKey)
+                this.setCollapsedSwimlanes(collapsed)
+                this.rebuildBoard()
+            }
+
+            col.addEventListener("transitionend", function handler(e) {
+                if (e.target === col && e.propertyName === "min-width") {
+                    col.removeEventListener("transitionend", handler)
+                    afterPhase2()
+                }
+            })
+            // Fallback in case transitionend doesn't fire
+            setTimeout(afterPhase2, 300)
+        }
+
+        if (cardList) {
+            cardList.addEventListener("transitionend", function handler(e) {
+                if (e.target === cardList && e.propertyName === "max-height") {
+                    cardList.removeEventListener("transitionend", handler)
+                    afterPhase1()
+                }
+            })
+            // Fallback
+            setTimeout(afterPhase1, 250)
+        } else {
+            afterPhase1()
+        }
+    }
+
+    private expandingColumnKey: GroupKey | null = null
+
+    private expandColumn(groupKey: GroupKey): void {
+        const collapsed = this.collapsedSwimlanes
+        if (!collapsed.has(groupKey)) {
+            return
+        }
+
+        collapsed.delete(groupKey)
+        // Set before config write — config.set may trigger onDataUpdated → rebuildBoard synchronously
+        this.expandingColumnKey = groupKey
+        this.setCollapsedSwimlanes(collapsed)
+    }
+
+    private openNote(file: TFile): void {
+        const behavior = this.plugin.settings.openNoteBehavior
+        if (behavior === "new-pane") {
+            // Reuse the existing split leaf if it's still attached to the workspace
+            if (this.splitLeaf && (this.splitLeaf as any).containerEl?.isConnected) {
+                this.splitLeaf.openFile(file)
+                return
+            }
+            this.splitLeaf = this.app.workspace.getLeaf("split")
+            this.splitLeaf.openFile(file)
+        } else {
+            const leaf =
+                behavior === "new-tab"
+                    ? this.app.workspace.getLeaf("tab")
+                    : this.app.workspace.getLeaf(false)
+            leaf.openFile(file)
+        }
+    }
+
     private get cardPropertyAliases(): CardPropertyAlias[] {
         // Properties from Bases (Properties toolbar). Labels come from property names or formulas.
         const excluded = new Set([
@@ -934,6 +1044,7 @@ export class SwimlaneView extends BasesView {
         // groups from data that aren't in the configured order. Skip hidden columns.
         const order = this.swimlaneOrder
         const hidden = this.hiddenSwimlanes
+        const collapsed = this.collapsedSwimlanes
         const orderedKeys = (
             order.length > 0
                 ? [...order, ...[...groupByKey.keys()].filter(k => !order.includes(k))]
@@ -992,6 +1103,7 @@ export class SwimlaneView extends BasesView {
             swimlaneProp: this.swimlaneProp,
             highlightColumn: col => this.highlightColumn(col as GroupKey),
             openNoteBehavior: this.plugin.settings.openNoteBehavior,
+            openNote: file => this.openNote(file),
             mobile,
             resolveTagColor: (tag: string) => this.plugin.tagColorResolver.resolve(tag),
             onEditTags: (cardEl: HTMLElement) => {
@@ -1057,6 +1169,47 @@ export class SwimlaneView extends BasesView {
         }
 
         for (const groupKey of orderedKeys) {
+            if (collapsed.has(groupKey) && !this.isMobileLayout) {
+                const entries = groupByKey.get(groupKey)?.entries ?? []
+                const strip = board.createDiv({ cls: "swimlane-column swimlane-column-collapsed" })
+                strip.dataset.groupKey = groupKey
+                strip.setAttribute("aria-label", groupKey)
+                strip.setAttribute("title", groupKey)
+
+                // Menu button at the top
+                const menuBtn = strip.createSpan({
+                    cls: "swimlane-column-collapsed-menu-btn",
+                    attr: { "data-no-drag": "", "aria-label": "Column menu" },
+                })
+                setIcon(menuBtn, "more-vertical")
+                menuBtn.addEventListener("click", e => {
+                    e.stopPropagation()
+                    this.showColumnMenu(menuBtn, board, groupKey, entries.length, orderedKeys)
+                })
+
+                // Inner wrapper acts as drag handle (swimlaneDnd requires .swimlane-column-header)
+                const inner = strip.createDiv({
+                    cls: "swimlane-column-header swimlane-column-collapsed-inner",
+                })
+
+                const label = inner.createDiv({ cls: "swimlane-column-collapsed-label" })
+                label.textContent = groupKey
+
+                const count = inner.createDiv({ cls: "swimlane-column-collapsed-count" })
+                count.textContent = String(entries.length)
+
+                // Register as drop area for dwell-to-expand during drag
+                if (!this.selectionManager.active) {
+                    this.cardDnd.registerDropArea(strip, { groupKey, collapsed: true } as any)
+                }
+                // Register for column reordering
+                if (!mobile && !this.selectionManager.active) {
+                    this.swimlaneDnd.registerDraggable(strip, { groupKey })
+                }
+
+                continue
+            }
+
             const group = groupByKey.get(groupKey) ?? null
             const label = groupKey || "(No value)"
             const col = board.createDiv({ cls: "swimlane-column" })
@@ -1211,6 +1364,41 @@ export class SwimlaneView extends BasesView {
 
         this.applyPendingHighlight()
         this.expandingCardPath = null
+
+        // Phase 2 of expand animation: card list grows in
+        if (this.expandingColumnKey) {
+            const expandKey = this.expandingColumnKey
+            this.expandingColumnKey = null
+            const expandedCol = board.querySelector(
+                `.swimlane-column[data-group-key="${CSS.escape(expandKey)}"]`,
+            ) as HTMLElement | null
+            if (expandedCol) {
+                const expandedCardList = expandedCol.querySelector(
+                    ".swimlane-card-list",
+                ) as HTMLElement | null
+                const targetHeight = expandedCardList?.scrollHeight ?? 0
+                expandedCol.style.setProperty("--expand-height", `${targetHeight}px`)
+                expandedCol.classList.add("swimlane-column--expanding")
+                void expandedCol.offsetHeight
+                expandedCol.classList.add("swimlane-column--expanding-active")
+
+                // Clean up classes after animation completes
+                const cleanup = () => {
+                    expandedCol.classList.remove(
+                        "swimlane-column--expanding",
+                        "swimlane-column--expanding-active",
+                    )
+                    expandedCol.style.removeProperty("--expand-height")
+                }
+                expandedCardList?.addEventListener("transitionend", function handler(e) {
+                    if (e.target === expandedCardList && e.propertyName === "max-height") {
+                        expandedCardList.removeEventListener("transitionend", handler)
+                        cleanup()
+                    }
+                })
+                setTimeout(cleanup, 400) // fallback
+            }
+        }
     }
 
     private renderAddCardButton(columnEl: HTMLElement, groupKey: GroupKey): void {
@@ -1570,6 +1758,15 @@ export class SwimlaneView extends BasesView {
                 .setIcon("eye-off")
                 .onClick(() => this.hideColumn(groupKey))
         })
+
+        if (!this.isMobileLayout) {
+            const isCollapsed = this.collapsedSwimlanes.has(groupKey)
+            menu.addItem(item => {
+                item.setTitle(isCollapsed ? "Expand" : "Collapse")
+                    .setIcon(isCollapsed ? "columns-2" : "columns-2")
+                    .onClick(() => this.toggleCollapsed(groupKey))
+            })
+        }
 
         if (this.showAddColumn) {
             menu.addItem(item => {
@@ -2294,6 +2491,58 @@ export class SwimlaneView extends BasesView {
 
         if (context.groupKey === ADD_COLUMN_DROP_KEY) {
             this.handleCardDropOnNewColumn(dragState)
+            return
+        }
+
+        // Drop onto a collapsed column — insert at top
+        if ((context as any).collapsed) {
+            const targetGroup = this.data.groupedData.find(g => String(g.key) === context.groupKey)
+            // Find the first rank in the target column to insert before it
+            let firstRank: string | null = null
+            if (targetGroup) {
+                for (const entry of targetGroup.entries) {
+                    const r = getFrontmatter<string>(this.app, entry.file, this.rankProp)
+                    if (r && (firstRank === null || r < firstRank)) {
+                        firstRank = r
+                    }
+                }
+            }
+            const newRank = midRank(null, firstRank)
+            const file = this.app.vault.getFileByPath(dragState.path)
+            if (!file) {
+                return
+            }
+
+            const automationMuts = this.getAutomationMutations(
+                dragState.groupKey,
+                context.groupKey,
+                "enters",
+            )
+            const previousValues: Record<string, unknown> = {}
+            for (const m of automationMuts) {
+                previousValues[m.property] = getFrontmatter(this.app, file, m.property)
+            }
+
+            this.undoManager.beginTransaction("Move card")
+            this.undoManager.pushOperation({
+                type: "MoveCard",
+                file,
+                fromSwimlane: dragState.groupKey,
+                toSwimlane: context.groupKey,
+                fromRank: getFrontmatter<string>(this.app, file, this.rankProp) ?? "",
+                toRank: newRank,
+                resolvedAutomationMutations: automationMuts,
+                automationPreviousValues: previousValues,
+            })
+            this.undoManager.endTransaction()
+
+            this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+                fm[this.swimlaneProp] = context.groupKey
+                fm[this.rankProp] = newRank
+                for (const m of automationMuts) {
+                    fm[m.property] = m.value
+                }
+            })
             return
         }
 
